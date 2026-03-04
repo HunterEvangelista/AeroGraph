@@ -1,0 +1,40 @@
+{
+  "name": "@kioku/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "kioku": "./bin/kioku"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "bun run ./src/index.ts",
+    "lint": "biome check src/",
+    "lint:fix": "biome check --write src/",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@effect/cli": "^0.49.3",
+    "@effect/platform": "^0.70.6",
+    "@effect/platform-bun": "^0.51.6",
+    "@kioku/core": "workspace:*",
+    "effect": "^3.11.9"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "^1.1.14",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
