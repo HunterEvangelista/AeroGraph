@@ -1,112 +1,122 @@
-/**
- * Entity domain models
- * Core data structures for the knowledge graph
- */
-import { Schema } from "effect"
+import { Schema } from "effect";
 
 // ============================================================================
 // Entity Types
 // ============================================================================
 
-export const EntityType = Schema.Literal("doc", "code_ref", "story", "diagram")
-export type EntityType = typeof EntityType.Type
+export enum EntityTypeEnum {
+  Doc = "doc",
+  CodeRef = "code_ref",
+  Story = "story",
+  Diagram = "diagram",
+}
+
+export const EntityType = Schema.Enums(EntityTypeEnum);
+export type EntityType = typeof EntityType.Type;
 
 // ============================================================================
 // Story Status & Priority
 // ============================================================================
 
-export const StoryStatus = Schema.Literal("backlog", "todo", "in_progress", "done", "cancelled")
-export type StoryStatus = typeof StoryStatus.Type
+export enum StoryStatusEnum {
+  Backlog = "backlog",
+  Todo = "todo",
+  InProgress = "in_progress",
+  Done = "done",
+  Cancelled = "cancelled",
+}
 
-export const Priority = Schema.Literal("low", "medium", "high", "urgent")
-export type Priority = typeof Priority.Type
+export const StoryStatus = Schema.Enums(StoryStatusEnum);
+export type StoryStatus = typeof StoryStatus.Type;
+
+export enum PriorityEnum {
+  Low = "low",
+  Medium = "medium",
+  High = "high",
+  Urgent = "urgent",
+}
+
+export const Priority = Schema.Enums(PriorityEnum);
+export type Priority = typeof Priority.Type;
 
 // ============================================================================
 // Diagram Types
 // ============================================================================
 
-export const DiagramType = Schema.Literal("flowchart", "sequence", "erd", "classDiagram", "other")
-export type DiagramType = typeof DiagramType.Type
+export enum DiagramTypeEnum {
+  Flowchart = "flowchart",
+  Sequence = "sequence",
+  Erd = "erd",
+  ClassDiagram = "classDiagram",
+  Other = "other",
+}
+
+export const DiagramType = Schema.Enums(DiagramTypeEnum);
+export type DiagramType = typeof DiagramType.Type;
 
 // ============================================================================
-// Base Entity Schema
+// Base Entity Schema (untagged)
 // ============================================================================
 
-export const BaseEntity = Schema.Struct({
-  id: Schema.String.pipe(Schema.brand("EntityId")),
-  type: EntityType,
+export const BrandedId = Schema.String.pipe(Schema.brand("EntityId"));
+
+const BaseEntityFields = {
+  id: BrandedId,
   title: Schema.String.pipe(Schema.nonEmptyString()),
   content: Schema.String,
   tags: Schema.Array(Schema.String),
   createdAt: Schema.Date,
   updatedAt: Schema.Date,
   version: Schema.Number.pipe(Schema.int(), Schema.positive()),
-})
+};
 
-export type BaseEntity = typeof BaseEntity.Type
-export type EntityId = (typeof BaseEntity.Type)["id"]
+export const BaseEntity = Schema.Struct(BaseEntityFields);
 
-// ============================================================================
-// Document Entity
-// ============================================================================
-
-export const Doc = Schema.Struct({
-  ...BaseEntity.fields,
-  type: Schema.Literal("doc"),
-})
-
-export type Doc = typeof Doc.Type
+export type BaseEntity = typeof BaseEntity.Type;
+export type EntityId = (typeof BaseEntity.Type)["id"];
 
 // ============================================================================
-// Code Reference Entity
+// Untagged Entity Variants
 // ============================================================================
 
-export const CodeRef = Schema.Struct({
-  ...BaseEntity.fields,
-  type: Schema.Literal("code_ref"),
+export const Doc = Schema.TaggedStruct(EntityTypeEnum.Doc, {
+  ...BaseEntityFields,
+});
+export type Doc = typeof Doc.Type;
+
+export const CodeRef = Schema.TaggedStruct(EntityTypeEnum.CodeRef, {
+  ...BaseEntityFields,
   repoPath: Schema.String,
   filePath: Schema.String.pipe(Schema.nonEmptyString()),
   startLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
   endLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
   commitHash: Schema.optional(Schema.String),
-})
+});
+export type CodeRef = typeof CodeRef.Type;
 
-export type CodeRef = typeof CodeRef.Type
-
-// ============================================================================
-// Story Entity
-// ============================================================================
-
-export const Story = Schema.Struct({
-  ...BaseEntity.fields,
-  type: Schema.Literal("story"),
+export const Story = Schema.TaggedStruct(EntityTypeEnum.Story, {
+  ...BaseEntityFields,
   status: StoryStatus,
   priority: Schema.optional(Priority),
   parentId: Schema.optional(Schema.String),
-})
+});
+export type Story = typeof Story.Type;
 
-export type Story = typeof Story.Type
-
-// ============================================================================
-// Diagram Entity
-// ============================================================================
-
-export const Diagram = Schema.Struct({
-  ...BaseEntity.fields,
-  type: Schema.Literal("diagram"),
+export const Diagram = Schema.TaggedStruct(EntityTypeEnum.Diagram, {
+  ...BaseEntityFields,
   diagramType: DiagramType,
   source: Schema.String,
   generatedFrom: Schema.optional(Schema.Array(Schema.String)),
-})
-
-export type Diagram = typeof Diagram.Type
+});
+export type Diagram = typeof Diagram.Type;
 
 // ============================================================================
-// Entity Union
+// Entity Unions
 // ============================================================================
 
-export const Entity = Schema.Union(Doc, CodeRef, Story, Diagram)
-export type Entity = typeof Entity.Type
+export const Entity = Schema.Union(Doc, CodeRef, Story, Diagram);
+export type Entity = typeof Entity.Type;
+
 
 // ============================================================================
 // Entity Creation Inputs (without auto-generated fields)
@@ -116,9 +126,9 @@ export const CreateDocInput = Schema.Struct({
   title: Schema.String.pipe(Schema.nonEmptyString()),
   content: Schema.String,
   tags: Schema.optional(Schema.Array(Schema.String)),
-})
+});
 
-export type CreateDocInput = typeof CreateDocInput.Type
+export type CreateDocInput = typeof CreateDocInput.Type;
 
 export const CreateCodeRefInput = Schema.Struct({
   title: Schema.String.pipe(Schema.nonEmptyString()),
@@ -129,9 +139,9 @@ export const CreateCodeRefInput = Schema.Struct({
   startLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
   endLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
   commitHash: Schema.optional(Schema.String),
-})
+});
 
-export type CreateCodeRefInput = typeof CreateCodeRefInput.Type
+export type CreateCodeRefInput = typeof CreateCodeRefInput.Type;
 
 export const CreateStoryInput = Schema.Struct({
   title: Schema.String.pipe(Schema.nonEmptyString()),
@@ -140,9 +150,9 @@ export const CreateStoryInput = Schema.Struct({
   status: Schema.optional(StoryStatus),
   priority: Schema.optional(Priority),
   parentId: Schema.optional(Schema.String),
-})
+});
 
-export type CreateStoryInput = typeof CreateStoryInput.Type
+export type CreateStoryInput = typeof CreateStoryInput.Type;
 
 export const CreateDiagramInput = Schema.Struct({
   title: Schema.String.pipe(Schema.nonEmptyString()),
@@ -151,6 +161,6 @@ export const CreateDiagramInput = Schema.Struct({
   diagramType: DiagramType,
   source: Schema.String,
   generatedFrom: Schema.optional(Schema.Array(Schema.String)),
-})
+});
 
-export type CreateDiagramInput = typeof CreateDiagramInput.Type
+export type CreateDiagramInput = typeof CreateDiagramInput.Type;

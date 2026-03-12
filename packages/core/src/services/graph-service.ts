@@ -3,7 +3,7 @@
  * Graph traversal algorithms and relationship queries
  */
 import { Context, Effect, Layer } from "effect"
-import type { Entity } from "../domain/entity.js"
+import { type Entity, EntityTypeEnum } from "../domain/entity.js"
 import type { Link, LinkType } from "../domain/link.js"
 import type { EntityNotFoundError, RepositoryError } from "../errors.js"
 import { EntityRepositoryTag } from "../repository/entity-repository.js"
@@ -176,7 +176,12 @@ export const GraphServiceLive = Layer.effect(
         ])
 
         const entitiesByType: Record<string, number> = {}
-        for (const type of ["doc", "code_ref", "story", "diagram"] as const) {
+        for (const type of [
+          EntityTypeEnum.Doc,
+          EntityTypeEnum.CodeRef,
+          EntityTypeEnum.Story,
+          EntityTypeEnum.Diagram,
+        ] as const) {
           entitiesByType[type] = yield* entityRepo.count(type)
         }
 
