@@ -17,7 +17,7 @@ Establish deterministic, high-signal tests for the core graph platform before Ph
 
 | Module | Primary assertions |
 |---|---|
-| `entity.ts` | Valid + invalid decode paths for doc/code_ref/story/diagram |
+| ~~`entity.ts`~~ | ~~Valid + invalid decode paths for doc/code_ref/story/diagram~~|
 | `tag.ts` | Optional field handling and invalid inputs |
 | `link.ts` | All `LinkType` values + inverse mapping correctness |
 | `version.ts` | Version/change type validation and edge constraints |
