@@ -12,12 +12,16 @@ export {
   CreateStoryInput,
   Diagram,
   DiagramType,
+  DiagramTypeEnum,
   Doc,
   Entity,
   EntityType,
+  EntityTypeEnum,
   Priority,
+  PriorityEnum,
   Story,
   StoryStatus,
+  StoryStatusEnum,
 } from "./entity.js"
 export type { EntityId } from "./entity.js"
 

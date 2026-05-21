@@ -11,7 +11,9 @@ import {
   EntityNotFoundError,
   type EntityRepository,
   EntityRepositoryTag,
+  EntityTypeEnum,
   type EntityType,
+  StoryStatusEnum,
   RepositoryError,
   type Story,
 } from "@kioku/core"
@@ -54,11 +56,11 @@ const rowToEntity = (row: EntityRow): Entity => {
 
   switch (row.type) {
     case "doc":
-      return { ...base, type: "doc" } as Doc
+      return { ...base, _tag: EntityTypeEnum.Doc } as Doc
     case "code_ref":
       return {
         ...base,
-        type: "code_ref",
+        _tag: EntityTypeEnum.CodeRef,
         repoPath: metadata.repoPath ?? "",
         filePath: metadata.filePath ?? "",
         startLine: metadata.startLine,
@@ -68,15 +70,15 @@ const rowToEntity = (row: EntityRow): Entity => {
     case "story":
       return {
         ...base,
-        type: "story",
-        status: metadata.status ?? "backlog",
+        _tag: EntityTypeEnum.Story,
+        status: metadata.status ?? StoryStatusEnum.Backlog,
         priority: metadata.priority,
         parentId: metadata.parentId,
       } as Story
     case "diagram":
       return {
         ...base,
-        type: "diagram",
+        _tag: EntityTypeEnum.Diagram,
         diagramType: metadata.diagramType ?? "other",
         source: metadata.source ?? "",
         generatedFrom: metadata.generatedFrom,
@@ -311,7 +313,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
 
         // Merge metadata based on type
         let newMetadata: string | null = null
-        if (existing.type === "code_ref") {
+        if (existing._tag === EntityTypeEnum.CodeRef) {
           const codeRef = existing as CodeRef
           const codeUpdates = updates as Partial<CodeRef>
           newMetadata = JSON.stringify({
@@ -321,7 +323,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             endLine: codeUpdates.endLine ?? codeRef.endLine,
             commitHash: codeUpdates.commitHash ?? codeRef.commitHash,
           })
-        } else if (existing.type === "story") {
+        } else if (existing._tag === EntityTypeEnum.Story) {
           const story = existing as Story
           const storyUpdates = updates as Partial<Story>
           newMetadata = JSON.stringify({
@@ -329,7 +331,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             priority: storyUpdates.priority ?? story.priority,
             parentId: storyUpdates.parentId ?? story.parentId,
           })
-        } else if (existing.type === "diagram") {
+        } else if (existing._tag === EntityTypeEnum.Diagram) {
           const diagram = existing as Diagram
           const diagramUpdates = updates as Partial<Diagram>
           newMetadata = JSON.stringify({

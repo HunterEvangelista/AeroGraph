@@ -1,0 +1,19 @@
+/**
+ * SQLite repository and application layer bundles
+ */
+import { CoreServicesLive } from "@kioku/core"
+import { Layer } from "effect"
+import { DatabaseClientLive } from "./client.js"
+import { SqliteEntityRepositoryLive } from "./entity-repository.js"
+import { SqliteLinkRepositoryLive } from "./link-repository.js"
+import { SqliteTagRepositoryLive } from "./tag-repository.js"
+
+export const SqliteRepositoriesLive = (dbPath: string) =>
+  Layer.mergeAll(
+    SqliteEntityRepositoryLive,
+    SqliteTagRepositoryLive,
+    SqliteLinkRepositoryLive
+  ).pipe(Layer.provide(DatabaseClientLive(dbPath)))
+
+export const CliCoreLive = (dbPath: string) =>
+  CoreServicesLive.pipe(Layer.provide(SqliteRepositoriesLive(dbPath)))
