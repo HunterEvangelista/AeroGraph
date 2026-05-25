@@ -14,7 +14,7 @@ export const TagServiceLive = Layer.effect(
 
     const ensureHierarchy = (tagPath: string) =>
       Effect.gen(function* () {
-        const parts = tagPath.split("/")
+        const parts = tagPath.split("/").filter((part) => part)
         let parentId: string | undefined
         let currentTag: Tag | undefined
 
