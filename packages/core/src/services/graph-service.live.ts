@@ -116,7 +116,7 @@ export const GraphServiceLive = Layer.effect(
         const parentMap = new Map<string, string>()
         let queue = [sourceId]
 
-        for (let depth = 0; depth < maxDepth && queue.length > 0; depth++) {
+        for (let depth = 0; depth <= maxDepth && queue.length > 0; depth++) {
           const nextQueue: string[] = []
 
           for (const currentId of queue) {
