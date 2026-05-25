@@ -26,8 +26,10 @@ import type { LinkRepository } from "../repository/link-repository.js";
 import { LinkRepositoryTag } from "../repository/link-repository.js";
 import type { TagRepository } from "../repository/tag-repository.js";
 import { TagRepositoryTag } from "../repository/tag-repository.js";
-import { GraphServiceLive, GraphServiceTag } from "../services/graph-service.js";
-import { TagServiceLive, TagServiceTag } from "../services/tag-service.js";
+import { GraphServiceTag } from "../services/graph-service.js";
+import { GraphServiceLive } from "../services/graph-service.live.js";
+import { TagServiceTag } from "../services/tag-service.js";
+import { TagServiceLive } from "../services/tag-service.live.js";
 import { FIXED_TIMESTAMP_ISO } from "./helpers/index.js";
 
 // ============================================================================

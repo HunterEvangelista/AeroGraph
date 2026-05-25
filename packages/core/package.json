@@ -20,6 +20,10 @@
     "./services": {
       "import": "./dist/services/index.js",
       "types": "./dist/services/index.d.ts"
+    },
+    "./layers": {
+      "import": "./dist/layers/index.js",
+      "types": "./dist/layers/index.d.ts"
     }
   },
   "scripts": {

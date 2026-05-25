@@ -3,15 +3,10 @@
  * Display workspace and graph statistics
  */
 import { Command } from "@effect/cli"
-import { GraphServiceLive, GraphServiceTag } from "@kioku/core"
-import { Console, Effect, Layer } from "effect"
+import { GraphServiceTag } from "@kioku/core"
+import { Console, Effect } from "effect"
 import { ConfigServiceTag } from "../config.js"
-import {
-  DatabaseClientLive,
-  SqliteEntityRepositoryLive,
-  SqliteLinkRepositoryLive,
-  SqliteTagRepositoryLive,
-} from "../db/index.js"
+import { CliCoreLive } from "../db/index.js"
 
 export const statusCommand = Command.make("status", {}, () =>
   Effect.gen(function* () {
@@ -28,21 +23,13 @@ export const statusCommand = Command.make("status", {}, () =>
     yield* Console.log(`Created:  ${workspace.config.createdAt}`)
     yield* Console.log("")
 
-    // Create repository layers
-    const DbLayer = DatabaseClientLive(workspace.dbPath)
-    const RepoLayers = Layer.mergeAll(
-      SqliteEntityRepositoryLive,
-      SqliteTagRepositoryLive,
-      SqliteLinkRepositoryLive
-    ).pipe(Layer.provide(DbLayer))
-
-    const GraphLayer = GraphServiceLive.pipe(Layer.provide(RepoLayers))
+    const ServiceLayer = CliCoreLive(workspace.dbPath)
 
     const stats = yield* Effect.scoped(
       Effect.gen(function* () {
         const graphService = yield* GraphServiceTag
         return yield* graphService.getStats()
-      }).pipe(Effect.provide(GraphLayer))
+      }).pipe(Effect.provide(ServiceLayer))
     )
 
     yield* Console.log("Graph Statistics")

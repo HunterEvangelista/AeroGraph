@@ -1,8 +1,8 @@
 /**
  * Tag Service
- * Business logic layer for tag operations
+ * Business logic layer for tag operations contract
  */
-import { Context, Effect, Layer } from "effect"
+import { Context, type Effect } from "effect"
 import type { CreateTagInput, Tag, TagId, UpdateTagInput } from "../domain/tag.js"
 import {
   type EntityNotFoundError,
@@ -10,7 +10,6 @@ import {
   type TagNotFoundError,
   ValidationError,
 } from "../errors.js"
-import { TagRepositoryTag } from "../repository/tag-repository.js"
 
 // ============================================================================
 // Tag Service Interface
@@ -70,70 +69,3 @@ export interface TagService {
 // ============================================================================
 
 export class TagServiceTag extends Context.Tag("TagService")<TagServiceTag, TagService>() {}
-
-// ============================================================================
-// Tag Service Implementation
-// ============================================================================
-
-export const TagServiceLive = Layer.effect(
-  TagServiceTag,
-  Effect.gen(function* () {
-    const repo = yield* TagRepositoryTag
-
-    const ensureHierarchy = (tagPath: string) =>
-      Effect.gen(function* () {
-        const parts = tagPath.split("/")
-        let parentId: string | undefined
-        let currentTag: Tag | undefined
-
-        for (let i = 0; i < parts.length; i++) {
-          const part = parts[i]
-          if (!part) continue
-
-          const tagId = parts.slice(0, i + 1).join("/")
-
-          // Try to get existing tag
-          const existingTag = yield* Effect.either(repo.getById(tagId as TagId))
-
-          if (existingTag._tag === "Right") {
-            currentTag = existingTag.right
-            parentId = tagId
-          } else {
-            // Create the tag
-            currentTag = yield* repo.create({
-              id: tagId,
-              name: part,
-              parentId,
-            })
-            parentId = tagId
-          }
-        }
-
-        if (!currentTag) {
-          return yield* Effect.fail(
-            new ValidationError({
-              message: `Invalid tag path: ${tagPath}`,
-            })
-          )
-        }
-
-        return currentTag
-      })
-
-    return {
-      create: (input) => repo.create(input),
-      getById: (id) => repo.getById(id),
-      getAll: () => repo.getAll(),
-      getChildren: (parentId) => repo.getChildren(parentId),
-      getAncestors: (id) => repo.getAncestors(id),
-      update: (id, updates) => repo.update(id, updates),
-      delete: (id) => repo.delete(id),
-      applyToEntity: (tagId, entityId) => repo.applyToEntity(tagId, entityId),
-      removeFromEntity: (tagId, entityId) => repo.removeFromEntity(tagId, entityId),
-      getTagsForEntity: (entityId) => repo.getTagsForEntity(entityId),
-      search: (query) => repo.search(query),
-      count: () => repo.count(),
-      ensureHierarchy,
-    } satisfies TagService
-  })
-)

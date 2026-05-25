@@ -3,30 +3,10 @@
  * Operations for managing tags and entity tagging
  */
 import { Args, Command, Options } from "@effect/cli"
-import { type TagId, TagServiceLive, TagServiceTag } from "@kioku/core"
-import { Console, Effect, Layer, Option } from "effect"
+import { type TagId, TagServiceTag } from "@kioku/core"
+import { Console, Effect, Option } from "effect"
 import { ConfigServiceTag } from "../config.js"
-import {
-  DatabaseClientLive,
-  SqliteEntityRepositoryLive,
-  SqliteLinkRepositoryLive,
-  SqliteTagRepositoryLive,
-} from "../db/index.js"
-
-// ============================================================================
-// Helper: Create service layers from workspace
-// ============================================================================
-
-const makeServiceLayers = (dbPath: string) => {
-  const DbLayer = DatabaseClientLive(dbPath)
-  const RepoLayers = Layer.mergeAll(
-    SqliteEntityRepositoryLive,
-    SqliteTagRepositoryLive,
-    SqliteLinkRepositoryLive
-  ).pipe(Layer.provide(DbLayer))
-
-  return TagServiceLive.pipe(Layer.provide(RepoLayers))
-}
+import { CliCoreLive } from "../db/index.js"
 
 // ============================================================================
 // Tag Create Command
@@ -51,7 +31,7 @@ const tagCreateCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag
       const workspace = yield* configService.load()
-      const ServiceLayers = makeServiceLayers(workspace.dbPath)
+      const ServiceLayers = CliCoreLive(workspace.dbPath)
 
       const parentValue = Option.getOrUndefined(parent)
       const descValue = Option.getOrUndefined(description)
@@ -122,7 +102,7 @@ const tagListCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag
       const workspace = yield* configService.load()
-      const ServiceLayers = makeServiceLayers(workspace.dbPath)
+      const ServiceLayers = CliCoreLive(workspace.dbPath)
 
       const searchValue = Option.getOrUndefined(search)
 
@@ -216,7 +196,7 @@ const tagApplyCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag
       const workspace = yield* configService.load()
-      const ServiceLayers = makeServiceLayers(workspace.dbPath)
+      const ServiceLayers = CliCoreLive(workspace.dbPath)
 
       yield* Effect.scoped(
         Effect.gen(function* () {
@@ -267,7 +247,7 @@ const tagRemoveCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag
       const workspace = yield* configService.load()
-      const ServiceLayers = makeServiceLayers(workspace.dbPath)
+      const ServiceLayers = CliCoreLive(workspace.dbPath)
 
       yield* Effect.scoped(
         Effect.gen(function* () {
@@ -310,7 +290,7 @@ const tagShowCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag
       const workspace = yield* configService.load()
-      const ServiceLayers = makeServiceLayers(workspace.dbPath)
+      const ServiceLayers = CliCoreLive(workspace.dbPath)
 
       const { tag, ancestors, children } = yield* Effect.scoped(
         Effect.gen(function* () {
@@ -385,7 +365,7 @@ const tagDeleteCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag
       const workspace = yield* configService.load()
-      const ServiceLayers = makeServiceLayers(workspace.dbPath)
+      const ServiceLayers = CliCoreLive(workspace.dbPath)
 
       yield* Effect.scoped(
         Effect.gen(function* () {
