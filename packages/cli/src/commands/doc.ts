@@ -3,15 +3,10 @@
  * CRUD operations for document entities
  */
 import { Args, Command, Options } from "@effect/cli"
-import { EntityServiceLive, EntityServiceTag, TagServiceLive, TagServiceTag } from "@kioku/core"
-import { Console, Data, Effect, Layer, Option } from "effect"
+import { EntityServiceTag, EntityTypeEnum, TagServiceTag } from "@kioku/core"
+import { Console, Data, Effect, Option } from "effect"
 import { ConfigServiceTag } from "../config.js"
-import {
-  DatabaseClientLive,
-  SqliteEntityRepositoryLive,
-  SqliteLinkRepositoryLive,
-  SqliteTagRepositoryLive,
-} from "../db/index.js"
+import { CliCoreLive } from "../db/index.js"
 
 // ============================================================================
 // Custom Error Types
@@ -22,24 +17,6 @@ class NotADocError extends Data.TaggedError("NotADocError")<{
 }> {}
 
 class NoUpdatesError extends Data.TaggedError("NoUpdatesError")<object> {}
-
-// ============================================================================
-// Helper: Create service layers from workspace
-// ============================================================================
-
-const makeServiceLayers = (dbPath: string) => {
-  const DbLayer = DatabaseClientLive(dbPath)
-  const RepoLayers = Layer.mergeAll(
-    SqliteEntityRepositoryLive,
-    SqliteTagRepositoryLive,
-    SqliteLinkRepositoryLive
-  ).pipe(Layer.provide(DbLayer))
-
-  return Layer.mergeAll(
-    EntityServiceLive.pipe(Layer.provide(RepoLayers)),
-    TagServiceLive.pipe(Layer.provide(RepoLayers))
-  )
-}
 
 // ============================================================================
 // Doc Create Command
@@ -64,7 +41,7 @@ const docCreateCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag
       const workspace = yield* configService.load()
-      const ServiceLayers = makeServiceLayers(workspace.dbPath)
+      const ServiceLayers = CliCoreLive(workspace.dbPath)
 
       const doc = yield* Effect.scoped(
         Effect.gen(function* () {
@@ -124,7 +101,7 @@ const docShowCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag
       const workspace = yield* configService.load()
-      const ServiceLayers = makeServiceLayers(workspace.dbPath)
+      const ServiceLayers = CliCoreLive(workspace.dbPath)
 
       const { doc, tags } = yield* Effect.scoped(
         Effect.gen(function* () {
@@ -135,7 +112,7 @@ const docShowCommand = Command.make(
             id as Parameters<typeof entityService.getById>[0]
           )
 
-          if (entity.type !== "doc") {
+          if (entity._tag !== EntityTypeEnum.Doc) {
             return yield* Effect.fail(new NotADocError({ id }))
           }
 
@@ -198,7 +175,7 @@ const docListCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag
       const workspace = yield* configService.load()
-      const ServiceLayers = makeServiceLayers(workspace.dbPath)
+      const ServiceLayers = CliCoreLive(workspace.dbPath)
 
       const docs = yield* Effect.scoped(
         Effect.gen(function* () {
@@ -209,15 +186,15 @@ const docListCommand = Command.make(
 
           if (searchValue) {
             const results = yield* entityService.search(searchValue)
-            return results.filter((e) => e.type === "doc")
+            return results.filter((e) => e._tag === EntityTypeEnum.Doc)
           }
 
           if (tagValue) {
             const results = yield* entityService.getByTag(tagValue)
-            return results.filter((e) => e.type === "doc")
+            return results.filter((e) => e._tag === EntityTypeEnum.Doc)
           }
 
-          return yield* entityService.getAll("doc")
+          return yield* entityService.getAll(EntityTypeEnum.Doc)
         }).pipe(Effect.provide(ServiceLayers))
       )
 
@@ -269,7 +246,7 @@ const docEditCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag
       const workspace = yield* configService.load()
-      const ServiceLayers = makeServiceLayers(workspace.dbPath)
+      const ServiceLayers = CliCoreLive(workspace.dbPath)
 
       const titleValue = Option.getOrUndefined(title)
       const contentValue = Option.getOrUndefined(content)
@@ -287,7 +264,7 @@ const docEditCommand = Command.make(
             id as Parameters<typeof entityService.getById>[0]
           )
 
-          if (existing.type !== "doc") {
+          if (existing._tag !== EntityTypeEnum.Doc) {
             return yield* Effect.fail(new NotADocError({ id }))
           }
 
@@ -341,7 +318,7 @@ const docDeleteCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag
       const workspace = yield* configService.load()
-      const ServiceLayers = makeServiceLayers(workspace.dbPath)
+      const ServiceLayers = CliCoreLive(workspace.dbPath)
 
       yield* Effect.scoped(
         Effect.gen(function* () {
@@ -352,7 +329,7 @@ const docDeleteCommand = Command.make(
             id as Parameters<typeof entityService.getById>[0]
           )
 
-          if (existing.type !== "doc") {
+          if (existing._tag !== EntityTypeEnum.Doc) {
             return yield* Effect.fail(new NotADocError({ id }))
           }
 

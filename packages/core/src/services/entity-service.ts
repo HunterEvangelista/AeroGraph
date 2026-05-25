@@ -1,8 +1,8 @@
 /**
  * Entity Service
- * Business logic layer for entity operations
+ * Business logic layer for entity operations contract
  */
-import { Context, Effect, Layer } from "effect"
+import { Context, type Effect } from "effect"
 import type {
   CodeRef,
   CreateCodeRefInput,
@@ -17,7 +17,6 @@ import type {
   Story,
 } from "../domain/entity.js"
 import type { EntityNotFoundError, RepositoryError, ValidationError } from "../errors.js"
-import { EntityRepositoryTag } from "../repository/entity-repository.js"
 
 // ============================================================================
 // Entity Service Interface
@@ -66,33 +65,11 @@ export interface EntityService {
 // Entity Service Tag
 // ============================================================================
 
+// This remains a thin application boundary on purpose for now. Future
+// entity-specific orchestration and policy should accumulate here rather than
+// leaking into the repository layer. See KIOKU-25.
+
 export class EntityServiceTag extends Context.Tag("EntityService")<
   EntityServiceTag,
   EntityService
 >() {}
-
-// ============================================================================
-// Entity Service Implementation
-// ============================================================================
-
-export const EntityServiceLive = Layer.effect(
-  EntityServiceTag,
-  Effect.gen(function* () {
-    const repo = yield* EntityRepositoryTag
-
-    return {
-      createDoc: (input) => repo.createDoc(input),
-      createCodeRef: (input) => repo.createCodeRef(input),
-      createStory: (input) => repo.createStory(input),
-      createDiagram: (input) => repo.createDiagram(input),
-      getById: (id) => repo.getById(id),
-      getAll: (type) => repo.getAll(type),
-      getByTag: (tagId) => repo.getByTag(tagId),
-      getByTags: (tagIds) => repo.getByTags(tagIds),
-      update: (id, updates) => repo.update(id, updates),
-      delete: (id) => repo.delete(id),
-      count: (type) => repo.count(type),
-      search: (query) => repo.search(query),
-    } satisfies EntityService
-  })
-)
