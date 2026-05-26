@@ -4,25 +4,40 @@
 
 ### Problem
 
-Product knowledge—requirements, architecture, code, and decisions—is fragmented across disconnected tools with no shared structure or version control. Changes happen ad-hoc, docs go stale, and neither humans nor AI agents can reliably answer "What is the current, canonical understanding of how X works?"
+Project memory—architecture, rationale, constraints, code, decisions, and sharp edges—is fragmented across disconnected tools, stale documents, and tacit maintainer knowledge. Coding agents can read code, but they cannot reliably understand why the system is shaped the way it is or what they must know before they act.
 
 ### Vision
 
-A version-controlled knowledge platform where epics, stories, documentation, system designs, and code references exist as a unified, tagged graph. Every change goes through an explicit workflow, ensuring the graph is always the canonical source of truth. AI agents traverse this graph to retrieve precise context; humans navigate it to understand the system at any level.
+A structured, version-controlled project memory layer where documentation, decisions, code references, stories, diagrams, and operational context exist as a unified, tagged graph. Coding agents traverse this graph to retrieve precise architecture, rationale, and constraint context before making changes; humans use it as the canonical project memory that can grow into a broader knowledge platform over time.
 
 ### Wedge (v1 Focus)
 
-AI-assisted codebase onboarding that analyzes a repo and, through guided conversation, builds a tagged knowledge graph connecting code, concepts, and documentation—giving any stakeholder (human or AI) precise, relevant context with minimal noise.
+AI-assisted codebase onboarding that analyzes a repo and runs a guided maintainer interview to build agent-queryable project memory. The v1 promise is: onboard your codebase to AI the way you onboard a senior engineer, so coding agents understand architecture, rationale, constraints, and known risks before they act.
 
 ### North Star Metric
 
 **Time-to-informed-action**: How quickly can any stakeholder go from question to confident action, with the right context and nothing more?
 
+For v1, this is evaluated through agent readiness: how quickly can a coding agent retrieve the project memory needed to make a correct plan or patch without violating known architecture, rationale, or constraints?
+
 ---
 
 ## 2. Core Concepts
 
-### 2.1 Knowledge Graph
+### 2.1 Project Memory
+
+The product starts as a structured memory layer for software projects. The highest-value facts are the ones coding agents cannot infer reliably from code alone:
+
+- Active architecture decisions and their rationale
+- Constraints, SLAs, compliance requirements, and fragile dependencies
+- Known sharp edges and areas agents should modify with caution
+- Canonical vs. stale documentation
+- Business rules and domain concepts tied to implementation
+- Rejected alternatives and historical context
+
+In v1, the onboarding interview is the primary mechanism for capturing this tacit knowledge and grounding it in code and docs.
+
+### 2.2 Knowledge Graph
 
 The central data structure is a **tagged knowledge graph** where:
 
@@ -51,7 +66,7 @@ The central data structure is a **tagged knowledge graph** where:
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2.2 Tags
+### 2.3 Tags
 
 Tags are the primary mechanism for connecting related entities across types.
 
@@ -66,7 +81,7 @@ Tags are the primary mechanism for connecting related entities across types.
 - "Everything tagged `#checkout`" → returns docs, code refs, stories
 - "Intersection of `#checkout` AND `#rate-limiting`" → precise context
 
-### 2.3 Version Control (v1: Simplified)
+### 2.4 Version Control (v1: Simplified)
 
 For v1, versioning is **append-only history per entity**:
 
@@ -176,19 +191,22 @@ This core is shared across CLI, Desktop, and Web clients.
 
 ### 5.1 Goals
 
-- Prove the core graph model works for organizing project knowledge
-- Demonstrate AI-assisted onboarding (repo → knowledge graph)
-- Enable precise context retrieval for a query
+- Prove that structured project memory improves coding-agent context
+- Demonstrate AI-assisted onboarding (repo + maintainer interview → project memory graph)
+- Enable precise retrieval of architecture, rationale, constraints, and risks before an agent acts
 - Single user, local-only, CLI-first
+- Preserve a graph model that can expand into broader project knowledge over time
 
 ### 5.2 Features
 
 | Feature                | Description                                                | Priority |
 | ---------------------- | ---------------------------------------------------------- | -------- |
+| **Onboarding Agent**   | Guided repo analysis + maintainer interview to build initial project memory | P0 |
+| **Project Memory Capture** | Capture docs, code refs, decisions, constraints, risks, and business rules in the graph | P0 |
+| **Agent Context Retrieval** | "What should an agent know before changing X?" → relevant architecture, rationale, constraints, and code refs | P0 |
 | **Graph CRUD**         | Create, read, update, delete entities (Docs, CodeRefs, Stories) | P0  |
 | **Tagging**            | Add/remove tags, hierarchical tags, tag search             | P0       |
 | **Linking**            | Bidirectional links between entities                       | P0       |
-| **Onboarding Agent**   | Guided interview to build initial graph from repo          | P0       |
 | **Query Command**      | "What do I need to know about #X?" → relevant entities     | P0       |
 | **Version History**    | View history of any entity                                 | P1       |
 | **Diagram Generation** | Generate Mermaid diagrams from graph relationships         | P1       |
@@ -260,6 +278,19 @@ interface Diagram extends BaseEntity {
   generatedFrom?: string[];      // Entity IDs if auto-generated
 }
 ```
+
+### 6.1.1 Project Memory Semantics
+
+The first implementation can represent project-memory concepts as tagged Docs, Stories, CodeRefs, and Links, with type-specific metadata where needed. The important v1 behavior is that the onboarding agent can capture and retrieve these concepts consistently:
+
+- **Decision**: an active or historical architecture/product decision and its rationale
+- **Constraint**: a rule, SLA, compliance requirement, dependency, or operational boundary
+- **Risk / Sharp Edge**: a fragile area agents should approach with caution
+- **Business Rule**: domain logic that should be connected to implementation code
+- **Canonical Reference**: the doc, ADR, owner, or code path considered authoritative
+- **Rejected Alternative**: an option the team considered and chose not to pursue
+
+These concepts may become first-class entity types later if the graph needs stronger typing. For v1, the priority is reliable capture, tagging, linking, and retrieval for agent context.
 
 ### 6.2 Tags
 
@@ -376,7 +407,7 @@ CREATE INDEX idx_entity_versions_entity ON entity_versions(entity_id);
 
 ### 7.1 Onboarding Agent
 
-The onboarding agent builds an initial knowledge graph from an existing codebase through guided conversation.
+The onboarding agent is the primary v1 product surface. It builds the initial project memory graph by combining repo/doc analysis with a guided maintainer interview, focusing on the context coding agents cannot infer from code alone.
 
 **Flow:**
 
@@ -402,15 +433,20 @@ The onboarding agent builds an initial knowledge graph from an existing codebase
 │     │                                                           │
 │     ├─► "There's an ARCHITECTURE.md from 2023. Is it current?"  │
 │     │                                                           │
-│     └─► "What are the 3-5 core concepts a new dev should know?" │
+│     ├─► "What are the 3-5 core concepts a new dev should know?" │
+│     │                                                           │
+│     └─► "Are there constraints or sharp edges an agent must      │
+│          know before changing this area?"                       │
 │                                                                 │
 │  3. GENERATE                                                    │
 │     │                                                           │
 │     ├─► Create Doc entities for key concepts                    │
 │     ├─► Create CodeRef entities for important files/dirs        │
+│     ├─► Capture decisions, constraints, risks, and business rules│
 │     ├─► Suggest tag taxonomy                                    │
 │     ├─► Link related entities                                   │
-│     └─► Generate overview diagram (Mermaid)                     │
+│     ├─► Generate overview diagram (Mermaid)                     │
+│     └─► Generate agent context summary                          │
 │                                                                 │
 │  4. REVIEW                                                      │
 │     │                                                           │
@@ -608,24 +644,27 @@ kioku/
 - [ ] Entity CRUD commands (doc create/edit/show/list)
 - [ ] Tagging commands (tag create/apply/remove)
 
-### Phase 2: Graph Operations (Week 2)
+### Phase 2: Project Memory Retrieval (Week 2)
 
 - [ ] Implement linking (bidirectional)
 - [ ] Graph traversal algorithms
-- [ ] Query command (tag-based, relationship-based)
-- [ ] Context export (markdown output for LLM)
+- [ ] Query command (tag-based, relationship-based, and project-memory focused)
+- [ ] Context export (markdown output for LLM/coding-agent context)
+- [ ] Project memory capture conventions for decisions, constraints, risks, and canonical references
 - [ ] Version history (entity history, version show)
 - [ ] Import command (markdown files)
 
 ### Phase 3: AI Integration (Week 3)
 
 - [ ] Set up `@kioku/ai` with Vercel AI SDK
-- [ ] Implement onboarding agent
+- [ ] Implement onboarding/interview agent
   - Repo scanning
-  - Guided interview flow
-  - Entity generation
+  - Ambiguity detection
+  - Guided maintainer interview flow
+  - Project memory generation
   - Tag suggestion
-- [ ] Implement query agent (natural language → graph query)
+- [ ] Implement query agent (natural language → graph/project-memory query)
+- [ ] Generate agent context summary from onboarding results
 - [ ] Diagram generation (Mermaid from graph)
 - [ ] Polish CLI UX (colors, spinners, error handling)
 
@@ -640,11 +679,13 @@ kioku/
 
 ## 11. Future Roadmap (v2+)
 
+The roadmap expands outward from the v1 project-memory wedge. The graph model is intentionally broad enough to support docs, stories, diagrams, collaboration, and workflow later, but v1 should stay focused on proving that structured project memory improves coding-agent behavior.
+
 | Version | Features                                                                       |
 | ------- | ------------------------------------------------------------------------------ |
-| **v2**  | Desktop app (Tauri), Web app (TanStack Start), Multi-user local (shared SQLite)|
-| **v3**  | Remote sync (PostgreSQL), Collaboration, PR workflow for changes               |
-| **v4**  | GitHub adapter (code hosting integration), Real-time sync                      |
+| **v2**  | Agent context server (MCP/API), Desktop app (Tauri), Web app (TanStack Start), Multi-user local (shared SQLite)|
+| **v3**  | Remote sync (PostgreSQL), Collaboration, PR workflow for memory changes        |
+| **v4**  | GitHub adapter (code hosting integration), stale-memory detection, real-time sync |
 | **v5**  | Entity-level branching, Bidirectional diagram editing, Full enterprise features|
 
 ---
@@ -665,19 +706,21 @@ kioku/
 
 The PoC is successful if:
 
-1. **Onboarding works**: Point at a real repo, answer 5-10 questions, get a useful initial graph
-2. **Queries are precise**: Ask "What do I need to know about X?" and get relevant results (not a wall of text)
-3. **Context export is useful**: Export context, paste into Claude/GPT, get better answers than without it
-4. **It feels fast**: CLI commands respond in <500ms for typical operations
-5. **You actually use it**: The tool provides enough value that you use it on a real project
+1. **Onboarding works**: Point at a real repo, answer 5-10 focused questions, and get useful project memory grounded in code and docs
+2. **Tacit context is captured**: The graph includes decisions, constraints, risks, canonical references, and open questions that were not obvious from code alone
+3. **Queries are precise**: Ask "What should an agent know before changing X?" and get relevant results (not a wall of text)
+4. **Agent context is useful**: Export context, paste into Claude/GPT/Codex, and get a better plan or patch than without it
+5. **It feels fast**: CLI commands respond in <500ms for typical operations
+6. **The wedge is obvious**: A demo can show an agent avoiding a mistake because Kioku surfaced architecture, rationale, or constraints
+7. **You actually use it**: The tool provides enough value that you use it on a real project
 
 ---
 
 ## 14. Next Steps
 
-1. **Confirm this design** - Any changes before implementation?
-2. **Set up the repo** - Initialize monorepo structure
-3. **Start Phase 1** - Foundation (core + CLI + SQLite)
+1. **Finish Phase 2 retrieval primitives** - Links, query, context export, and history wiring
+2. **Implement project-memory capture conventions** - Decisions, constraints, risks, canonical references, and open questions
+3. **Build the onboarding/interview MVP** - Repo scan, focused questions, generated project memory, and agent context export
 
 ---
 
