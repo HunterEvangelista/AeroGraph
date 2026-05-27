@@ -212,12 +212,13 @@ const runTraverseQuery = (graphService: GraphService, traverseValue: string, dep
 
 const runPathQuery = (graphService: GraphService, pathValue: ReadonlyArray<string>) =>
   Effect.gen(function* () {
-    const [fromId, toId] = pathValue;
-    if (!fromId || !toId) {
+    if (pathValue.length !== 2) {
       return yield* Effect.fail(
         new InvalidQueryError({ message: "--path requires <fromId> and <toId>." })
       );
     }
+
+    const [fromId, toId] = pathValue as readonly [string, string];
 
     const pathEntities = yield* graphService.findPath(fromId, toId);
 
