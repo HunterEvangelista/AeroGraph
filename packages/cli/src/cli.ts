@@ -2,11 +2,17 @@
  * Kioku CLI
  * Main entry point for the command-line interface
  */
-import { Command } from "@effect/cli"
-import { BunContext, BunRuntime } from "@effect/platform-bun"
-import { Effect, Layer } from "effect"
-import { docCommand, initCommand, statusCommand, tagCommand } from "./commands/index.js"
-import { ConfigServiceLive } from "./config.js"
+import { Command } from "@effect/cli";
+import { BunContext, BunRuntime } from "@effect/platform-bun";
+import { Effect, Layer } from "effect";
+import {
+  docCommand,
+  initCommand,
+  queryCommand,
+  statusCommand,
+  tagCommand,
+} from "./commands/index.js";
+import { ConfigServiceLive } from "./config.js";
 
 // ============================================================================
 // CLI Application
@@ -14,21 +20,21 @@ import { ConfigServiceLive } from "./config.js"
 
 const kioku = Command.make("kioku").pipe(
   Command.withDescription("A version-controlled knowledge platform for codebases")
-)
+);
 
 const command = kioku.pipe(
-  Command.withSubcommands([initCommand, statusCommand, docCommand, tagCommand])
-)
+  Command.withSubcommands([initCommand, statusCommand, docCommand, tagCommand, queryCommand])
+);
 
 const cli = Command.run(command, {
   name: "kioku",
   version: "0.1.0",
-})
+});
 
 // ============================================================================
 // Run
 // ============================================================================
 
-const MainLive = Layer.mergeAll(ConfigServiceLive, BunContext.layer)
+const MainLive = Layer.mergeAll(ConfigServiceLive, BunContext.layer);
 
-cli(process.argv).pipe(Effect.provide(MainLive), BunRuntime.runMain)
+cli(process.argv).pipe(Effect.provide(MainLive), BunRuntime.runMain);
