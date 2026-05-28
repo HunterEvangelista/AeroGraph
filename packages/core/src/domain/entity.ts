@@ -91,6 +91,7 @@ export const CodeRef = Schema.TaggedStruct(EntityTypeEnum.CodeRef, {
   startLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
   endLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
   commitHash: Schema.optional(Schema.String),
+  symbol: Schema.optional(Schema.String),
 });
 export type CodeRef = typeof CodeRef.Type;
 
@@ -117,7 +118,6 @@ export type Diagram = typeof Diagram.Type;
 export const Entity = Schema.Union(Doc, CodeRef, Story, Diagram);
 export type Entity = typeof Entity.Type;
 
-
 // ============================================================================
 // Entity Creation Inputs (without auto-generated fields)
 // ============================================================================
@@ -139,6 +139,7 @@ export const CreateCodeRefInput = Schema.Struct({
   startLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
   endLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
   commitHash: Schema.optional(Schema.String),
+  symbol: Schema.optional(Schema.String),
 });
 
 export type CreateCodeRefInput = typeof CreateCodeRefInput.Type;
