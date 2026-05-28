@@ -32,3 +32,5 @@ coverage/
 # Logs
 *.log
 npm-debug.log*
+
+.opencode/skills/*

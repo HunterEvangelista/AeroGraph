@@ -66,6 +66,7 @@ const rowToEntity = (row: EntityRow): Entity => {
         startLine: metadata.startLine,
         endLine: metadata.endLine,
         commitHash: metadata.commitHash,
+        symbol: metadata.symbol,
       } as CodeRef
     case "story":
       return {
@@ -164,6 +165,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             startLine: input.startLine,
             endLine: input.endLine,
             commitHash: input.commitHash,
+            symbol: input.symbol,
           })
           insertEntity.run(
             id,
@@ -322,6 +324,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             startLine: codeUpdates.startLine ?? codeRef.startLine,
             endLine: codeUpdates.endLine ?? codeRef.endLine,
             commitHash: codeUpdates.commitHash ?? codeRef.commitHash,
+            symbol: codeUpdates.symbol ?? codeRef.symbol,
           })
         } else if (existing._tag === EntityTypeEnum.Story) {
           const story = existing as Story

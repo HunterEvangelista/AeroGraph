@@ -17,6 +17,7 @@ const metadata = {
     filePath: "src/auth.ts",
     startLine: 10,
     endLine: 20,
+    symbol: "authMiddleware",
   }),
   story: JSON.stringify({ status: "in_progress", priority: "high" }),
   diagram: JSON.stringify({ diagramType: "flowchart", source: "graph TD; auth-->session" }),

@@ -6,11 +6,13 @@ import { Command } from "@effect/cli";
 import { BunContext, BunRuntime } from "@effect/platform-bun";
 import { Effect, Layer } from "effect";
 import {
+  codeRefCommand,
   docCommand,
   initCommand,
   linkCommand,
   queryCommand,
   statusCommand,
+  storyCommand,
   tagCommand,
   unlinkCommand,
 } from "./commands/index.js";
@@ -29,6 +31,8 @@ const command = kioku.pipe(
     initCommand,
     statusCommand,
     docCommand,
+    codeRefCommand,
+    storyCommand,
     tagCommand,
     linkCommand,
     unlinkCommand,
