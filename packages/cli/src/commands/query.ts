@@ -76,10 +76,8 @@ const entitySummary = (entity: Entity): string => {
   return `${entity.id}  [${entity._tag}] ${entity.title}${suffix}`;
 };
 
-const printEntityDetails = (entity: Entity) =>
+const printEntityBody = (entity: Entity) =>
   Effect.gen(function* () {
-    yield* Console.log(`  ${entitySummary(entity)}`);
-
     if (entity._tag === EntityTypeEnum.Story) {
       const priority = entity.priority ? `, priority: ${entity.priority}` : "";
       yield* Console.log(`    status: ${entity.status}${priority}`);
@@ -92,6 +90,12 @@ const printEntityDetails = (entity: Entity) =>
 
     yield* Console.log(`    next: kioku query --related-to ${entity.id}`);
     yield* Console.log(`    next: kioku query --traverse ${entity.id} --depth 2`);
+  });
+
+const printEntityDetails = (entity: Entity) =>
+  Effect.gen(function* () {
+    yield* Console.log(`  ${entitySummary(entity)}`);
+    yield* printEntityBody(entity);
   });
 
 const printGroupedEntities = (title: string, entities: ReadonlyArray<Entity>) =>
@@ -193,9 +197,9 @@ const runRelatedQuery = (graphService: GraphService, relatedToValue: string) =>
 
       yield* Console.log("");
       yield* Console.log(
-        `  ${center.entity.id} ${linkDirectionLabel(link, entityId)} ${target.id}`
+        `  ${center.entity.id} ${linkDirectionLabel(link, entityId)} ${entitySummary(target)}`
       );
-      yield* printEntityDetails(target);
+      yield* printEntityBody(target);
     }
 
     yield* Console.log("");

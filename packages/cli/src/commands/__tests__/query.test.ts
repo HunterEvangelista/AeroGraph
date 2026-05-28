@@ -27,8 +27,13 @@ describe("query command", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Related to Auth Overview (doc-auth-overview)");
-    expect(result.stdout).toContain("doc-auth-overview --references--> code-auth-middleware");
-    expect(result.stdout).toContain("doc-auth-overview <--blocks-- story-auth-hardening");
+    expect(result.stdout).toContain(
+      "doc-auth-overview --references--> code-auth-middleware  [code_ref] Auth Middleware"
+    );
+    expect(result.stdout).toContain(
+      "doc-auth-overview <--blocks-- story-auth-hardening  [story] Auth Hardening Story"
+    );
+    expect(result.stdout).not.toContain("\n  code-auth-middleware  [code_ref] Auth Middleware");
     expect(result.stdout).toContain("next: kioku query --traverse doc-auth-overview --depth 2");
   });
 
