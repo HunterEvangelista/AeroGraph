@@ -4,10 +4,9 @@
  */
 import { Args, Command, Options } from "@effect/cli";
 import { EntityServiceTag, EntityTypeEnum, LinkRepositoryTag, TagServiceTag } from "@kioku/core";
-import { Console, Data, Effect, Layer, Option } from "effect";
-import { ConfigServiceTag } from "../config.js";
-import { CliCoreLive, SqliteRepositoriesLive } from "../db/index.js";
+import { Console, Data, Effect, Option } from "effect";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
+import { withCliServices } from "./workspace.js";
 
 // ============================================================================
 // Custom Error Types
@@ -55,14 +54,7 @@ const docCreateCommand = Command.make(
   },
   ({ title, content, tags }) =>
     Effect.gen(function* () {
-      const configService = yield* ConfigServiceTag;
-      const workspace = yield* configService.load();
-      const ServiceLayers = Layer.merge(
-        CliCoreLive(workspace.dbPath),
-        SqliteRepositoriesLive(workspace.dbPath)
-      );
-
-      const doc = yield* Effect.scoped(
+      const doc = yield* withCliServices(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
 
@@ -88,7 +80,7 @@ const docCreateCommand = Command.make(
           }
 
           return doc;
-        }).pipe(Effect.provide(ServiceLayers))
+        })
       );
 
       yield* Console.log("");
@@ -118,14 +110,7 @@ const docShowCommand = Command.make(
   },
   ({ id }) =>
     Effect.gen(function* () {
-      const configService = yield* ConfigServiceTag;
-      const workspace = yield* configService.load();
-      const ServiceLayers = Layer.merge(
-        CliCoreLive(workspace.dbPath),
-        SqliteRepositoriesLive(workspace.dbPath)
-      );
-
-      const { doc, links, linkedEntities, tags } = yield* Effect.scoped(
+      const { doc, links, linkedEntities, tags } = yield* withCliServices(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const linkRepository = yield* LinkRepositoryTag;
@@ -153,7 +138,7 @@ const docShowCommand = Command.make(
           }
 
           return { doc: entity, links, linkedEntities, tags };
-        }).pipe(Effect.provide(ServiceLayers))
+        })
       );
 
       yield* Console.log("");
@@ -220,11 +205,7 @@ const docListCommand = Command.make(
   },
   ({ tag, search }) =>
     Effect.gen(function* () {
-      const configService = yield* ConfigServiceTag;
-      const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
-
-      const docs = yield* Effect.scoped(
+      const docs = yield* withCliServices(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
 
@@ -242,7 +223,7 @@ const docListCommand = Command.make(
           }
 
           return yield* entityService.getAll(EntityTypeEnum.Doc);
-        }).pipe(Effect.provide(ServiceLayers))
+        })
       );
 
       yield* Console.log("");
@@ -291,10 +272,6 @@ const docEditCommand = Command.make(
   },
   ({ id, title, content }) =>
     Effect.gen(function* () {
-      const configService = yield* ConfigServiceTag;
-      const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
-
       const titleValue = Option.getOrUndefined(title);
       const contentValue = Option.getOrUndefined(content);
 
@@ -302,7 +279,7 @@ const docEditCommand = Command.make(
         return yield* Effect.fail(new NoUpdatesError({}));
       }
 
-      const updated = yield* Effect.scoped(
+      const updated = yield* withCliServices(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
 
@@ -324,7 +301,7 @@ const docEditCommand = Command.make(
             resolvedId as Parameters<typeof entityService.getById>[0],
             updates
           );
-        }).pipe(Effect.provide(ServiceLayers))
+        })
       );
 
       yield* Console.log("");
@@ -362,11 +339,7 @@ const docDeleteCommand = Command.make(
   },
   ({ id, force }) =>
     Effect.gen(function* () {
-      const configService = yield* ConfigServiceTag;
-      const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
-
-      const deletedId = yield* Effect.scoped(
+      const deletedId = yield* withCliServices(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
 
@@ -387,7 +360,7 @@ const docDeleteCommand = Command.make(
 
           yield* entityService.delete(resolvedId as Parameters<typeof entityService.getById>[0]);
           return existing.id;
-        }).pipe(Effect.provide(ServiceLayers))
+        })
       );
 
       yield* Console.log("");
