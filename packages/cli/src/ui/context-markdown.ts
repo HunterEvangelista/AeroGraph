@@ -76,7 +76,7 @@ export const formatContextMarkdown = ({ title, entities, links }: ContextMarkdow
     appendSection(
       lines,
       section.title,
-      entities.filter((entity) => hasAnyTag(entity, section.tags)),
+      entities.filter((entity) => !used.has(entity.entity.id) && hasAnyTag(entity, section.tags)),
       used
     );
   }

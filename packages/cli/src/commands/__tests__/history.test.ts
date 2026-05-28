@@ -46,4 +46,11 @@ describe("history command", () => {
     expect(versionOne.stdout).toContain("Original auth notes.");
     expect(versionOne.stdout).not.toContain("Updated auth notes.");
   });
+
+  it("rejects malformed version values", () => {
+    const result = workspace.run("history", "doc-auth-overview", "--version", "2x");
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain("--version must be a positive integer");
+  });
 });

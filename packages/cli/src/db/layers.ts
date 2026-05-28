@@ -20,5 +20,8 @@ export const SqliteRepositoriesLive = (dbPath: string) =>
 export const CliCoreLive = (dbPath: string) =>
   CoreServicesLive.pipe(Layer.provide(SqliteRepositoriesLive(dbPath)));
 
-export const CliServicesLive = (dbPath: string) =>
-  Layer.merge(CliCoreLive(dbPath), SqliteRepositoriesLive(dbPath));
+export const CliServicesLive = (dbPath: string) => {
+  const repositories = SqliteRepositoriesLive(dbPath);
+  const core = CoreServicesLive.pipe(Layer.provide(repositories));
+  return Layer.merge(core, repositories);
+};

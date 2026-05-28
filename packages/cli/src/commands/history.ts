@@ -36,8 +36,14 @@ const parseHistoryArgs = (args: ReadonlyArray<string>) =>
             new InvalidHistoryArgsError({ message: "--version requires a value." })
           );
         }
+        if (!/^\d+$/.test(value)) {
+          return yield* Effect.fail(
+            new InvalidHistoryArgsError({ message: "--version must be a positive integer." })
+          );
+        }
+
         version = Number.parseInt(value, 10);
-        if (!Number.isInteger(version) || version < 1) {
+        if (version < 1) {
           return yield* Effect.fail(
             new InvalidHistoryArgsError({ message: "--version must be a positive integer." })
           );

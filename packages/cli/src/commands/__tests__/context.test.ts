@@ -50,4 +50,23 @@ describe("context command", () => {
     expect(result.stdout).toContain("Task-shaped context export is not available yet.");
     expect(result.stdout).toContain("kioku context <entityId> --depth 2");
   });
+
+  it("does not duplicate multi-role entities across semantic sections", () => {
+    const create = workspace.run(
+      "doc",
+      "create",
+      "--tags",
+      "auth,decision,constraint",
+      "--content",
+      "Multi-role project memory.",
+      "Multi Role Memory"
+    );
+    expect(create.status).toBe(0);
+
+    const result = workspace.run("context", "--tags", "auth");
+
+    expect(result.status).toBe(0);
+    expect(result.stdout.match(/### Multi Role Memory/g)).toHaveLength(1);
+    expect(result.stdout).toContain("## Relevant Decisions");
+  });
 });
