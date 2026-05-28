@@ -7,6 +7,7 @@ import { EntityServiceTag, EntityTypeEnum, LinkRepositoryTag, TagServiceTag } fr
 import { Console, Data, Effect, Layer, Option } from "effect";
 import { ConfigServiceTag } from "../config.js";
 import { CliCoreLive, SqliteRepositoriesLive } from "../db/index.js";
+import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
 
 // ============================================================================
 // Custom Error Types
@@ -17,6 +18,21 @@ class NotADocError extends Data.TaggedError("NotADocError")<{
 }> {}
 
 class NoUpdatesError extends Data.TaggedError("NoUpdatesError")<object> {}
+
+interface DocCommandError {
+  readonly _tag: string;
+  readonly matches?: Parameters<typeof formatEntityIdMatches>[0];
+  readonly message?: string;
+  readonly value?: string;
+}
+
+const formatDocError = (error: DocCommandError): string => {
+  if (error._tag === "AmbiguousEntityIdError") {
+    return `Entity id "${error.value ?? ""}" is ambiguous: ${formatEntityIdMatches(error.matches ?? [])}`;
+  }
+
+  return `${error._tag}: ${error.message ?? String(error)}`;
+};
 
 // ============================================================================
 // Doc Create Command
@@ -115,8 +131,9 @@ const docShowCommand = Command.make(
           const linkRepository = yield* LinkRepositoryTag;
           const tagService = yield* TagServiceTag;
 
+          const resolvedId = yield* resolveEntityId(id);
           const entity = yield* entityService.getById(
-            id as Parameters<typeof entityService.getById>[0]
+            resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
           if (entity._tag !== EntityTypeEnum.Doc) {
@@ -178,9 +195,7 @@ const docShowCommand = Command.make(
       yield* Console.log("");
     }).pipe(
       Effect.catchAll((error) =>
-        Console.error(
-          `Error: ${error._tag}: ${"message" in error ? error.message : String(error)}`
-        ).pipe(Effect.zipRight(Effect.fail(error)))
+        Console.error(`Error: ${formatDocError(error)}`).pipe(Effect.zipRight(Effect.fail(error)))
       )
     )
 );
@@ -292,8 +307,9 @@ const docEditCommand = Command.make(
           const entityService = yield* EntityServiceTag;
 
           // Verify it exists and is a doc
+          const resolvedId = yield* resolveEntityId(id);
           const existing = yield* entityService.getById(
-            id as Parameters<typeof entityService.getById>[0]
+            resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
           if (existing._tag !== EntityTypeEnum.Doc) {
@@ -305,7 +321,7 @@ const docEditCommand = Command.make(
           if (contentValue) updates.content = contentValue;
 
           return yield* entityService.update(
-            id as Parameters<typeof entityService.getById>[0],
+            resolvedId as Parameters<typeof entityService.getById>[0],
             updates
           );
         }).pipe(Effect.provide(ServiceLayers))
@@ -325,9 +341,7 @@ const docEditCommand = Command.make(
         )
       ),
       Effect.catchAll((error) =>
-        Console.error(
-          `Error: ${error._tag}: ${"message" in error ? error.message : String(error)}`
-        ).pipe(Effect.zipRight(Effect.fail(error)))
+        Console.error(`Error: ${formatDocError(error)}`).pipe(Effect.zipRight(Effect.fail(error)))
       )
     )
 );
@@ -357,8 +371,9 @@ const docDeleteCommand = Command.make(
           const entityService = yield* EntityServiceTag;
 
           // Verify it exists and is a doc
+          const resolvedId = yield* resolveEntityId(id);
           const existing = yield* entityService.getById(
-            id as Parameters<typeof entityService.getById>[0]
+            resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
           if (existing._tag !== EntityTypeEnum.Doc) {
@@ -370,7 +385,7 @@ const docDeleteCommand = Command.make(
             yield* Console.log("(Use --force to skip this confirmation in scripts)");
           }
 
-          yield* entityService.delete(id as Parameters<typeof entityService.getById>[0]);
+          yield* entityService.delete(resolvedId as Parameters<typeof entityService.getById>[0]);
         }).pipe(Effect.provide(ServiceLayers))
       );
 
@@ -379,9 +394,7 @@ const docDeleteCommand = Command.make(
       yield* Console.log("");
     }).pipe(
       Effect.catchAll((error) =>
-        Console.error(
-          `Error: ${error._tag}: ${"message" in error ? error.message : String(error)}`
-        ).pipe(Effect.zipRight(Effect.fail(error)))
+        Console.error(`Error: ${formatDocError(error)}`).pipe(Effect.zipRight(Effect.fail(error)))
       )
     )
 );
