@@ -7,6 +7,7 @@ import { BunContext, BunRuntime } from "@effect/platform-bun";
 import { Effect, Layer } from "effect";
 import {
   codeRefCommand,
+  contextCommand,
   docCommand,
   historyCommand,
   initCommand,
@@ -34,6 +35,7 @@ const command = kioku.pipe(
     docCommand,
     codeRefCommand,
     historyCommand,
+    contextCommand,
     storyCommand,
     tagCommand,
     linkCommand,
