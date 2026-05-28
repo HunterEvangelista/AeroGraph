@@ -23,17 +23,22 @@ describe("query command", () => {
   });
 
   it("queries related entities with link direction labels", () => {
-    const result = workspace.run("query", "--related-to", "doc-auth-overview");
+    const result = workspace.run("query", "--related-to", "doc-auth-ov");
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Related to Auth Overview (doc-auth-overview)");
-    expect(result.stdout).toContain("doc-auth-overview --references--> code-auth-middleware");
-    expect(result.stdout).toContain("doc-auth-overview <--blocks-- story-auth-hardening");
+    expect(result.stdout).toContain(
+      "doc-auth-overview --references--> code-auth-middleware  [code_ref] Auth Middleware"
+    );
+    expect(result.stdout).toContain(
+      "doc-auth-overview <--blocks-- story-auth-hardening  [story] Auth Hardening Story"
+    );
+    expect(result.stdout).not.toContain("\n  code-auth-middleware  [code_ref] Auth Middleware");
     expect(result.stdout).toContain("next: kioku query --traverse doc-auth-overview --depth 2");
   });
 
   it("queries bounded traversals only with explicit depth", () => {
-    const result = workspace.run("query", "--traverse", "doc-auth-overview", "--depth", "1");
+    const result = workspace.run("query", "--traverse", "doc-auth-ov", "--depth", "1");
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain(
@@ -45,7 +50,7 @@ describe("query command", () => {
   });
 
   it("queries shortest paths using positional endpoints", () => {
-    const result = workspace.run("query", "--path", "story-auth-hardening", "diagram-auth-flow");
+    const result = workspace.run("query", "--path", "story-auth", "diagram-auth");
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Shortest path: story-auth-hardening -> diagram-auth-flow");
@@ -96,5 +101,14 @@ describe("query command", () => {
 
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("--path requires <fromId> and <toId>");
+  });
+
+  it("rejects ambiguous entity id prefixes", () => {
+    const result = workspace.run("query", "--related-to", "doc-auth");
+
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Entity id "doc-auth" is ambiguous');
+    expect(result.stderr).toContain("doc-auth-overview [doc] Auth Overview");
+    expect(result.stderr).toContain("doc-auth-only [doc] Auth Only Doc");
   });
 });

@@ -13,6 +13,7 @@ import {
 import { Console, Data, Effect, Option } from "effect";
 import { ConfigServiceTag } from "../config.js";
 import { CliCoreLive } from "../db/index.js";
+import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
 
 // ============================================================================
 // Custom Error Types
@@ -75,10 +76,8 @@ const entitySummary = (entity: Entity): string => {
   return `${entity.id}  [${entity._tag}] ${entity.title}${suffix}`;
 };
 
-const printEntityDetails = (entity: Entity) =>
+const printEntityBody = (entity: Entity) =>
   Effect.gen(function* () {
-    yield* Console.log(`  ${entitySummary(entity)}`);
-
     if (entity._tag === EntityTypeEnum.Story) {
       const priority = entity.priority ? `, priority: ${entity.priority}` : "";
       yield* Console.log(`    status: ${entity.status}${priority}`);
@@ -91,6 +90,12 @@ const printEntityDetails = (entity: Entity) =>
 
     yield* Console.log(`    next: kioku query --related-to ${entity.id}`);
     yield* Console.log(`    next: kioku query --traverse ${entity.id} --depth 2`);
+  });
+
+const printEntityDetails = (entity: Entity) =>
+  Effect.gen(function* () {
+    yield* Console.log(`  ${entitySummary(entity)}`);
+    yield* printEntityBody(entity);
   });
 
 const printGroupedEntities = (title: string, entities: ReadonlyArray<Entity>) =>
@@ -169,8 +174,9 @@ const runTagsQuery = (graphService: GraphService, tagValue: string) =>
 
 const runRelatedQuery = (graphService: GraphService, relatedToValue: string) =>
   Effect.gen(function* () {
-    const center = yield* graphService.getEntityWithLinks(relatedToValue);
-    const related = yield* graphService.getRelatedEntities(relatedToValue);
+    const entityId = yield* resolveEntityId(relatedToValue);
+    const center = yield* graphService.getEntityWithLinks(entityId);
+    const related = yield* graphService.getRelatedEntities(entityId);
     const relatedById = new Map<string, Entity>(related.map((entity) => [entity.id, entity]));
 
     yield* Console.log("");
@@ -186,14 +192,14 @@ const runRelatedQuery = (graphService: GraphService, relatedToValue: string) =>
 
     const links = [...center.outgoingLinks, ...center.incomingLinks];
     for (const link of links) {
-      const target = relatedById.get(otherEntityId(link, relatedToValue));
+      const target = relatedById.get(otherEntityId(link, entityId));
       if (!target) continue;
 
       yield* Console.log("");
       yield* Console.log(
-        `  ${center.entity.id} ${linkDirectionLabel(link, relatedToValue)} ${target.id}`
+        `  ${center.entity.id} ${linkDirectionLabel(link, entityId)} ${entitySummary(target)}`
       );
-      yield* printEntityDetails(target);
+      yield* printEntityBody(target);
     }
 
     yield* Console.log("");
@@ -203,9 +209,10 @@ const runRelatedQuery = (graphService: GraphService, relatedToValue: string) =>
 
 const runTraverseQuery = (graphService: GraphService, traverseValue: string, depthValue: number) =>
   Effect.gen(function* () {
-    const result = yield* graphService.traverse(traverseValue, depthValue);
+    const entityId = yield* resolveEntityId(traverseValue);
+    const result = yield* graphService.traverse(entityId, depthValue);
     yield* printGroupedEntities(
-      `Traversal from ${traverseValue} to depth ${depthValue} (visited depth ${result.depth})`,
+      `Traversal from ${entityId} to depth ${depthValue} (visited depth ${result.depth})`,
       result.entities
     );
   });
@@ -220,10 +227,12 @@ const runPathQuery = (graphService: GraphService, pathValue: ReadonlyArray<strin
 
     const [fromId, toId] = pathValue as readonly [string, string];
 
-    const pathEntities = yield* graphService.findPath(fromId, toId);
+    const resolvedFromId = yield* resolveEntityId(fromId);
+    const resolvedToId = yield* resolveEntityId(toId);
+    const pathEntities = yield* graphService.findPath(resolvedFromId, resolvedToId);
 
     yield* Console.log("");
-    yield* Console.log(`Shortest path: ${fromId} -> ${toId}`);
+    yield* Console.log(`Shortest path: ${resolvedFromId} -> ${resolvedToId}`);
     yield* Console.log("=".repeat(40));
 
     if (!pathEntities) {
@@ -252,8 +261,8 @@ const runPathQuery = (graphService: GraphService, pathValue: ReadonlyArray<strin
     }
 
     yield* Console.log("");
-    yield* Console.log(`next: kioku query --related-to ${fromId}`);
-    yield* Console.log(`next: kioku query --related-to ${toId}`);
+    yield* Console.log(`next: kioku query --related-to ${resolvedFromId}`);
+    yield* Console.log(`next: kioku query --related-to ${resolvedToId}`);
     yield* Console.log("");
   });
 
@@ -408,6 +417,10 @@ export const queryCommand = Command.make(
           Console.error(`Error: Entity not found: ${e.entityId}`).pipe(
             Effect.zipRight(Effect.fail(e))
           ),
+        AmbiguousEntityIdError: (e) =>
+          Console.error(
+            `Error: Entity id "${e.value}" is ambiguous: ${formatEntityIdMatches(e.matches)}`
+          ).pipe(Effect.zipRight(Effect.fail(e))),
       })
     )
 ).pipe(Command.withDescription("Query project memory by tags, links, traversal, or paths"));

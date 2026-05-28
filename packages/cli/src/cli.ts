@@ -9,10 +9,12 @@ import {
   codeRefCommand,
   docCommand,
   initCommand,
+  linkCommand,
   queryCommand,
   statusCommand,
   storyCommand,
   tagCommand,
+  unlinkCommand,
 } from "./commands/index.js";
 import { ConfigServiceLive } from "./config.js";
 
@@ -32,6 +34,8 @@ const command = kioku.pipe(
     codeRefCommand,
     storyCommand,
     tagCommand,
+    linkCommand,
+    unlinkCommand,
     queryCommand,
   ])
 );
