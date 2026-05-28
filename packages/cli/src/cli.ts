@@ -8,9 +8,11 @@ import { Effect, Layer } from "effect";
 import {
   docCommand,
   initCommand,
+  linkCommand,
   queryCommand,
   statusCommand,
   tagCommand,
+  unlinkCommand,
 } from "./commands/index.js";
 import { ConfigServiceLive } from "./config.js";
 
@@ -23,7 +25,15 @@ const kioku = Command.make("kioku").pipe(
 );
 
 const command = kioku.pipe(
-  Command.withSubcommands([initCommand, statusCommand, docCommand, tagCommand, queryCommand])
+  Command.withSubcommands([
+    initCommand,
+    statusCommand,
+    docCommand,
+    tagCommand,
+    linkCommand,
+    unlinkCommand,
+    queryCommand,
+  ])
 );
 
 const cli = Command.run(command, {
