@@ -26,6 +26,10 @@ export const resolveEntityId = (value: string) =>
       return exact.right.id;
     }
 
+    if (exact.left._tag !== "EntityNotFoundError") {
+      return yield* exact.left;
+    }
+
     const entities = yield* entityService.getAll();
     const matches = entities.filter((entity) => entity.id.startsWith(value));
 
@@ -35,12 +39,12 @@ export const resolveEntityId = (value: string) =>
 
     if (matches.length > 1) {
       return yield* new AmbiguousEntityIdError({
-          value,
-          matches: matches.map((entity) => ({
-              id: entity.id,
-              title: entity.title,
-              type: entity._tag,
-          })),
+        value,
+        matches: matches.map((entity) => ({
+          id: entity.id,
+          title: entity.title,
+          type: entity._tag,
+        })),
       });
     }
 

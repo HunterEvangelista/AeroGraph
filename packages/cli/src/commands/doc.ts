@@ -137,7 +137,7 @@ const docShowCommand = Command.make(
           );
 
           if (entity._tag !== EntityTypeEnum.Doc) {
-            return yield* Effect.fail(new NotADocError({ id }));
+            return yield* new NotADocError({ id: resolvedId });
           }
 
           const tags = yield* tagService.getTagsForEntity(entity.id);
@@ -313,7 +313,7 @@ const docEditCommand = Command.make(
           );
 
           if (existing._tag !== EntityTypeEnum.Doc) {
-            return yield* Effect.fail(new NotADocError({ id }));
+            return yield* new NotADocError({ id: resolvedId });
           }
 
           const updates: { title?: string; content?: string } = {};
@@ -366,7 +366,7 @@ const docDeleteCommand = Command.make(
       const workspace = yield* configService.load();
       const ServiceLayers = CliCoreLive(workspace.dbPath);
 
-      yield* Effect.scoped(
+      const deletedId = yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
 
@@ -377,7 +377,7 @@ const docDeleteCommand = Command.make(
           );
 
           if (existing._tag !== EntityTypeEnum.Doc) {
-            return yield* Effect.fail(new NotADocError({ id }));
+            return yield* new NotADocError({ id: resolvedId });
           }
 
           if (!force) {
@@ -386,11 +386,12 @@ const docDeleteCommand = Command.make(
           }
 
           yield* entityService.delete(resolvedId as Parameters<typeof entityService.getById>[0]);
+          return existing.id;
         }).pipe(Effect.provide(ServiceLayers))
       );
 
       yield* Console.log("");
-      yield* Console.log(`Document ${id} deleted.`);
+      yield* Console.log(`Document ${deletedId} deleted.`);
       yield* Console.log("");
     }).pipe(
       Effect.catchAll((error) =>

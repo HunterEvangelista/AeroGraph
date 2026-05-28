@@ -140,20 +140,23 @@ export const SqliteLinkRepositoryLive = Layer.effect(
 
         return yield* Effect.try({
           try: () => {
-            const timestamp = now();
+            const createPair = db.transaction(() => {
+              const timestamp = now();
 
-            // Create forward link
-            const forwardId = generateId();
-            insertLink.run(forwardId, input.sourceId, input.targetId, input.type, timestamp);
+              const forwardId = generateId();
+              const inverseId = generateId();
+              const inverseType = getInverseLinkType(input.type);
 
-            // Create inverse link
-            const inverseId = generateId();
-            const inverseType = getInverseLinkType(input.type);
-            insertLink.run(inverseId, input.targetId, input.sourceId, inverseType, timestamp);
+              insertLink.run(forwardId, input.sourceId, input.targetId, input.type, timestamp);
+              insertLink.run(inverseId, input.targetId, input.sourceId, inverseType, timestamp);
 
-            const forwardRow = selectById.get(forwardId) as LinkRow;
-            const inverseRow = selectById.get(inverseId) as LinkRow;
+              const forwardRow = selectById.get(forwardId) as LinkRow;
+              const inverseRow = selectById.get(inverseId) as LinkRow;
 
+              return [forwardRow, inverseRow] as const;
+            });
+
+            const [forwardRow, inverseRow] = createPair();
             return [rowToLink(forwardRow), rowToLink(inverseRow)] as const;
           },
           catch: (error) =>
