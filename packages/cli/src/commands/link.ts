@@ -10,10 +10,9 @@ import {
   LinkRepositoryTag,
   type LinkType,
 } from "@kioku/core";
-import { Console, Data, Effect, Layer } from "effect";
-import { ConfigServiceTag } from "../config.js";
-import { CliCoreLive, SqliteRepositoriesLive } from "../db/index.js";
+import { Console, Data, Effect } from "effect";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
+import { withCliServices } from "./workspace.js";
 
 const linkTypes = [
   "references",
@@ -116,17 +115,6 @@ const printLinkGroup = (title: string, entityId: string, links: ReadonlyArray<Li
     }
   });
 
-const withWorkspace = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-  Effect.gen(function* () {
-    const configService = yield* ConfigServiceTag;
-    const workspace = yield* configService.load();
-    const ServiceLayers = Layer.merge(
-      CliCoreLive(workspace.dbPath),
-      SqliteRepositoriesLive(workspace.dbPath)
-    );
-    return yield* Effect.scoped(effect.pipe(Effect.provide(ServiceLayers)));
-  });
-
 const catchLinkErrors = <A, R>(effect: Effect.Effect<A, LinkCommandError, R>) =>
   effect.pipe(
     Effect.catchAll((error) => {
@@ -169,7 +157,7 @@ const linkListCommand = Command.make(
     entityId: Args.text({ name: "entityId" }),
   },
   ({ entityId }) =>
-    withWorkspace(
+    withCliServices(
       Effect.gen(function* () {
         const linkRepository = yield* LinkRepositoryTag;
         const resolvedEntityId = yield* resolveEntityId(entityId);
@@ -193,7 +181,7 @@ export const linkCommand = Command.make(
     args: Args.text({ name: "args" }).pipe(Args.repeated),
   },
   ({ args }) =>
-    withWorkspace(
+    withCliServices(
       Effect.gen(function* () {
         const linkRepository = yield* LinkRepositoryTag;
         const parsed = yield* parseLinkArgs(args, true);
@@ -224,7 +212,7 @@ export const unlinkCommand = Command.make(
     args: Args.text({ name: "args" }).pipe(Args.repeated),
   },
   ({ args }) =>
-    withWorkspace(
+    withCliServices(
       Effect.gen(function* () {
         const linkRepository = yield* LinkRepositoryTag;
         const parsed = yield* parseLinkArgs(args, false);
