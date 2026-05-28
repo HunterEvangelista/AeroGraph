@@ -8,6 +8,7 @@ import { Effect, Layer } from "effect";
 import {
   codeRefCommand,
   docCommand,
+  historyCommand,
   initCommand,
   linkCommand,
   queryCommand,
@@ -32,6 +33,7 @@ const command = kioku.pipe(
     statusCommand,
     docCommand,
     codeRefCommand,
+    historyCommand,
     storyCommand,
     tagCommand,
     linkCommand,
