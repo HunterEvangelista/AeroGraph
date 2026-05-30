@@ -97,7 +97,6 @@ export interface LinkRepository {
 // Link Repository Tag (for Effect DI)
 // ============================================================================
 
-export class LinkRepositoryTag extends Context.Tag("LinkRepository")<
-  LinkRepositoryTag,
-  LinkRepository
->() {}
+export class LinkRepositoryTag extends Context.Service<LinkRepositoryTag, LinkRepository>()(
+  "LinkRepository"
+) {}

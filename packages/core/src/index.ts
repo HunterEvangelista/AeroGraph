@@ -4,16 +4,12 @@
  */
 
 // Domain models
-export * from "./domain/index.js"
-
-// Repository interfaces
-export * from "./repository/index.js"
-
-// Services
-export * from "./services/index.js"
-
-// Layer bundles
-export * from "./layers/index.js"
-
+export * from "./domain/index.js";
 // Errors
-export * from "./errors.js"
+export * from "./errors.js";
+// Layer bundles
+export * from "./layers/index.js";
+// Repository interfaces
+export * from "./repository/index.js";
+// Services
+export * from "./services/index.js";

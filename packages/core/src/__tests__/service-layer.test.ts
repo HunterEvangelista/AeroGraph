@@ -4,7 +4,7 @@
  * Tests for TagService and GraphService business logic using mock repositories.
  * These are unit tests - they verify service behavior in isolation.
  */
-import { Effect, Exit, Layer } from "effect";
+import { Cause, Effect, Exit, Layer } from "effect";
 import { describe, expect, it } from "vitest";
 
 import type {
@@ -454,8 +454,7 @@ describe("TagService", () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const error = exit.cause;
-        expect(error._tag).toBe("Fail");
+        expect(exit.cause.reasons.some(Cause.isFailReason)).toBe(true);
       }
     });
   });

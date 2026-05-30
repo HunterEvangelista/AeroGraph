@@ -1,19 +1,20 @@
-import { Schema } from "effect"
-import { describe, expect, it } from "vitest"
+import { Schema } from "effect";
+import { describe, expect, it } from "vitest";
 
+import { EntityTypeEnum } from "../domain/entity.js";
 import {
   CodeRef,
   CreateTagInput,
   Diagram,
   Doc,
   Entity,
+  getInverseLinkType,
   LinkType,
   Story,
   Tag,
   UpdateTagInput,
-  getInverseLinkType,
-} from "../domain/index.js"
-import { ChangeType, EntityVersion } from "../domain/version.js"
+} from "../domain/index.js";
+import { ChangeType, EntityVersion } from "../domain/version.js";
 import {
   ConfigError,
   DatabaseError,
@@ -26,16 +27,13 @@ import {
   VersionNotFoundError,
   WorkspaceAlreadyExistsError,
   WorkspaceNotFoundError,
-} from "../errors.js"
-import { FIXED_TIMESTAMP_ISO } from "./helpers/index.js"
-import { EntityTypeEnum } from "../domain/entity.js"
+} from "../errors.js";
+import { FIXED_TIMESTAMP_ISO } from "./helpers/index.js";
 
-const FIXED_DATE_ISO = FIXED_TIMESTAMP_ISO
+const FIXED_DATE_ISO = FIXED_TIMESTAMP_ISO;
 
-const decodeSync = <A, I>(
-  schema: Schema.Schema<A, I, never>,
-  input: unknown
-): A => Schema.decodeUnknownSync(schema)(input)
+const decodeSync = <A, I>(schema: Schema.Schema<A, I, never>, input: unknown): A =>
+  Schema.decodeUnknownSync(schema)(input);
 
 describe("domain schema unit tests", () => {
   describe("entity.ts", () => {
@@ -49,14 +47,14 @@ describe("domain schema unit tests", () => {
         createdAt: FIXED_DATE_ISO,
         updatedAt: FIXED_DATE_ISO,
         version: 1,
-      })
+      });
 
-      expect(result.id).toBe("entity-0001")
-      expect(result._tag).toBe(EntityTypeEnum.Doc)
-      expect(result.title).toBe("Architecture Overview")
-      expect(result.createdAt).toBeInstanceOf(Date)
-      expect(result.updatedAt).toBeInstanceOf(Date)
-    })
+      expect(result.id).toBe("entity-0001");
+      expect(result._tag).toBe(EntityTypeEnum.Doc);
+      expect(result.title).toBe("Architecture Overview");
+      expect(result.createdAt).toBeInstanceOf(Date);
+      expect(result.updatedAt).toBeInstanceOf(Date);
+    });
 
     it("decodes a valid code_ref entity", () => {
       const result = decodeSync(CodeRef, {
@@ -73,16 +71,16 @@ describe("domain schema unit tests", () => {
         startLine: 10,
         endLine: 42,
         commitHash: "abc123",
-      })
+      });
 
-      expect(result.id).toBe("entity-0002")
-      expect(result._tag).toBe(EntityTypeEnum.CodeRef)
-      expect(result.filePath).toBe("src/services/graph-service.ts")
-      expect(result.startLine).toBe(10)
-      expect(result.endLine).toBe(42)
-      expect(result.createdAt).toBeInstanceOf(Date)
-      expect(result.updatedAt).toBeInstanceOf(Date)
-    })
+      expect(result.id).toBe("entity-0002");
+      expect(result._tag).toBe(EntityTypeEnum.CodeRef);
+      expect(result.filePath).toBe("src/services/graph-service.ts");
+      expect(result.startLine).toBe(10);
+      expect(result.endLine).toBe(42);
+      expect(result.createdAt).toBeInstanceOf(Date);
+      expect(result.updatedAt).toBeInstanceOf(Date);
+    });
 
     it("decodes a valid story entity", () => {
       const result = decodeSync(Story, {
@@ -97,16 +95,16 @@ describe("domain schema unit tests", () => {
         status: "in_progress",
         priority: "high",
         parentId: "story-epic-1",
-      })
+      });
 
-      expect(result.id).toBe("entity-0003")
-      expect(result._tag).toBe(EntityTypeEnum.Story)
-      expect(result.status).toBe("in_progress")
-      expect(result.priority).toBe("high")
-      expect(result.parentId).toBe("story-epic-1")
-      expect(result.createdAt).toBeInstanceOf(Date)
-      expect(result.updatedAt).toBeInstanceOf(Date)
-    })
+      expect(result.id).toBe("entity-0003");
+      expect(result._tag).toBe(EntityTypeEnum.Story);
+      expect(result.status).toBe("in_progress");
+      expect(result.priority).toBe("high");
+      expect(result.parentId).toBe("story-epic-1");
+      expect(result.createdAt).toBeInstanceOf(Date);
+      expect(result.updatedAt).toBeInstanceOf(Date);
+    });
 
     it("decodes a valid diagram entity", () => {
       const result = decodeSync(Diagram, {
@@ -121,15 +119,15 @@ describe("domain schema unit tests", () => {
         diagramType: "erd",
         source: "entity -> link -> tag",
         generatedFrom: ["entity-0001", "entity-0002"],
-      })
+      });
 
-      expect(result.id).toBe("entity-0004")
-      expect(result._tag).toBe(EntityTypeEnum.Diagram)
-      expect(result.diagramType).toBe("erd")
-      expect(result.generatedFrom).toEqual(["entity-0001", "entity-0002"])
-      expect(result.createdAt).toBeInstanceOf(Date)
-      expect(result.updatedAt).toBeInstanceOf(Date)
-    })
+      expect(result.id).toBe("entity-0004");
+      expect(result._tag).toBe(EntityTypeEnum.Diagram);
+      expect(result.diagramType).toBe("erd");
+      expect(result.generatedFrom).toEqual(["entity-0001", "entity-0002"]);
+      expect(result.createdAt).toBeInstanceOf(Date);
+      expect(result.updatedAt).toBeInstanceOf(Date);
+    });
 
     it("decodes all supported entity variants through the union", () => {
       const variants = [
@@ -178,12 +176,12 @@ describe("domain schema unit tests", () => {
           diagramType: "flowchart",
           source: "A -> B",
         },
-      ]
+      ];
 
-      const decoded = variants.map((variant) => decodeSync(Entity, variant))
+      const decoded = variants.map((variant) => decodeSync(Entity, variant));
 
-      expect(decoded.map((entity) => entity._tag)).toEqual(["doc", "code_ref", "story", "diagram"])
-    })
+      expect(decoded.map((entity) => entity._tag)).toEqual(["doc", "code_ref", "story", "diagram"]);
+    });
 
     it("rejects invalid entity shapes", () => {
       expect(() =>
@@ -196,7 +194,7 @@ describe("domain schema unit tests", () => {
           updatedAt: FIXED_DATE_ISO,
           version: 1,
         })
-      ).toThrow()
+      ).toThrow();
 
       expect(() =>
         decodeSync(CodeRef, {
@@ -210,7 +208,7 @@ describe("domain schema unit tests", () => {
           repoPath: "packages/core",
           filePath: "",
         })
-      ).toThrow()
+      ).toThrow();
 
       expect(() =>
         decodeSync(Story, {
@@ -223,7 +221,7 @@ describe("domain schema unit tests", () => {
           version: 1,
           status: "shipped",
         })
-      ).toThrow()
+      ).toThrow();
 
       expect(() =>
         decodeSync(Diagram, {
@@ -237,9 +235,9 @@ describe("domain schema unit tests", () => {
           diagramType: "uml",
           source: "A -> B",
         })
-      ).toThrow()
-    })
-  })
+      ).toThrow();
+    });
+  });
 
   describe("tag.ts", () => {
     it("accepts optional fields when present or omitted", () => {
@@ -247,7 +245,7 @@ describe("domain schema unit tests", () => {
         id: "tag-0001",
         name: "architecture",
         createdAt: FIXED_DATE_ISO,
-      })
+      });
 
       const createInput = decodeSync(CreateTagInput, {
         id: "tag-0002",
@@ -255,22 +253,22 @@ describe("domain schema unit tests", () => {
         description: "Backend systems",
         parentId: "tag-0001",
         aliases: ["server", "api"],
-      })
+      });
 
       const updateInput = decodeSync(UpdateTagInput, {
         name: "platform",
         description: "Platform concerns",
         parentId: "tag-root",
         aliases: ["infra"],
-      })
+      });
 
-      expect(tag.id).toBe("tag-0001")
-      expect(tag.createdAt).toBeInstanceOf(Date)
-      expect(tag.description).toBeUndefined()
-      expect(tag.aliases).toBeUndefined()
-      expect(createInput.aliases).toEqual(["server", "api"])
-      expect(updateInput.parentId).toBe("tag-root")
-    })
+      expect(tag.id).toBe("tag-0001");
+      expect(tag.createdAt).toBeInstanceOf(Date);
+      expect(tag.description).toBeUndefined();
+      expect(tag.aliases).toBeUndefined();
+      expect(createInput.aliases).toEqual(["server", "api"]);
+      expect(updateInput.parentId).toBe("tag-root");
+    });
 
     it("rejects invalid tag inputs", () => {
       expect(() =>
@@ -279,22 +277,22 @@ describe("domain schema unit tests", () => {
           name: "",
           createdAt: FIXED_DATE_ISO,
         })
-      ).toThrow()
+      ).toThrow();
 
       expect(() =>
         decodeSync(CreateTagInput, {
           id: "",
           name: "valid-name",
         })
-      ).toThrow()
+      ).toThrow();
 
       expect(() =>
         decodeSync(UpdateTagInput, {
           name: "",
         })
-      ).toThrow()
-    })
-  })
+      ).toThrow();
+    });
+  });
 
   describe("link.ts", () => {
     it("accepts all link types and returns correct inverse mappings", async () => {
@@ -305,25 +303,25 @@ describe("domain schema unit tests", () => {
         "blocks",
         "blocked_by",
         "related_to",
-      ] as const
+      ] as const;
 
       for (const type of validTypes) {
-        const decoded = decodeSync(LinkType, type)
-        expect(decoded).toBe(type)
+        const decoded = decodeSync(LinkType, type);
+        expect(decoded).toBe(type);
       }
 
-      expect(getInverseLinkType("references")).toBe("references")
-      expect(getInverseLinkType("related_to")).toBe("related_to")
-      expect(getInverseLinkType("parent_of")).toBe("child_of")
-      expect(getInverseLinkType("child_of")).toBe("parent_of")
-      expect(getInverseLinkType("blocks")).toBe("blocked_by")
-      expect(getInverseLinkType("blocked_by")).toBe("blocks")
-    })
+      expect(getInverseLinkType("references")).toBe("references");
+      expect(getInverseLinkType("related_to")).toBe("related_to");
+      expect(getInverseLinkType("parent_of")).toBe("child_of");
+      expect(getInverseLinkType("child_of")).toBe("parent_of");
+      expect(getInverseLinkType("blocks")).toBe("blocked_by");
+      expect(getInverseLinkType("blocked_by")).toBe("blocks");
+    });
 
     it("rejects invalid link types", () => {
-      expect(() => decodeSync(LinkType, "depends_on")).toThrow()
-    })
-  })
+      expect(() => decodeSync(LinkType, "depends_on")).toThrow();
+    });
+  });
 
   describe("version.ts", () => {
     it("validates version schema and change types", () => {
@@ -336,18 +334,18 @@ describe("domain schema unit tests", () => {
         changedFields: ["title", "content"],
         createdAt: FIXED_DATE_ISO,
         authorId: "user-123",
-      })
+      });
 
-      expect(version.id).toBe("version-0001")
-      expect(version.version).toBe(1)
-      expect(version.changeType).toBe("update")
-      expect(version.changedFields).toEqual(["title", "content"])
-      expect(version.createdAt).toBeInstanceOf(Date)
+      expect(version.id).toBe("version-0001");
+      expect(version.version).toBe(1);
+      expect(version.changeType).toBe("update");
+      expect(version.changedFields).toEqual(["title", "content"]);
+      expect(version.createdAt).toBeInstanceOf(Date);
 
-      expect(decodeSync(ChangeType, "create")).toBe("create")
-      expect(decodeSync(ChangeType, "update")).toBe("update")
-      expect(decodeSync(ChangeType, "delete")).toBe("delete")
-    })
+      expect(decodeSync(ChangeType, "create")).toBe("create");
+      expect(decodeSync(ChangeType, "update")).toBe("update");
+      expect(decodeSync(ChangeType, "delete")).toBe("delete");
+    });
 
     it("rejects invalid version edge cases", () => {
       expect(() =>
@@ -359,86 +357,86 @@ describe("domain schema unit tests", () => {
           changeType: "create",
           createdAt: FIXED_DATE_ISO,
         })
-      ).toThrow()
+      ).toThrow();
 
-      expect(() => decodeSync(ChangeType, "restore")).toThrow()
-    })
-  })
+      expect(() => decodeSync(ChangeType, "restore")).toThrow();
+    });
+  });
 
   describe("errors.ts", () => {
     it("constructs tagged errors with consistent shape", () => {
       const repositoryError = new RepositoryError({
         message: "Repository failed",
         cause: new Error("disk"),
-      })
+      });
       const validationError = new ValidationError({
         message: "Invalid field",
         field: "title",
-      })
+      });
       const entityNotFoundError = new EntityNotFoundError({
         entityId: "entity-404",
         message: "Missing entity",
-      })
+      });
       const tagNotFoundError = new TagNotFoundError({
         tagId: "tag-404",
-      })
+      });
       const linkNotFoundError = new LinkNotFoundError({
         linkId: "link-404",
-      })
+      });
       const versionNotFoundError = new VersionNotFoundError({
         entityId: "entity-0001",
         version: 7,
-      })
+      });
       const configError = new ConfigError({
         message: "Missing config",
         path: "/tmp/kioku.json",
-      })
+      });
       const workspaceNotFoundError = new WorkspaceNotFoundError({
         path: "/workspace/kioku",
-      })
+      });
       const workspaceAlreadyExistsError = new WorkspaceAlreadyExistsError({
         path: "/workspace/kioku",
-      })
+      });
       const databaseError = new DatabaseError({
         message: "SQLite failure",
-      })
+      });
       const migrationError = new MigrationError({
         message: "Migration failed",
         version: 2,
-      })
+      });
 
-      expect(repositoryError._tag).toBe("RepositoryError")
-      expect(repositoryError.message).toBe("Repository failed")
+      expect(repositoryError._tag).toBe("RepositoryError");
+      expect(repositoryError.message).toBe("Repository failed");
 
-      expect(validationError._tag).toBe("ValidationError")
-      expect(validationError.field).toBe("title")
+      expect(validationError._tag).toBe("ValidationError");
+      expect(validationError.field).toBe("title");
 
-      expect(entityNotFoundError._tag).toBe("EntityNotFoundError")
-      expect(entityNotFoundError.entityId).toBe("entity-404")
+      expect(entityNotFoundError._tag).toBe("EntityNotFoundError");
+      expect(entityNotFoundError.entityId).toBe("entity-404");
 
-      expect(tagNotFoundError._tag).toBe("TagNotFoundError")
-      expect(tagNotFoundError.tagId).toBe("tag-404")
+      expect(tagNotFoundError._tag).toBe("TagNotFoundError");
+      expect(tagNotFoundError.tagId).toBe("tag-404");
 
-      expect(linkNotFoundError._tag).toBe("LinkNotFoundError")
-      expect(linkNotFoundError.linkId).toBe("link-404")
+      expect(linkNotFoundError._tag).toBe("LinkNotFoundError");
+      expect(linkNotFoundError.linkId).toBe("link-404");
 
-      expect(versionNotFoundError._tag).toBe("VersionNotFoundError")
-      expect(versionNotFoundError.version).toBe(7)
+      expect(versionNotFoundError._tag).toBe("VersionNotFoundError");
+      expect(versionNotFoundError.version).toBe(7);
 
-      expect(configError._tag).toBe("ConfigError")
-      expect(configError.path).toBe("/tmp/kioku.json")
+      expect(configError._tag).toBe("ConfigError");
+      expect(configError.path).toBe("/tmp/kioku.json");
 
-      expect(workspaceNotFoundError._tag).toBe("WorkspaceNotFoundError")
-      expect(workspaceNotFoundError.path).toBe("/workspace/kioku")
+      expect(workspaceNotFoundError._tag).toBe("WorkspaceNotFoundError");
+      expect(workspaceNotFoundError.path).toBe("/workspace/kioku");
 
-      expect(workspaceAlreadyExistsError._tag).toBe("WorkspaceAlreadyExistsError")
-      expect(workspaceAlreadyExistsError.path).toBe("/workspace/kioku")
+      expect(workspaceAlreadyExistsError._tag).toBe("WorkspaceAlreadyExistsError");
+      expect(workspaceAlreadyExistsError.path).toBe("/workspace/kioku");
 
-      expect(databaseError._tag).toBe("DatabaseError")
-      expect(databaseError.message).toBe("SQLite failure")
+      expect(databaseError._tag).toBe("DatabaseError");
+      expect(databaseError.message).toBe("SQLite failure");
 
-      expect(migrationError._tag).toBe("MigrationError")
-      expect(migrationError.version).toBe(2)
-    })
-  })
-})
+      expect(migrationError._tag).toBe("MigrationError");
+      expect(migrationError.version).toBe(2);
+    });
+  });
+});

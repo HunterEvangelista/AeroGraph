@@ -2,7 +2,7 @@
  * Entity Repository Interface
  * Storage-agnostic interface for entity CRUD operations
  */
-import { Context, type Effect } from "effect"
+import { Context, type Effect } from "effect";
 import type {
   CodeRef,
   CreateCodeRefInput,
@@ -15,8 +15,8 @@ import type {
   EntityId,
   EntityType,
   Story,
-} from "../domain/entity.js"
-import type { EntityNotFoundError, RepositoryError, ValidationError } from "../errors.js"
+} from "../domain/entity.js";
+import type { EntityNotFoundError, RepositoryError, ValidationError } from "../errors.js";
 
 // ============================================================================
 // Entity Repository Interface
@@ -28,50 +28,50 @@ export interface EntityRepository {
    */
   readonly createDoc: (
     input: CreateDocInput
-  ) => Effect.Effect<Doc, ValidationError | RepositoryError>
+  ) => Effect.Effect<Doc, ValidationError | RepositoryError>;
 
   /**
    * Create a new code reference entity
    */
   readonly createCodeRef: (
     input: CreateCodeRefInput
-  ) => Effect.Effect<CodeRef, ValidationError | RepositoryError>
+  ) => Effect.Effect<CodeRef, ValidationError | RepositoryError>;
 
   /**
    * Create a new story entity
    */
   readonly createStory: (
     input: CreateStoryInput
-  ) => Effect.Effect<Story, ValidationError | RepositoryError>
+  ) => Effect.Effect<Story, ValidationError | RepositoryError>;
 
   /**
    * Create a new diagram entity
    */
   readonly createDiagram: (
     input: CreateDiagramInput
-  ) => Effect.Effect<Diagram, ValidationError | RepositoryError>
+  ) => Effect.Effect<Diagram, ValidationError | RepositoryError>;
 
   /**
    * Get an entity by ID
    */
-  readonly getById: (id: EntityId) => Effect.Effect<Entity, EntityNotFoundError | RepositoryError>
+  readonly getById: (id: EntityId) => Effect.Effect<Entity, EntityNotFoundError | RepositoryError>;
 
   /**
    * Get all entities, optionally filtered by type
    */
-  readonly getAll: (type?: EntityType) => Effect.Effect<ReadonlyArray<Entity>, RepositoryError>
+  readonly getAll: (type?: EntityType) => Effect.Effect<ReadonlyArray<Entity>, RepositoryError>;
 
   /**
    * Get entities by tag
    */
-  readonly getByTag: (tagId: string) => Effect.Effect<ReadonlyArray<Entity>, RepositoryError>
+  readonly getByTag: (tagId: string) => Effect.Effect<ReadonlyArray<Entity>, RepositoryError>;
 
   /**
    * Get entities by multiple tags (intersection)
    */
   readonly getByTags: (
     tagIds: ReadonlyArray<string>
-  ) => Effect.Effect<ReadonlyArray<Entity>, RepositoryError>
+  ) => Effect.Effect<ReadonlyArray<Entity>, RepositoryError>;
 
   /**
    * Update an entity
@@ -79,29 +79,28 @@ export interface EntityRepository {
   readonly update: (
     id: EntityId,
     updates: Partial<Entity>
-  ) => Effect.Effect<Entity, EntityNotFoundError | ValidationError | RepositoryError>
+  ) => Effect.Effect<Entity, EntityNotFoundError | ValidationError | RepositoryError>;
 
   /**
    * Delete an entity
    */
-  readonly delete: (id: EntityId) => Effect.Effect<void, EntityNotFoundError | RepositoryError>
+  readonly delete: (id: EntityId) => Effect.Effect<void, EntityNotFoundError | RepositoryError>;
 
   /**
    * Count entities, optionally filtered by type
    */
-  readonly count: (type?: EntityType) => Effect.Effect<number, RepositoryError>
+  readonly count: (type?: EntityType) => Effect.Effect<number, RepositoryError>;
 
   /**
    * Search entities by title or content
    */
-  readonly search: (query: string) => Effect.Effect<ReadonlyArray<Entity>, RepositoryError>
+  readonly search: (query: string) => Effect.Effect<ReadonlyArray<Entity>, RepositoryError>;
 }
 
 // ============================================================================
 // Entity Repository Tag (for Effect DI)
 // ============================================================================
 
-export class EntityRepositoryTag extends Context.Tag("EntityRepository")<
-  EntityRepositoryTag,
-  EntityRepository
->() {}
+export class EntityRepositoryTag extends Context.Service<EntityRepositoryTag, EntityRepository>()(
+  "EntityRepository"
+) {}
