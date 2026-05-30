@@ -1,8 +1,3 @@
-/**
- * Story Commands
- * CRUD operations for story entities
- */
-import { Args, Command, Options } from "@effect/cli";
 import {
   EntityServiceTag,
   EntityTypeEnum,
@@ -12,6 +7,11 @@ import {
   TagServiceTag,
 } from "@kioku/core";
 import { Console, Data, Effect, Option } from "effect";
+/**
+ * Story Commands
+ * CRUD operations for story entities
+ */
+import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config.js";
 import { CliCoreLive } from "../db/index.js";
 
@@ -108,63 +108,6 @@ const parseOptionalStatus = (status: Option.Option<string>) =>
     return parsed;
   });
 
-const requireFlagValue = (args: ReadonlyArray<string>, index: number, flag: string) =>
-  Effect.gen(function* () {
-    const value = args[index + 1];
-    if (value === undefined || value.startsWith("-")) {
-      return yield* Effect.fail(new InvalidStoryArgsError({ message: `${flag} requires a value` }));
-    }
-    return value;
-  });
-
-const parseStoryEditArgs = (args: ReadonlyArray<string>) =>
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keeps option-after-id parsing localized for `story edit <id> --status done`.
-  Effect.gen(function* () {
-    let id: string | undefined;
-    let title: string | undefined;
-    let content: string | undefined;
-    let statusText: string | undefined;
-
-    for (let index = 0; index < args.length; index++) {
-      const arg = args[index];
-      if (arg === undefined) continue;
-
-      if (arg === "--title") {
-        title = yield* requireFlagValue(args, index, arg);
-        index++;
-      } else if (arg === "--content" || arg === "-c") {
-        content = yield* requireFlagValue(args, index, arg);
-        index++;
-      } else if (arg === "--status") {
-        statusText = yield* requireFlagValue(args, index, arg);
-        index++;
-      } else if (arg.startsWith("-")) {
-        return yield* Effect.fail(new InvalidStoryArgsError({ message: `Unknown option: ${arg}` }));
-      } else if (!id) {
-        id = arg;
-      } else {
-        return yield* Effect.fail(
-          new InvalidStoryArgsError({ message: `Unexpected argument: ${arg}` })
-        );
-      }
-    }
-
-    if (!id) {
-      return yield* Effect.fail(new InvalidStoryArgsError({ message: "story edit requires <id>" }));
-    }
-
-    if (title === undefined && content === undefined && statusText === undefined) {
-      return yield* Effect.fail(new NoUpdatesError({}));
-    }
-
-    const status = statusText ? parseStoryStatus(statusText) : undefined;
-    if (status instanceof InvalidStoryStatusError) {
-      return yield* Effect.fail(status);
-    }
-
-    return { id, title, content, status };
-  });
-
 const parseStoryDeleteArgs = (args: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     let id: string | undefined;
@@ -215,17 +158,17 @@ const printStoryDetails = (story: Story) =>
 const storyCreateCommand = Command.make(
   "create",
   {
-    title: Options.text("title").pipe(Options.withDescription("Story title")),
-    content: Options.text("content").pipe(
-      Options.withAlias("c"),
-      Options.withDescription("Story content"),
-      Options.optional
+    title: Flag.string("title").pipe(Flag.withDescription("Story title")),
+    content: Flag.string("content").pipe(
+      Flag.withAlias("c"),
+      Flag.withDescription("Story content"),
+      Flag.optional
     ),
-    status: Options.text("status").pipe(Options.withDescription("Story status"), Options.optional),
-    tag: Options.text("tag").pipe(
-      Options.withAlias("t"),
-      Options.withDescription("Comma-separated tags to apply"),
-      Options.optional
+    status: Flag.string("status").pipe(Flag.withDescription("Story status"), Flag.optional),
+    tag: Flag.string("tag").pipe(
+      Flag.withAlias("t"),
+      Flag.withDescription("Comma-separated tags to apply"),
+      Flag.optional
     ),
   },
   ({ title, content, status, tag }) =>
@@ -267,8 +210,8 @@ const storyCreateCommand = Command.make(
       yield* Console.log(`Version: ${story.version}`);
       yield* Console.log("");
     }).pipe(
-      Effect.catchAll((error) =>
-        Console.error(`Error: ${formatStoryError(error)}`).pipe(Effect.zipRight(Effect.fail(error)))
+      Effect.catch((error) =>
+        Console.error(`Error: ${formatStoryError(error)}`).pipe(Effect.andThen(Effect.fail(error)))
       )
     )
 );
@@ -280,7 +223,7 @@ const storyCreateCommand = Command.make(
 const storyShowCommand = Command.make(
   "show",
   {
-    id: Args.text({ name: "id" }),
+    id: Argument.string("id"),
   },
   ({ id }) =>
     Effect.gen(function* () {
@@ -348,8 +291,8 @@ const storyShowCommand = Command.make(
 
       yield* Console.log("");
     }).pipe(
-      Effect.catchAll((error) =>
-        Console.error(`Error: ${formatStoryError(error)}`).pipe(Effect.zipRight(Effect.fail(error)))
+      Effect.catch((error) =>
+        Console.error(`Error: ${formatStoryError(error)}`).pipe(Effect.andThen(Effect.fail(error)))
       )
     )
 );
@@ -361,20 +304,17 @@ const storyShowCommand = Command.make(
 const storyListCommand = Command.make(
   "list",
   {
-    tag: Options.text("tag").pipe(
-      Options.withAlias("t"),
-      Options.withDescription("Filter by tag"),
-      Options.optional
+    tag: Flag.string("tag").pipe(
+      Flag.withAlias("t"),
+      Flag.withDescription("Filter by tag"),
+      Flag.optional
     ),
-    search: Options.text("search").pipe(
-      Options.withAlias("s"),
-      Options.withDescription("Search in title/content"),
-      Options.optional
+    search: Flag.string("search").pipe(
+      Flag.withAlias("s"),
+      Flag.withDescription("Search in title/content"),
+      Flag.optional
     ),
-    status: Options.text("status").pipe(
-      Options.withDescription("Filter by status"),
-      Options.optional
-    ),
+    status: Flag.string("status").pipe(Flag.withDescription("Filter by status"), Flag.optional),
   },
   ({ tag, search, status }) =>
     Effect.gen(function* () {
@@ -424,8 +364,8 @@ const storyListCommand = Command.make(
         }
       }
     }).pipe(
-      Effect.catchAll((error) =>
-        Console.error(`Error: ${formatStoryError(error)}`).pipe(Effect.zipRight(Effect.fail(error)))
+      Effect.catch((error) =>
+        Console.error(`Error: ${formatStoryError(error)}`).pipe(Effect.andThen(Effect.fail(error)))
       )
     )
 );
@@ -437,33 +377,42 @@ const storyListCommand = Command.make(
 const storyEditCommand = Command.make(
   "edit",
   {
-    args: Args.text({ name: "args" }).pipe(Args.repeated),
+    id: Argument.string("id"),
+    title: Flag.string("title").pipe(Flag.optional),
+    content: Flag.string("content").pipe(Flag.withAlias("c"), Flag.optional),
+    status: Flag.string("status").pipe(Flag.optional),
   },
-  ({ args }) =>
+  ({ id, title, content, status }) =>
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
       const ServiceLayers = CliCoreLive(workspace.dbPath);
-      const values = yield* parseStoryEditArgs(args);
+      const titleValue = Option.getOrUndefined(title);
+      const contentValue = Option.getOrUndefined(content);
+      const statusValue = yield* parseOptionalStatus(status);
+
+      if (titleValue === undefined && contentValue === undefined && statusValue === undefined) {
+        return yield* Effect.fail(new NoUpdatesError());
+      }
 
       const updated = yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const existing = yield* entityService.getById(
-            values.id as Parameters<typeof entityService.getById>[0]
+            id as Parameters<typeof entityService.getById>[0]
           );
 
           if (existing._tag !== EntityTypeEnum.Story) {
-            return yield* Effect.fail(new NotAStoryError({ id: values.id }));
+            return yield* Effect.fail(new NotAStoryError({ id }));
           }
 
           const updates: { title?: string; content?: string; status?: StoryStatusEnum } = {};
-          if (values.title !== undefined) updates.title = values.title;
-          if (values.content !== undefined) updates.content = values.content;
-          if (values.status !== undefined) updates.status = values.status;
+          if (titleValue !== undefined) updates.title = titleValue;
+          if (contentValue !== undefined) updates.content = contentValue;
+          if (statusValue !== undefined) updates.status = statusValue;
 
           return yield* entityService.update(
-            values.id as Parameters<typeof entityService.getById>[0],
+            id as Parameters<typeof entityService.getById>[0],
             updates
           );
         }).pipe(Effect.provide(ServiceLayers))
@@ -482,8 +431,8 @@ const storyEditCommand = Command.make(
       yield* Console.log(`Version: ${updated.version}`);
       yield* Console.log("");
     }).pipe(
-      Effect.catchAll((error) =>
-        Console.error(`Error: ${formatStoryError(error)}`).pipe(Effect.zipRight(Effect.fail(error)))
+      Effect.catch((error) =>
+        Console.error(`Error: ${formatStoryError(error)}`).pipe(Effect.andThen(Effect.fail(error)))
       )
     )
 );
@@ -495,7 +444,7 @@ const storyEditCommand = Command.make(
 const storyDeleteCommand = Command.make(
   "delete",
   {
-    args: Args.text({ name: "args" }).pipe(Args.repeated),
+    args: Argument.string("args").pipe(Argument.variadic()),
   },
   ({ args }) =>
     Effect.gen(function* () {
@@ -528,8 +477,8 @@ const storyDeleteCommand = Command.make(
       yield* Console.log(`Story ${values.id} deleted.`);
       yield* Console.log("");
     }).pipe(
-      Effect.catchAll((error) =>
-        Console.error(`Error: ${formatStoryError(error)}`).pipe(Effect.zipRight(Effect.fail(error)))
+      Effect.catch((error) =>
+        Console.error(`Error: ${formatStoryError(error)}`).pipe(Effect.andThen(Effect.fail(error)))
       )
     )
 );

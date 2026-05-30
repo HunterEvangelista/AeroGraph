@@ -1,8 +1,3 @@
-/**
- * Query Command
- * Retrieval operations for project memory graph context.
- */
-import { Args, Command, Options } from "@effect/cli";
 import {
   type Entity,
   EntityTypeEnum,
@@ -11,6 +6,11 @@ import {
   type Link,
 } from "@kioku/core";
 import { Console, Data, Effect, Option } from "effect";
+/**
+ * Query Command
+ * Retrieval operations for project memory graph context.
+ */
+import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config.js";
 import { CliCoreLive } from "../db/index.js";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
@@ -347,27 +347,27 @@ const runStructuredQuery = (graphService: GraphService, selection: QuerySelectio
 export const queryCommand = Command.make(
   "query",
   {
-    tags: Options.text("tags").pipe(
-      Options.withDescription("Comma-separated tags to intersect, matched exactly"),
-      Options.optional
+    tags: Flag.string("tags").pipe(
+      Flag.withDescription("Comma-separated tags to intersect, matched exactly"),
+      Flag.optional
     ),
-    relatedTo: Options.text("related-to").pipe(
-      Options.withDescription("Entity ID to retrieve 1-hop neighbors for"),
-      Options.optional
+    relatedTo: Flag.string("related-to").pipe(
+      Flag.withDescription("Entity ID to retrieve 1-hop neighbors for"),
+      Flag.optional
     ),
-    traverse: Options.text("traverse").pipe(
-      Options.withDescription("Entity ID to retrieve a bounded graph neighborhood for"),
-      Options.optional
+    traverse: Flag.string("traverse").pipe(
+      Flag.withDescription("Entity ID to retrieve a bounded graph neighborhood for"),
+      Flag.optional
     ),
-    depth: Options.integer("depth").pipe(
-      Options.withDescription("Required traversal depth for --traverse"),
-      Options.optional
+    depth: Flag.integer("depth").pipe(
+      Flag.withDescription("Required traversal depth for --traverse"),
+      Flag.optional
     ),
-    path: Options.boolean("path").pipe(
-      Options.withDescription("Interpret positional values as shortest path endpoints"),
-      Options.withDefault(false)
+    path: Flag.boolean("path").pipe(
+      Flag.withDescription("Interpret positional values as shortest path endpoints"),
+      Flag.withDefault(false)
     ),
-    query: Args.text({ name: "query" }).pipe(Args.repeated),
+    query: Argument.string("query").pipe(Argument.variadic()),
   },
   ({ tags, relatedTo, traverse, depth, path, query }) =>
     Effect.gen(function* () {
@@ -406,21 +406,21 @@ export const queryCommand = Command.make(
     }).pipe(
       Effect.catchTags({
         InvalidQueryError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         EntityNotFoundError: (e) =>
           Console.error(`Error: Entity not found: ${e.entityId}`).pipe(
-            Effect.zipRight(Effect.fail(e))
+            Effect.andThen(Effect.fail(e))
           ),
         AmbiguousEntityIdError: (e) =>
           Console.error(
             `Error: Entity id "${e.value}" is ambiguous: ${formatEntityIdMatches(e.matches)}`
-          ).pipe(Effect.zipRight(Effect.fail(e))),
+          ).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
 ).pipe(Command.withDescription("Query project memory by tags, links, traversal, or paths"));

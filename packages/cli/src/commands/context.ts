@@ -1,5 +1,4 @@
 import { writeFile } from "node:fs/promises";
-import { Args, Command } from "@effect/cli";
 import {
   type Entity,
   EntityServiceTag,
@@ -8,7 +7,8 @@ import {
   LinkRepositoryTag,
   TagServiceTag,
 } from "@kioku/core";
-import { Console, Data, Effect } from "effect";
+import { Console, Data, Effect, Option } from "effect";
+import { Argument, Command, Flag } from "effect/unstable/cli";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
 import { type ContextEntity, formatContextMarkdown } from "../ui/context-markdown.js";
 import { withCliServices } from "./workspace.js";
@@ -58,64 +58,18 @@ const printTaskStub = (task: string) =>
     yield* Console.log("");
   });
 
-const readFlagValue = (args: ReadonlyArray<string>, index: number, flag: string) =>
-  Effect.gen(function* () {
-    const value = args[index + 1];
-    if (!value || value.startsWith("-")) {
-      return yield* Effect.fail(
-        new InvalidContextQueryError({ message: `${flag} requires a value.` })
-      );
-    }
-    return value;
-  });
-
-const parseContextArgs = (args: ReadonlyArray<string>) =>
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keeps option-after-id parsing localized for documented `context <id> --depth N --output file` forms.
-  Effect.gen(function* () {
-    let tagValue: string | undefined;
-    let depth = 1;
-    let outputValue: string | undefined;
-    const query: string[] = [];
-
-    for (let index = 0; index < args.length; index++) {
-      const arg = args[index];
-      if (!arg) continue;
-
-      if (arg === "--tags") {
-        tagValue = yield* readFlagValue(args, index, arg);
-        index++;
-      } else if (arg === "--depth") {
-        const value = yield* readFlagValue(args, index, arg);
-        depth = Number.parseInt(value, 10);
-        if (!Number.isInteger(depth) || depth < 0) {
-          return yield* Effect.fail(
-            new InvalidContextQueryError({ message: "--depth must be >= 0." })
-          );
-        }
-        index++;
-      } else if (arg === "--output") {
-        outputValue = yield* readFlagValue(args, index, arg);
-        index++;
-      } else if (arg.startsWith("-")) {
-        return yield* Effect.fail(
-          new InvalidContextQueryError({ message: `Unknown option: ${arg}` })
-        );
-      } else {
-        query.push(arg);
-      }
-    }
-
-    return { tagValue, depth, outputValue, query };
-  });
-
 export const contextCommand = Command.make(
   "context",
   {
-    args: Args.text({ name: "args" }).pipe(Args.repeated),
+    tags: Flag.string("tags").pipe(Flag.optional),
+    depth: Flag.integer("depth").pipe(Flag.withDefault(1)),
+    output: Flag.string("output").pipe(Flag.optional),
+    query: Argument.string("query").pipe(Argument.variadic()),
   },
-  ({ args }) =>
+  ({ tags, depth, output, query }) =>
     Effect.gen(function* () {
-      const { tagValue, depth, outputValue, query } = yield* parseContextArgs(args);
+      const tagValue = Option.getOrUndefined(tags);
+      const outputValue = Option.getOrUndefined(output);
       const hasQuery = query.length > 0;
 
       if (tagValue && hasQuery) {
@@ -195,21 +149,21 @@ export const contextCommand = Command.make(
     }).pipe(
       Effect.catchTags({
         InvalidContextQueryError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         AmbiguousEntityIdError: (e) =>
           Console.error(
             `Error: Entity id "${e.value}" is ambiguous: ${formatEntityIdMatches(e.matches)}`
-          ).pipe(Effect.zipRight(Effect.fail(e))),
+          ).pipe(Effect.andThen(Effect.fail(e))),
         EntityNotFoundError: (e) =>
           Console.error(`Error: Entity not found: ${e.entityId}`).pipe(
-            Effect.zipRight(Effect.fail(e))
+            Effect.andThen(Effect.fail(e))
           ),
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
 ).pipe(Command.withDescription("Export agent-ready markdown context"));

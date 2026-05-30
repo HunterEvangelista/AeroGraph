@@ -1,5 +1,5 @@
 import { type Entity, EntityNotFoundError, EntityServiceTag } from "@kioku/core";
-import { Data, Effect } from "effect";
+import { Data, Effect, Result } from "effect";
 
 export interface EntityIdMatch {
   readonly id: string;
@@ -18,16 +18,16 @@ export const formatEntityIdMatches = (matches: ReadonlyArray<EntityIdMatch>): st
 export const resolveEntityId = (value: string) =>
   Effect.gen(function* () {
     const entityService = yield* EntityServiceTag;
-    const exact = yield* Effect.either(
+    const exact = yield* Effect.result(
       entityService.getById(value as Parameters<typeof entityService.getById>[0])
     );
 
-    if (exact._tag === "Right") {
-      return exact.right.id;
+    if (Result.isSuccess(exact)) {
+      return exact.success.id;
     }
 
-    if (exact.left._tag !== "EntityNotFoundError") {
-      return yield* exact.left;
+    if (exact.failure._tag !== "EntityNotFoundError") {
+      return yield* exact.failure;
     }
 
     const entities = yield* entityService.getAll();

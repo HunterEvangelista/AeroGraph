@@ -1,10 +1,10 @@
+import { EntityServiceTag, EntityTypeEnum, LinkRepositoryTag, TagServiceTag } from "@kioku/core";
+import { Console, Data, Effect, Option } from "effect";
 /**
  * Doc Commands
  * CRUD operations for document entities
  */
-import { Args, Command, Options } from "@effect/cli";
-import { EntityServiceTag, EntityTypeEnum, LinkRepositoryTag, TagServiceTag } from "@kioku/core";
-import { Console, Data, Effect, Option } from "effect";
+import { Argument, Command, Flag } from "effect/unstable/cli";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
 import { withCliServices } from "./workspace.js";
 
@@ -40,16 +40,16 @@ const formatDocError = (error: DocCommandError): string => {
 const docCreateCommand = Command.make(
   "create",
   {
-    title: Args.text({ name: "title" }),
-    content: Options.text("content").pipe(
-      Options.withAlias("c"),
-      Options.withDescription("Document content (markdown)"),
-      Options.optional
+    title: Argument.string("title"),
+    content: Flag.string("content").pipe(
+      Flag.withAlias("c"),
+      Flag.withDescription("Document content (markdown)"),
+      Flag.optional
     ),
-    tags: Options.text("tags").pipe(
-      Options.withAlias("t"),
-      Options.withDescription("Comma-separated tags to apply"),
-      Options.optional
+    tags: Flag.string("tags").pipe(
+      Flag.withAlias("t"),
+      Flag.withDescription("Comma-separated tags to apply"),
+      Flag.optional
     ),
   },
   ({ title, content, tags }) =>
@@ -91,10 +91,10 @@ const docCreateCommand = Command.make(
       yield* Console.log(`Version: ${doc.version}`);
       yield* Console.log("");
     }).pipe(
-      Effect.catchAll((error) =>
+      Effect.catch((error) =>
         Console.error(
           `Error: ${error._tag}: ${"message" in error ? error.message : String(error)}`
-        ).pipe(Effect.zipRight(Effect.fail(error)))
+        ).pipe(Effect.andThen(Effect.fail(error)))
       )
     )
 );
@@ -106,7 +106,7 @@ const docCreateCommand = Command.make(
 const docShowCommand = Command.make(
   "show",
   {
-    id: Args.text({ name: "id" }),
+    id: Argument.string("id"),
   },
   ({ id }) =>
     Effect.gen(function* () {
@@ -179,8 +179,8 @@ const docShowCommand = Command.make(
 
       yield* Console.log("");
     }).pipe(
-      Effect.catchAll((error) =>
-        Console.error(`Error: ${formatDocError(error)}`).pipe(Effect.zipRight(Effect.fail(error)))
+      Effect.catch((error) =>
+        Console.error(`Error: ${formatDocError(error)}`).pipe(Effect.andThen(Effect.fail(error)))
       )
     )
 );
@@ -192,15 +192,15 @@ const docShowCommand = Command.make(
 const docListCommand = Command.make(
   "list",
   {
-    tag: Options.text("tag").pipe(
-      Options.withAlias("t"),
-      Options.withDescription("Filter by tag"),
-      Options.optional
+    tag: Flag.string("tag").pipe(
+      Flag.withAlias("t"),
+      Flag.withDescription("Filter by tag"),
+      Flag.optional
     ),
-    search: Options.text("search").pipe(
-      Options.withAlias("s"),
-      Options.withDescription("Search in title/content"),
-      Options.optional
+    search: Flag.string("search").pipe(
+      Flag.withAlias("s"),
+      Flag.withDescription("Search in title/content"),
+      Flag.optional
     ),
   },
   ({ tag, search }) =>
@@ -247,10 +247,10 @@ const docListCommand = Command.make(
         }
       }
     }).pipe(
-      Effect.catchAll((error) =>
+      Effect.catch((error) =>
         Console.error(
           `Error: ${error._tag}: ${"message" in error ? error.message : String(error)}`
-        ).pipe(Effect.zipRight(Effect.fail(error)))
+        ).pipe(Effect.andThen(Effect.fail(error)))
       )
     )
 );
@@ -262,12 +262,12 @@ const docListCommand = Command.make(
 const docEditCommand = Command.make(
   "edit",
   {
-    id: Args.text({ name: "id" }),
-    title: Options.text("title").pipe(Options.withDescription("New title"), Options.optional),
-    content: Options.text("content").pipe(
-      Options.withAlias("c"),
-      Options.withDescription("New content"),
-      Options.optional
+    id: Argument.string("id"),
+    title: Flag.string("title").pipe(Flag.withDescription("New title"), Flag.optional),
+    content: Flag.string("content").pipe(
+      Flag.withAlias("c"),
+      Flag.withDescription("New content"),
+      Flag.optional
     ),
   },
   ({ id, title, content }) =>
@@ -276,7 +276,7 @@ const docEditCommand = Command.make(
       const contentValue = Option.getOrUndefined(content);
 
       if (!titleValue && !contentValue) {
-        return yield* Effect.fail(new NoUpdatesError({}));
+        return yield* Effect.fail(new NoUpdatesError());
       }
 
       const updated = yield* withCliServices(
@@ -314,11 +314,11 @@ const docEditCommand = Command.make(
     }).pipe(
       Effect.catchTag("NoUpdatesError", () =>
         Console.error("Error: Provide at least --title or --content to update").pipe(
-          Effect.zipRight(Effect.fail(new NoUpdatesError({})))
+          Effect.andThen(Effect.fail(new NoUpdatesError()))
         )
       ),
-      Effect.catchAll((error) =>
-        Console.error(`Error: ${formatDocError(error)}`).pipe(Effect.zipRight(Effect.fail(error)))
+      Effect.catch((error) =>
+        Console.error(`Error: ${formatDocError(error)}`).pipe(Effect.andThen(Effect.fail(error)))
       )
     )
 );
@@ -330,11 +330,11 @@ const docEditCommand = Command.make(
 const docDeleteCommand = Command.make(
   "delete",
   {
-    id: Args.text({ name: "id" }),
-    force: Options.boolean("force").pipe(
-      Options.withAlias("f"),
-      Options.withDescription("Skip confirmation"),
-      Options.withDefault(false)
+    id: Argument.string("id"),
+    force: Flag.boolean("force").pipe(
+      Flag.withAlias("f"),
+      Flag.withDescription("Skip confirmation"),
+      Flag.withDefault(false)
     ),
   },
   ({ id, force }) =>
@@ -367,8 +367,8 @@ const docDeleteCommand = Command.make(
       yield* Console.log(`Document ${deletedId} deleted.`);
       yield* Console.log("");
     }).pipe(
-      Effect.catchAll((error) =>
-        Console.error(`Error: ${formatDocError(error)}`).pipe(Effect.zipRight(Effect.fail(error)))
+      Effect.catch((error) =>
+        Console.error(`Error: ${formatDocError(error)}`).pipe(Effect.andThen(Effect.fail(error)))
       )
     )
 );
