@@ -1,6 +1,6 @@
-import { Args, Command } from "@effect/cli";
 import { type Entity, VersionRepositoryTag } from "@kioku/core";
-import { Console, Data, Effect } from "effect";
+import { Console, Data, Effect, Option } from "effect";
+import { Argument, Command, Flag } from "effect/unstable/cli";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
 import { withCliServices } from "./workspace.js";
 
@@ -19,70 +19,32 @@ class InvalidHistoryArgsError extends Data.TaggedError("InvalidHistoryArgsError"
   readonly message: string;
 }> {}
 
-const parseHistoryArgs = (args: ReadonlyArray<string>) =>
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Keeps option-after-id parsing localized for `history <id> --version 1`.
-  Effect.gen(function* () {
-    let entityId: string | undefined;
-    let version: number | undefined;
-
-    for (let index = 0; index < args.length; index++) {
-      const arg = args[index];
-      if (!arg) continue;
-
-      if (arg === "--version") {
-        const value = args[index + 1];
-        if (!value || value.startsWith("-")) {
-          return yield* Effect.fail(
-            new InvalidHistoryArgsError({ message: "--version requires a value." })
-          );
-        }
-        if (!/^\d+$/.test(value)) {
-          return yield* Effect.fail(
-            new InvalidHistoryArgsError({ message: "--version must be a positive integer." })
-          );
-        }
-
-        version = Number.parseInt(value, 10);
-        if (version < 1) {
-          return yield* Effect.fail(
-            new InvalidHistoryArgsError({ message: "--version must be a positive integer." })
-          );
-        }
-        index++;
-      } else if (arg.startsWith("-")) {
-        return yield* Effect.fail(
-          new InvalidHistoryArgsError({ message: `Unknown option: ${arg}` })
-        );
-      } else if (!entityId) {
-        entityId = arg;
-      } else {
-        return yield* Effect.fail(
-          new InvalidHistoryArgsError({ message: `Unexpected argument: ${arg}` })
-        );
-      }
-    }
-
-    if (!entityId) {
-      return yield* Effect.fail(
-        new InvalidHistoryArgsError({ message: "history requires <entityId>." })
-      );
-    }
-
-    return { entityId, version };
-  });
-
 export const historyCommand = Command.make(
   "history",
   {
-    args: Args.text({ name: "args" }).pipe(Args.repeated),
+    entityId: Argument.string("entityId"),
+    version: Flag.string("version").pipe(Flag.optional),
   },
-  ({ args }) =>
+  ({ entityId, version }) =>
     withCliServices(
       Effect.gen(function* () {
         const versionRepository = yield* VersionRepositoryTag;
-        const parsed = yield* parseHistoryArgs(args);
-        const resolvedId = yield* resolveEntityId(parsed.entityId);
-        const versionValue = parsed.version;
+        const versionText = Option.getOrUndefined(version);
+        let versionValue: number | undefined;
+        if (versionText !== undefined) {
+          if (!/^\d+$/.test(versionText)) {
+            return yield* new InvalidHistoryArgsError({
+              message: "--version must be a positive integer.",
+            });
+          }
+          versionValue = Number.parseInt(versionText, 10);
+          if (versionValue < 1) {
+            return yield* new InvalidHistoryArgsError({
+              message: "--version must be a positive integer.",
+            });
+          }
+        }
+        const resolvedId = yield* resolveEntityId(entityId);
 
         if (versionValue !== undefined) {
           const record = yield* versionRepository.getEntityAtVersion<Entity>(
@@ -135,23 +97,23 @@ export const historyCommand = Command.make(
         AmbiguousEntityIdError: (e) =>
           Console.error(
             `Error: Entity id "${e.value}" is ambiguous: ${formatEntityIdMatches(e.matches)}`
-          ).pipe(Effect.zipRight(Effect.fail(e))),
+          ).pipe(Effect.andThen(Effect.fail(e))),
         EntityNotFoundError: (e) =>
           Console.error(`Error: Entity not found: ${e.entityId}`).pipe(
-            Effect.zipRight(Effect.fail(e))
+            Effect.andThen(Effect.fail(e))
           ),
         VersionNotFoundError: (e) =>
           Console.error(`Error: Version not found: ${e.entityId} v${e.version}`).pipe(
-            Effect.zipRight(Effect.fail(e))
+            Effect.andThen(Effect.fail(e))
           ),
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         InvalidHistoryArgsError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
 ).pipe(Command.withDescription("Show entity version history"));

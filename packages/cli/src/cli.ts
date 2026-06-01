@@ -1,10 +1,10 @@
+import { BunRuntime, BunServices } from "@effect/platform-bun";
+import { Effect, Layer } from "effect";
 /**
  * Kioku CLI
  * Main entry point for the command-line interface
  */
-import { Command } from "@effect/cli";
-import { BunContext, BunRuntime } from "@effect/platform-bun";
-import { Effect, Layer } from "effect";
+import { Command } from "effect/unstable/cli";
 import {
   codeRefCommand,
   contextCommand,
@@ -45,7 +45,6 @@ const command = kioku.pipe(
 );
 
 const cli = Command.run(command, {
-  name: "kioku",
   version: "0.1.0",
 });
 
@@ -53,6 +52,6 @@ const cli = Command.run(command, {
 // Run
 // ============================================================================
 
-const MainLive = Layer.mergeAll(ConfigServiceLive, BunContext.layer);
+const MainLive = Layer.mergeAll(ConfigServiceLive, BunServices.layer);
 
-cli(process.argv).pipe(Effect.provide(MainLive), BunRuntime.runMain);
+cli.pipe(Effect.provide(MainLive), BunRuntime.runMain);

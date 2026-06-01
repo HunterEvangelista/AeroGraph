@@ -37,10 +37,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "effect": "^3.11.9"
+    "effect": "4.0.0-beta.74"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "^2.4.16",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

@@ -10,12 +10,13 @@
  * Implementation coming in Phase 3.
  */
 
-// Provider abstraction
+// Prompt templates
 export {
-  AIProviderError,
-  AIProviderLive,
-  AIProviderTag,
-} from "./providers/index.js"
+  formatEntityContext,
+  formatTagSuggestion,
+  ONBOARDING_SYSTEM_PROMPT,
+  QUERY_SYSTEM_PROMPT,
+} from "./prompts/index.js";
 export type {
   AIProvider,
   GenerateOptions,
@@ -23,15 +24,13 @@ export type {
   Message,
   ProviderConfig,
   ProviderType,
-} from "./providers/index.js"
-
-// Prompt templates
+} from "./providers/index.js";
+// Provider abstraction
 export {
-  formatEntityContext,
-  formatTagSuggestion,
-  ONBOARDING_SYSTEM_PROMPT,
-  QUERY_SYSTEM_PROMPT,
-} from "./prompts/index.js"
+  AIProviderError,
+  AIProviderLive,
+  AIProviderTag,
+} from "./providers/index.js";
 
 // Structured output schemas
 export {
@@ -40,4 +39,4 @@ export {
   SuggestedCodeRef,
   SuggestedDoc,
   SuggestedTag,
-} from "./structured/index.js"
+} from "./structured/index.js";

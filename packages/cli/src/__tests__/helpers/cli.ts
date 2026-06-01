@@ -17,7 +17,7 @@ export interface CliWorkspace {
 }
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const cliEntrypoint = join(packageRoot, "src/index.ts");
+const cliEntrypoint = join(packageRoot, "src/cli.ts");
 const seedQueryFixtureEntrypoint = join(packageRoot, "src/__tests__/helpers/seed-query-fixture.ts");
 
 const runBun = (args: ReadonlyArray<string>, cwd: string): CliResult => {

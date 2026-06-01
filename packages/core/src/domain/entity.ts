@@ -11,7 +11,7 @@ export enum EntityTypeEnum {
   Diagram = "diagram",
 }
 
-export const EntityType = Schema.Enums(EntityTypeEnum);
+export const EntityType = Schema.Enum(EntityTypeEnum);
 export type EntityType = typeof EntityType.Type;
 
 // ============================================================================
@@ -26,7 +26,7 @@ export enum StoryStatusEnum {
   Cancelled = "cancelled",
 }
 
-export const StoryStatus = Schema.Enums(StoryStatusEnum);
+export const StoryStatus = Schema.Enum(StoryStatusEnum);
 export type StoryStatus = typeof StoryStatus.Type;
 
 export enum PriorityEnum {
@@ -36,7 +36,7 @@ export enum PriorityEnum {
   Urgent = "urgent",
 }
 
-export const Priority = Schema.Enums(PriorityEnum);
+export const Priority = Schema.Enum(PriorityEnum);
 export type Priority = typeof Priority.Type;
 
 // ============================================================================
@@ -51,7 +51,7 @@ export enum DiagramTypeEnum {
   Other = "other",
 }
 
-export const DiagramType = Schema.Enums(DiagramTypeEnum);
+export const DiagramType = Schema.Enum(DiagramTypeEnum);
 export type DiagramType = typeof DiagramType.Type;
 
 // ============================================================================
@@ -62,12 +62,12 @@ export const BrandedId = Schema.String.pipe(Schema.brand("EntityId"));
 
 const BaseEntityFields = {
   id: BrandedId,
-  title: Schema.String.pipe(Schema.nonEmptyString()),
+  title: Schema.String.check(Schema.isNonEmpty()),
   content: Schema.String,
   tags: Schema.Array(Schema.String),
-  createdAt: Schema.Date,
-  updatedAt: Schema.Date,
-  version: Schema.Number.pipe(Schema.int(), Schema.positive()),
+  createdAt: Schema.DateFromString,
+  updatedAt: Schema.DateFromString,
+  version: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
 };
 
 export const BaseEntity = Schema.Struct(BaseEntityFields);
@@ -87,9 +87,9 @@ export type Doc = typeof Doc.Type;
 export const CodeRef = Schema.TaggedStruct(EntityTypeEnum.CodeRef, {
   ...BaseEntityFields,
   repoPath: Schema.String,
-  filePath: Schema.String.pipe(Schema.nonEmptyString()),
-  startLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
-  endLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
+  filePath: Schema.String.check(Schema.isNonEmpty()),
+  startLine: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))),
+  endLine: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))),
   commitHash: Schema.optional(Schema.String),
   symbol: Schema.optional(Schema.String),
 });
@@ -115,7 +115,7 @@ export type Diagram = typeof Diagram.Type;
 // Entity Unions
 // ============================================================================
 
-export const Entity = Schema.Union(Doc, CodeRef, Story, Diagram);
+export const Entity = Schema.Union([Doc, CodeRef, Story, Diagram]);
 export type Entity = typeof Entity.Type;
 
 // ============================================================================
@@ -123,7 +123,7 @@ export type Entity = typeof Entity.Type;
 // ============================================================================
 
 export const CreateDocInput = Schema.Struct({
-  title: Schema.String.pipe(Schema.nonEmptyString()),
+  title: Schema.String.check(Schema.isNonEmpty()),
   content: Schema.String,
   tags: Schema.optional(Schema.Array(Schema.String)),
 });
@@ -131,13 +131,13 @@ export const CreateDocInput = Schema.Struct({
 export type CreateDocInput = typeof CreateDocInput.Type;
 
 export const CreateCodeRefInput = Schema.Struct({
-  title: Schema.String.pipe(Schema.nonEmptyString()),
+  title: Schema.String.check(Schema.isNonEmpty()),
   content: Schema.String,
   tags: Schema.optional(Schema.Array(Schema.String)),
   repoPath: Schema.String,
-  filePath: Schema.String.pipe(Schema.nonEmptyString()),
-  startLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
-  endLine: Schema.optional(Schema.Number.pipe(Schema.int(), Schema.positive())),
+  filePath: Schema.String.check(Schema.isNonEmpty()),
+  startLine: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))),
+  endLine: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))),
   commitHash: Schema.optional(Schema.String),
   symbol: Schema.optional(Schema.String),
 });
@@ -145,7 +145,7 @@ export const CreateCodeRefInput = Schema.Struct({
 export type CreateCodeRefInput = typeof CreateCodeRefInput.Type;
 
 export const CreateStoryInput = Schema.Struct({
-  title: Schema.String.pipe(Schema.nonEmptyString()),
+  title: Schema.String.check(Schema.isNonEmpty()),
   content: Schema.String,
   tags: Schema.optional(Schema.Array(Schema.String)),
   status: Schema.optional(StoryStatus),
@@ -156,7 +156,7 @@ export const CreateStoryInput = Schema.Struct({
 export type CreateStoryInput = typeof CreateStoryInput.Type;
 
 export const CreateDiagramInput = Schema.Struct({
-  title: Schema.String.pipe(Schema.nonEmptyString()),
+  title: Schema.String.check(Schema.isNonEmpty()),
   content: Schema.String,
   tags: Schema.optional(Schema.Array(Schema.String)),
   diagramType: DiagramType,

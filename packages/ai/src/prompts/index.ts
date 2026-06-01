@@ -17,7 +17,7 @@ You will:
 4. Suggest tags and categories for organizing knowledge
 5. Generate entities (Docs, CodeRefs, Stories) to represent the codebase
 
-Be concise but thorough. Ask one question at a time. Use the information gathered to build an accurate knowledge graph.`
+Be concise but thorough. Ask one question at a time. Use the information gathered to build an accurate knowledge graph.`;
 
 // ============================================================================
 // Query Agent Prompts
@@ -31,7 +31,7 @@ Given a user's question, you will:
 3. Retrieve and rank relevant entities
 4. Provide a concise summary with links to the most relevant resources
 
-Focus on precision over recall - return only the most relevant information.`
+Focus on precision over recall - return only the most relevant information.`;
 
 // ============================================================================
 // Template Helpers
@@ -39,9 +39,9 @@ Focus on precision over recall - return only the most relevant information.`
 
 export const formatEntityContext = (entities: unknown[]): string => {
   // Placeholder - will format entities for LLM context
-  return JSON.stringify(entities, null, 2)
-}
+  return JSON.stringify(entities, null, 2);
+};
 
 export const formatTagSuggestion = (concepts: string[]): string => {
-  return concepts.map((c) => `#${c.toLowerCase().replace(/\s+/g, "-")}`).join(" ")
-}
+  return concepts.map((c) => `#${c.toLowerCase().replace(/\s+/g, "-")}`).join(" ");
+};

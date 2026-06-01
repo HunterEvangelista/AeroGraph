@@ -3,7 +3,7 @@
  * Database DDL for the knowledge graph
  */
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 1;
 
 export const CREATE_TABLES_SQL = `
 -- Entities table (stores current state)
@@ -92,12 +92,12 @@ CREATE TRIGGER IF NOT EXISTS entities_au AFTER UPDATE ON entities BEGIN
   INSERT INTO entities_fts(entities_fts, id, title, content) VALUES('delete', old.id, old.title, old.content);
   INSERT INTO entities_fts(id, title, content) VALUES (new.id, new.title, new.content);
 END;
-`
+`;
 
 export const INSERT_SCHEMA_VERSION_SQL = `
 INSERT OR REPLACE INTO schema_meta (key, value) VALUES ('version', ?);
-`
+`;
 
 export const GET_SCHEMA_VERSION_SQL = `
 SELECT value FROM schema_meta WHERE key = 'version';
-`
+`;

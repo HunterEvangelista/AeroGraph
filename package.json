@@ -34,7 +34,7 @@
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
+    "@biomejs/biome": "^2.4.16",
     "@effect/language-service": "^0.86.2",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2"

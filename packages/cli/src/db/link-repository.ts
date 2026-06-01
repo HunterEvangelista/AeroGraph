@@ -1,6 +1,7 @@
 import {
   type CreateLinkInput,
   EntityNotFoundError,
+  getInverseLinkType,
   type Link,
   type LinkId,
   LinkNotFoundError,
@@ -8,7 +9,6 @@ import {
   LinkRepositoryTag,
   type LinkType,
   RepositoryError,
-  getInverseLinkType,
 } from "@kioku/core";
 /**
  * SQLite Link Repository Implementation

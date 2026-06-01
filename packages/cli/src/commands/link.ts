@@ -1,8 +1,3 @@
-/**
- * Link Commands
- * Create, remove, and inspect directed entity relationships.
- */
-import { Args, Command } from "@effect/cli";
 import {
   type Entity,
   EntityServiceTag,
@@ -10,7 +5,12 @@ import {
   LinkRepositoryTag,
   type LinkType,
 } from "@kioku/core";
-import { Console, Data, Effect } from "effect";
+import { Console, Data, Effect, Option } from "effect";
+/**
+ * Link Commands
+ * Create, remove, and inspect directed entity relationships.
+ */
+import { Argument, Command, Flag } from "effect/unstable/cli";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
 import { withCliServices } from "./workspace.js";
 
@@ -45,48 +45,6 @@ const parseLinkType = (value: string) =>
     ? Effect.succeed(value as LinkType)
     : Effect.fail(new InvalidLinkTypeError({ value }));
 
-const collectLinkArgs = (args: ReadonlyArray<string>) => {
-  const positional: string[] = [];
-  let type: string | undefined;
-
-  for (let index = 0; index < args.length; index++) {
-    const value = args[index];
-    if (!value) continue;
-
-    if (value === "--type") {
-      type = args[index + 1];
-      index++;
-    } else {
-      positional.push(value);
-    }
-  }
-
-  return { positional, type };
-};
-
-const validateLinkArgs = (args: ReadonlyArray<string>, requireType: boolean) => {
-  if (args.includes("--type") && !args[args.indexOf("--type") + 1]) {
-    return "--type requires a value.";
-  }
-
-  const unknownOption = args.find((value) => value.startsWith("--") && value !== "--type");
-  if (unknownOption) return `Unknown option: ${unknownOption}`;
-
-  const { positional, type } = collectLinkArgs(args);
-  if (positional.length !== 2) return "Expected <sourceId> and <targetId>.";
-  if (requireType && !type) return "--type is required.";
-};
-
-const parseLinkArgs = (args: ReadonlyArray<string>, requireType: boolean) =>
-  Effect.gen(function* () {
-    const error = validateLinkArgs(args, requireType);
-    if (error) return yield* Effect.fail(new InvalidLinkCommandError({ message: error }));
-
-    const { positional, type } = collectLinkArgs(args);
-    const [sourceId, targetId] = positional as [string, string];
-    return { sourceId, targetId, type };
-  });
-
 const entitySummary = (entity: Entity): string => `${entity.id}  [${entity._tag}] ${entity.title}`;
 
 const directionLabel = (link: Link, entityId: string): string =>
@@ -117,33 +75,33 @@ const printLinkGroup = (title: string, entityId: string, links: ReadonlyArray<Li
 
 const catchLinkErrors = <A, R>(effect: Effect.Effect<A, LinkCommandError, R>) =>
   effect.pipe(
-    Effect.catchAll((error) => {
+    Effect.catch((error) => {
       switch (error._tag) {
         case "InvalidLinkTypeError":
           return Console.error(
             `Error: Invalid link type "${error.value ?? ""}". Expected one of: ${linkTypes.join(", ")}.`
-          ).pipe(Effect.zipRight(Effect.fail(error)));
+          ).pipe(Effect.andThen(Effect.fail(error)));
         case "AmbiguousEntityIdError":
           return Console.error(
             `Error: Entity id "${error.value ?? ""}" is ambiguous: ${formatEntityIdMatches(error.matches ?? [])}`
-          ).pipe(Effect.zipRight(Effect.fail(error)));
+          ).pipe(Effect.andThen(Effect.fail(error)));
         case "InvalidLinkCommandError":
         case "WorkspaceNotFoundError":
         case "ConfigError":
           return Console.error(`Error: ${error.message ?? error._tag}`).pipe(
-            Effect.zipRight(Effect.fail(error))
+            Effect.andThen(Effect.fail(error))
           );
         case "RepositoryError":
           return Console.error(`Database error: ${error.message ?? error._tag}`).pipe(
-            Effect.zipRight(Effect.fail(error))
+            Effect.andThen(Effect.fail(error))
           );
         case "EntityNotFoundError":
           return Console.error(`Error: Entity not found: ${error.entityId ?? ""}`).pipe(
-            Effect.zipRight(Effect.fail(error))
+            Effect.andThen(Effect.fail(error))
           );
         case "LinkNotFoundError":
           return Console.error(`Error: Link not found: ${error.linkId ?? ""}`).pipe(
-            Effect.zipRight(Effect.fail(error))
+            Effect.andThen(Effect.fail(error))
           );
         default:
           return Effect.fail(error);
@@ -154,7 +112,7 @@ const catchLinkErrors = <A, R>(effect: Effect.Effect<A, LinkCommandError, R>) =>
 const linkListCommand = Command.make(
   "list",
   {
-    entityId: Args.text({ name: "entityId" }),
+    entityId: Argument.string("entityId"),
   },
   ({ entityId }) =>
     withCliServices(
@@ -178,16 +136,23 @@ const linkListCommand = Command.make(
 export const linkCommand = Command.make(
   "link",
   {
-    args: Args.text({ name: "args" }).pipe(Args.repeated),
+    sourceId: Argument.string("sourceId"),
+    targetId: Argument.string("targetId"),
+    type: Flag.string("type").pipe(Flag.optional),
   },
-  ({ args }) =>
+  ({ sourceId, targetId, type }) =>
     withCliServices(
       Effect.gen(function* () {
         const linkRepository = yield* LinkRepositoryTag;
-        const parsed = yield* parseLinkArgs(args, true);
-        const source = yield* resolveEntityId(parsed.sourceId);
-        const target = yield* resolveEntityId(parsed.targetId);
-        const linkType = yield* parseLinkType(parsed.type ?? "");
+        const typeValue = Option.getOrUndefined(type);
+        if (!typeValue) {
+          return yield* Effect.fail(
+            new InvalidLinkCommandError({ message: "--type is required." })
+          );
+        }
+        const source = yield* resolveEntityId(sourceId);
+        const target = yield* resolveEntityId(targetId);
+        const linkType = yield* parseLinkType(typeValue);
 
         // Links are stored as one directed row. Incoming/inverse semantics are derived
         // from source/target at read time so we can add bidirectional options later.
@@ -209,16 +174,18 @@ export const linkCommand = Command.make(
 export const unlinkCommand = Command.make(
   "unlink",
   {
-    args: Args.text({ name: "args" }).pipe(Args.repeated),
+    sourceId: Argument.string("sourceId"),
+    targetId: Argument.string("targetId"),
+    type: Flag.string("type").pipe(Flag.optional),
   },
-  ({ args }) =>
+  ({ sourceId, targetId, type }) =>
     withCliServices(
       Effect.gen(function* () {
         const linkRepository = yield* LinkRepositoryTag;
-        const parsed = yield* parseLinkArgs(args, false);
-        const source = yield* resolveEntityId(parsed.sourceId);
-        const target = yield* resolveEntityId(parsed.targetId);
-        const linkType = parsed.type ? yield* parseLinkType(parsed.type) : undefined;
+        const source = yield* resolveEntityId(sourceId);
+        const target = yield* resolveEntityId(targetId);
+        const typeValue = Option.getOrUndefined(type);
+        const linkType = typeValue ? yield* parseLinkType(typeValue) : undefined;
 
         yield* linkRepository.deleteBetween(source, target, linkType);
 

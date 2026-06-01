@@ -1,10 +1,10 @@
+import { type TagId, TagServiceTag } from "@kioku/core";
+import { Console, Effect, Option } from "effect";
 /**
  * Tag Commands
  * Operations for managing tags and entity tagging
  */
-import { Args, Command, Options } from "@effect/cli";
-import { type TagId, TagServiceTag } from "@kioku/core";
-import { Console, Effect, Option } from "effect";
+import { Argument, Command, Flag } from "effect/unstable/cli";
 import { withCliServices } from "./workspace.js";
 
 // ============================================================================
@@ -14,16 +14,16 @@ import { withCliServices } from "./workspace.js";
 const tagCreateCommand = Command.make(
   "create",
   {
-    name: Args.text({ name: "name" }),
-    parent: Options.text("parent").pipe(
-      Options.withAlias("p"),
-      Options.withDescription("Parent tag ID for hierarchy"),
-      Options.optional
+    name: Argument.string("name"),
+    parent: Flag.string("parent").pipe(
+      Flag.withAlias("p"),
+      Flag.withDescription("Parent tag ID for hierarchy"),
+      Flag.optional
     ),
-    description: Options.text("description").pipe(
-      Options.withAlias("d"),
-      Options.withDescription("Tag description"),
-      Options.optional
+    description: Flag.string("description").pipe(
+      Flag.withAlias("d"),
+      Flag.withDescription("Tag description"),
+      Flag.optional
     ),
   },
   ({ name, parent, description }) =>
@@ -65,13 +65,13 @@ const tagCreateCommand = Command.make(
     }).pipe(
       Effect.catchTags({
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ValidationError: (e) =>
-          Console.error(`Validation error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Validation error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
 );
@@ -83,14 +83,14 @@ const tagCreateCommand = Command.make(
 const tagListCommand = Command.make(
   "list",
   {
-    search: Options.text("search").pipe(
-      Options.withAlias("s"),
-      Options.withDescription("Search tags by name"),
-      Options.optional
+    search: Flag.string("search").pipe(
+      Flag.withAlias("s"),
+      Flag.withDescription("Search tags by name"),
+      Flag.optional
     ),
-    tree: Options.boolean("tree").pipe(
-      Options.withDescription("Show as hierarchy tree"),
-      Options.withDefault(false)
+    tree: Flag.boolean("tree").pipe(
+      Flag.withDescription("Show as hierarchy tree"),
+      Flag.withDefault(false)
     ),
   },
   ({ search, tree }) =>
@@ -165,11 +165,11 @@ const tagListCommand = Command.make(
     }).pipe(
       Effect.catchTags({
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
 );
@@ -181,8 +181,8 @@ const tagListCommand = Command.make(
 const tagApplyCommand = Command.make(
   "apply",
   {
-    entityId: Args.text({ name: "entity-id" }),
-    tagId: Args.text({ name: "tag" }),
+    entityId: Argument.string("entity-id"),
+    tagId: Argument.string("tag"),
   },
   ({ entityId, tagId }) =>
     Effect.gen(function* () {
@@ -204,19 +204,19 @@ const tagApplyCommand = Command.make(
     }).pipe(
       Effect.catchTags({
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         EntityNotFoundError: (e) =>
           Console.error(`Error: Entity not found: ${e.entityId}`).pipe(
-            Effect.zipRight(Effect.fail(e))
+            Effect.andThen(Effect.fail(e))
           ),
         TagNotFoundError: (e) =>
-          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.andThen(Effect.fail(e))),
         ValidationError: (e) =>
-          Console.error(`Validation error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Validation error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
 );
@@ -228,8 +228,8 @@ const tagApplyCommand = Command.make(
 const tagRemoveCommand = Command.make(
   "remove",
   {
-    entityId: Args.text({ name: "entity-id" }),
-    tagId: Args.text({ name: "tag" }),
+    entityId: Argument.string("entity-id"),
+    tagId: Argument.string("tag"),
   },
   ({ entityId, tagId }) =>
     Effect.gen(function* () {
@@ -246,17 +246,17 @@ const tagRemoveCommand = Command.make(
     }).pipe(
       Effect.catchTags({
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         EntityNotFoundError: (e) =>
           Console.error(`Error: Entity not found: ${e.entityId}`).pipe(
-            Effect.zipRight(Effect.fail(e))
+            Effect.andThen(Effect.fail(e))
           ),
         TagNotFoundError: (e) =>
-          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
 );
@@ -268,7 +268,7 @@ const tagRemoveCommand = Command.make(
 const tagShowCommand = Command.make(
   "show",
   {
-    id: Args.text({ name: "tag-id" }),
+    id: Argument.string("tag-id"),
   },
   ({ id }) =>
     Effect.gen(function* () {
@@ -278,7 +278,7 @@ const tagShowCommand = Command.make(
 
           const tag = yield* tagService.getById(id as TagId);
           const ancestors = yield* tagService.getAncestors(tag.id);
-          const children = yield* Effect.catchAll(tagService.getChildren(tag.id), () =>
+          const children = yield* Effect.catch(tagService.getChildren(tag.id), () =>
             Effect.succeed([] as ReadonlyArray<typeof tag>)
           );
 
@@ -316,13 +316,13 @@ const tagShowCommand = Command.make(
     }).pipe(
       Effect.catchTags({
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         TagNotFoundError: (e) =>
-          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
 );
@@ -334,11 +334,11 @@ const tagShowCommand = Command.make(
 const tagDeleteCommand = Command.make(
   "delete",
   {
-    id: Args.text({ name: "tag-id" }),
-    force: Options.boolean("force").pipe(
-      Options.withAlias("f"),
-      Options.withDescription("Skip confirmation"),
-      Options.withDefault(false)
+    id: Argument.string("tag-id"),
+    force: Flag.boolean("force").pipe(
+      Flag.withAlias("f"),
+      Flag.withDescription("Skip confirmation"),
+      Flag.withDefault(false)
     ),
   },
   ({ id, force }) =>
@@ -364,13 +364,13 @@ const tagDeleteCommand = Command.make(
     }).pipe(
       Effect.catchTags({
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         TagNotFoundError: (e) =>
-          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
 );

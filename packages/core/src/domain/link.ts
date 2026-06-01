@@ -2,21 +2,21 @@
  * Link domain model
  * Relationships between entities
  */
-import { Schema } from "effect"
+import { Schema } from "effect";
 
 // ============================================================================
 // Link Types
 // ============================================================================
 
-export const LinkType = Schema.Literal(
+export const LinkType = Schema.Literals([
   "references",
   "parent_of",
   "child_of",
   "blocks",
   "blocked_by",
-  "related_to"
-)
-export type LinkType = typeof LinkType.Type
+  "related_to",
+]);
+export type LinkType = typeof LinkType.Type;
 
 // ============================================================================
 // Link Schema
@@ -27,23 +27,23 @@ export const Link = Schema.Struct({
   sourceId: Schema.String,
   targetId: Schema.String,
   type: LinkType,
-  createdAt: Schema.Date,
-})
+  createdAt: Schema.DateFromString,
+});
 
-export type Link = typeof Link.Type
-export type LinkId = (typeof Link.Type)["id"]
+export type Link = typeof Link.Type;
+export type LinkId = (typeof Link.Type)["id"];
 
 // ============================================================================
 // Link Creation Input
 // ============================================================================
 
 export const CreateLinkInput = Schema.Struct({
-  sourceId: Schema.String.pipe(Schema.nonEmptyString()),
-  targetId: Schema.String.pipe(Schema.nonEmptyString()),
+  sourceId: Schema.String.check(Schema.isNonEmpty()),
+  targetId: Schema.String.check(Schema.isNonEmpty()),
   type: LinkType,
-})
+});
 
-export type CreateLinkInput = typeof CreateLinkInput.Type
+export type CreateLinkInput = typeof CreateLinkInput.Type;
 
 // ============================================================================
 // Inverse Link Types (for bidirectional linking)
@@ -52,15 +52,15 @@ export type CreateLinkInput = typeof CreateLinkInput.Type
 export const getInverseLinkType = (type: LinkType): LinkType => {
   switch (type) {
     case "parent_of":
-      return "child_of"
+      return "child_of";
     case "child_of":
-      return "parent_of"
+      return "parent_of";
     case "blocks":
-      return "blocked_by"
+      return "blocked_by";
     case "blocked_by":
-      return "blocks"
+      return "blocks";
     case "references":
     case "related_to":
-      return type // Symmetric relationships
+      return type; // Symmetric relationships
   }
-}
+};
