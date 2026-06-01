@@ -3,7 +3,7 @@
  */
 import { Effect, Layer, Result } from "effect";
 import type { Tag, TagId } from "../domain/tag.js";
-import { ValidationError } from "../errors.js";
+import { TagNotFoundError, ValidationError } from "../errors.js";
 import { TagRepositoryTag } from "../repository/tag-repository.js";
 import { type TagService, TagServiceTag } from "./tag-service.js";
 
@@ -29,13 +29,15 @@ export const TagServiceLive = Layer.effect(
           if (Result.isSuccess(existingTag)) {
             currentTag = existingTag.success;
             parentId = tagId;
-          } else {
+          } else if (existingTag.failure instanceof TagNotFoundError) {
             currentTag = yield* repo.create({
               id: tagId,
               name: part,
               parentId,
             });
             parentId = tagId;
+          } else {
+            return yield* Effect.fail(existingTag.failure);
           }
         }
 

@@ -29,10 +29,6 @@ class InvalidStoryStatusError extends Data.TaggedError("InvalidStoryStatusError"
   readonly status: string;
 }> {}
 
-class InvalidStoryArgsError extends Data.TaggedError("InvalidStoryArgsError")<{
-  readonly message: string;
-}> {}
-
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -84,10 +80,6 @@ const formatStoryError = (error: { readonly _tag?: string; readonly message?: st
     return `Invalid story status "${String(error.status)}". Expected one of: ${acceptedStatuses.join(", ")}`;
   }
 
-  if (error._tag === "InvalidStoryArgsError") {
-    return error.message ?? "Invalid story command arguments";
-  }
-
   if (error._tag === "EntityNotFoundError" && "entityId" in error) {
     return `Entity not found: ${String(error.entityId)}`;
   }
@@ -106,34 +98,6 @@ const parseOptionalStatus = (status: Option.Option<string>) =>
     }
 
     return parsed;
-  });
-
-const parseStoryDeleteArgs = (args: ReadonlyArray<string>) =>
-  Effect.gen(function* () {
-    let id: string | undefined;
-    let force = false;
-
-    for (const arg of args) {
-      if (arg === "--force" || arg === "-f") {
-        force = true;
-      } else if (arg.startsWith("-")) {
-        return yield* Effect.fail(new InvalidStoryArgsError({ message: `Unknown option: ${arg}` }));
-      } else if (!id) {
-        id = arg;
-      } else {
-        return yield* Effect.fail(
-          new InvalidStoryArgsError({ message: `Unexpected argument: ${arg}` })
-        );
-      }
-    }
-
-    if (!id) {
-      return yield* Effect.fail(
-        new InvalidStoryArgsError({ message: "story delete requires <id>" })
-      );
-    }
-
-    return { id, force };
   });
 
 const printStoryDetails = (story: Story) =>
@@ -444,37 +408,37 @@ const storyEditCommand = Command.make(
 const storyDeleteCommand = Command.make(
   "delete",
   {
-    args: Argument.string("args").pipe(Argument.variadic()),
+    id: Argument.string("id"),
+    force: Flag.boolean("force").pipe(Flag.withAlias("f"), Flag.withDefault(false)),
   },
-  ({ args }) =>
+  ({ id, force }) =>
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
       const ServiceLayers = CliCoreLive(workspace.dbPath);
-      const values = yield* parseStoryDeleteArgs(args);
 
       yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const existing = yield* entityService.getById(
-            values.id as Parameters<typeof entityService.getById>[0]
+            id as Parameters<typeof entityService.getById>[0]
           );
 
           if (existing._tag !== EntityTypeEnum.Story) {
-            return yield* Effect.fail(new NotAStoryError({ id: values.id }));
+            return yield* Effect.fail(new NotAStoryError({ id }));
           }
 
-          if (!values.force) {
+          if (!force) {
             yield* Console.log(`Deleting story: ${existing.title}`);
             yield* Console.log("(Use --force to skip this confirmation in scripts)");
           }
 
-          yield* entityService.delete(values.id as Parameters<typeof entityService.getById>[0]);
+          yield* entityService.delete(id as Parameters<typeof entityService.getById>[0]);
         }).pipe(Effect.provide(ServiceLayers))
       );
 
       yield* Console.log("");
-      yield* Console.log(`Story ${values.id} deleted.`);
+      yield* Console.log(`Story ${id} deleted.`);
       yield* Console.log("");
     }).pipe(
       Effect.catch((error) =>

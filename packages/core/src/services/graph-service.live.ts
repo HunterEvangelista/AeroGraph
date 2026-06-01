@@ -4,6 +4,7 @@
 import { Effect, Layer, Result } from "effect";
 import { type Entity, EntityTypeEnum } from "../domain/entity.js";
 import type { LinkType } from "../domain/link.js";
+import { EntityNotFoundError } from "../errors.js";
 import { EntityRepositoryTag } from "../repository/entity-repository.js";
 import { LinkRepositoryTag } from "../repository/link-repository.js";
 import { TagRepositoryTag } from "../repository/tag-repository.js";
@@ -53,6 +54,8 @@ export const GraphServiceLive = Layer.effect(
           const result = yield* Effect.result(entityRepo.getById(id as Entity["id"]));
           if (Result.isSuccess(result)) {
             entities.push(result.success);
+          } else if (!(result.failure instanceof EntityNotFoundError)) {
+            return yield* Effect.fail(result.failure);
           }
         }
 
