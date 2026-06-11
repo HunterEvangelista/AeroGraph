@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import { EntityTypeEnum } from "../domain/entity.js";
 import {
-  CodeRef,
+  CodeRefSchema,
   CreateTagInput,
-  Diagram,
-  Doc,
-  Entity,
+  DiagramSchema,
+  DocSchema,
+  EntitySchema,
   getInverseLinkType,
   LinkType,
-  Story,
+  StorySchema,
   Tag,
   UpdateTagInput,
 } from "../domain/index.js";
@@ -38,7 +38,7 @@ const decodeSync = <A, I>(schema: Schema.Schema<A, I, never>, input: unknown): A
 describe("domain schema unit tests", () => {
   describe("entity.ts", () => {
     it("decodes a valid doc entity", () => {
-      const result = decodeSync(Doc, {
+      const result = decodeSync(DocSchema, {
         id: "entity-0001",
         _tag: EntityTypeEnum.Doc,
         title: "Architecture Overview",
@@ -57,7 +57,7 @@ describe("domain schema unit tests", () => {
     });
 
     it("decodes a valid code_ref entity", () => {
-      const result = decodeSync(CodeRef, {
+      const result = decodeSync(CodeRefSchema, {
         id: "entity-0002",
         _tag: EntityTypeEnum.CodeRef,
         title: "Graph service traversal",
@@ -83,7 +83,7 @@ describe("domain schema unit tests", () => {
     });
 
     it("decodes a valid story entity", () => {
-      const result = decodeSync(Story, {
+      const result = decodeSync(StorySchema, {
         id: "entity-0003",
         title: "Implement graph traversal",
         _tag: EntityTypeEnum.Story,
@@ -107,7 +107,7 @@ describe("domain schema unit tests", () => {
     });
 
     it("decodes a valid diagram entity", () => {
-      const result = decodeSync(Diagram, {
+      const result = decodeSync(DiagramSchema, {
         id: "entity-0004",
         _tag: EntityTypeEnum.Diagram,
         title: "Entity relationship diagram",
@@ -178,14 +178,14 @@ describe("domain schema unit tests", () => {
         },
       ];
 
-      const decoded = variants.map((variant) => decodeSync(Entity, variant));
+      const decoded = variants.map((variant) => decodeSync(EntitySchema, variant));
 
       expect(decoded.map((entity) => entity._tag)).toEqual(["doc", "code_ref", "story", "diagram"]);
     });
 
     it("rejects invalid entity shapes", () => {
       expect(() =>
-        decodeSync(Doc, {
+        decodeSync(DocSchema, {
           id: "entity-invalid",
           title: "",
           content: "Missing non-empty title",
@@ -197,7 +197,7 @@ describe("domain schema unit tests", () => {
       ).toThrow();
 
       expect(() =>
-        decodeSync(CodeRef, {
+        decodeSync(CodeRefSchema, {
           id: "entity-invalid",
           title: "Broken code ref",
           content: "Missing filePath",
@@ -211,7 +211,7 @@ describe("domain schema unit tests", () => {
       ).toThrow();
 
       expect(() =>
-        decodeSync(Story, {
+        decodeSync(StorySchema, {
           id: "entity-invalid",
           title: "Broken story",
           content: "Invalid status",
@@ -224,7 +224,7 @@ describe("domain schema unit tests", () => {
       ).toThrow();
 
       expect(() =>
-        decodeSync(Diagram, {
+        decodeSync(DiagramSchema, {
           id: "entity-invalid",
           title: "Broken diagram",
           content: "Invalid type",

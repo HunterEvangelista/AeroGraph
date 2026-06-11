@@ -89,6 +89,45 @@ const rowToEntity = (row: EntityRow): Entity => {
   }
 };
 
+const mergeDocMetadata = (_existing: Doc, _updates: Partial<Doc>): string | null => null;
+
+const mergeCodeRefMetadata = (existing: CodeRef, updates: Partial<CodeRef>): string =>
+  JSON.stringify({
+    repoPath: updates.repoPath ?? existing.repoPath,
+    filePath: updates.filePath ?? existing.filePath,
+    startLine: updates.startLine ?? existing.startLine,
+    endLine: updates.endLine ?? existing.endLine,
+    commitHash: updates.commitHash ?? existing.commitHash,
+    symbol: updates.symbol ?? existing.symbol,
+  });
+
+const mergeStoryMetadata = (existing: Story, updates: Partial<Story>): string =>
+  JSON.stringify({
+    status: updates.status ?? existing.status,
+    priority: updates.priority ?? existing.priority,
+    parentId: updates.parentId ?? existing.parentId,
+  });
+
+const mergeDiagramMetadata = (existing: Diagram, updates: Partial<Diagram>): string =>
+  JSON.stringify({
+    diagramType: updates.diagramType ?? existing.diagramType,
+    source: updates.source ?? existing.source,
+    generatedFrom: updates.generatedFrom ?? existing.generatedFrom,
+  });
+
+const mergeEntityMetadata = (existing: Entity, updates: Partial<Entity>): string | null => {
+  switch (existing._tag) {
+    case EntityTypeEnum.Doc:
+      return mergeDocMetadata(existing, updates as Partial<Doc>);
+    case EntityTypeEnum.CodeRef:
+      return mergeCodeRefMetadata(existing, updates as Partial<CodeRef>);
+    case EntityTypeEnum.Story:
+      return mergeStoryMetadata(existing, updates as Partial<Story>);
+    case EntityTypeEnum.Diagram:
+      return mergeDiagramMetadata(existing, updates as Partial<Diagram>);
+  }
+};
+
 // ============================================================================
 // Repository Implementation
 // ============================================================================
@@ -119,7 +158,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
     `);
 
     const updateEntity = db.prepare(`
-      UPDATE entities 
+      UPDATE entities
       SET title = ?, content = ?, metadata = ?, updated_at = ?, version = version + 1
       WHERE id = ?
     `);
@@ -248,7 +287,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
         });
 
         if (!row) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId: id }));
+          return yield* new EntityNotFoundError({ entityId: id });
         }
 
         return rowToEntity(row);
@@ -313,36 +352,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
         const newTitle = updates.title ?? existing.title;
         const newContent = updates.content ?? existing.content;
 
-        // Merge metadata based on type
-        let newMetadata: string | null = null;
-        if (existing._tag === EntityTypeEnum.CodeRef) {
-          const codeRef = existing as CodeRef;
-          const codeUpdates = updates as Partial<CodeRef>;
-          newMetadata = JSON.stringify({
-            repoPath: codeUpdates.repoPath ?? codeRef.repoPath,
-            filePath: codeUpdates.filePath ?? codeRef.filePath,
-            startLine: codeUpdates.startLine ?? codeRef.startLine,
-            endLine: codeUpdates.endLine ?? codeRef.endLine,
-            commitHash: codeUpdates.commitHash ?? codeRef.commitHash,
-            symbol: codeUpdates.symbol ?? codeRef.symbol,
-          });
-        } else if (existing._tag === EntityTypeEnum.Story) {
-          const story = existing as Story;
-          const storyUpdates = updates as Partial<Story>;
-          newMetadata = JSON.stringify({
-            status: storyUpdates.status ?? story.status,
-            priority: storyUpdates.priority ?? story.priority,
-            parentId: storyUpdates.parentId ?? story.parentId,
-          });
-        } else if (existing._tag === EntityTypeEnum.Diagram) {
-          const diagram = existing as Diagram;
-          const diagramUpdates = updates as Partial<Diagram>;
-          newMetadata = JSON.stringify({
-            diagramType: diagramUpdates.diagramType ?? diagram.diagramType,
-            source: diagramUpdates.source ?? diagram.source,
-            generatedFrom: diagramUpdates.generatedFrom ?? diagram.generatedFrom,
-          });
-        }
+        const newMetadata = mergeEntityMetadata(existing, updates);
 
         yield* Effect.try({
           try: () => updateEntity.run(newTitle, newContent, newMetadata, now(), id),

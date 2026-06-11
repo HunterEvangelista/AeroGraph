@@ -1,10 +1,4 @@
-/**
- * Domain module exports
- */
-
-export type { EntityId } from "./entity.js";
-// Entity types and schemas
-export {
+export type {
   BaseEntity,
   CodeRef,
   CreateCodeRefInput,
@@ -13,16 +7,34 @@ export {
   CreateStoryInput,
   Diagram,
   DiagramType,
-  DiagramTypeEnum,
   Doc,
   Entity,
+  EntityId,
   EntityType,
-  EntityTypeEnum,
   Priority,
-  PriorityEnum,
   Story,
   StoryStatus,
+} from "./entity.js";
+// Entity types and schemas
+export {
+  BaseEntitySchema,
+  CodeRefSchema,
+  CreateCodeRefInputSchema,
+  CreateDiagramInputSchema,
+  CreateDocInputSchema,
+  CreateStoryInputSchema,
+  DiagramSchema,
+  DiagramTypeEnum,
+  DiagramTypeSchema,
+  DocSchema,
+  EntitySchema,
+  EntityTypeEnum,
+  EntityTypeSchema,
+  PriorityEnum,
+  PrioritySchema,
+  StorySchema,
   StoryStatusEnum,
+  StoryStatusSchema,
 } from "./entity.js";
 export type { LinkId } from "./link.js";
 // Link types and schemas

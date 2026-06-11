@@ -160,9 +160,7 @@ const runTagsQuery = (graphService: GraphService, tagValue: string) =>
   Effect.gen(function* () {
     const tagIds = splitTags(tagValue);
     if (tagIds.length === 0) {
-      return yield* Effect.fail(
-        new InvalidQueryError({ message: "--tags must include at least one tag." })
-      );
+      return yield* new InvalidQueryError({ message: "--tags must include at least one tag." });
     }
 
     const entities = yield* graphService.findByTagPath(tagIds);

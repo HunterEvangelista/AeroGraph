@@ -7,10 +7,6 @@ import {
   TagServiceTag,
 } from "@kioku/core";
 import { Console, Data, Effect, Option } from "effect";
-/**
- * Story Commands
- * CRUD operations for story entities
- */
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config.js";
 import { CliCoreLive } from "../db/index.js";
@@ -204,7 +200,7 @@ const storyShowCommand = Command.make(
           const entity = withLinks.entity;
 
           if (entity._tag !== EntityTypeEnum.Story) {
-            return yield* Effect.fail(new NotAStoryError({ id }));
+            return yield* new NotAStoryError({ id });
           }
 
           const tags = yield* tagService.getTagsForEntity(entity.id);
@@ -356,7 +352,7 @@ const storyEditCommand = Command.make(
       const statusValue = yield* parseOptionalStatus(status);
 
       if (titleValue === undefined && contentValue === undefined && statusValue === undefined) {
-        return yield* Effect.fail(new NoUpdatesError());
+        return yield* new NoUpdatesError();
       }
 
       const updated = yield* Effect.scoped(
@@ -367,7 +363,7 @@ const storyEditCommand = Command.make(
           );
 
           if (existing._tag !== EntityTypeEnum.Story) {
-            return yield* Effect.fail(new NotAStoryError({ id }));
+            return yield* new NotAStoryError({ id });
           }
 
           const updates: { title?: string; content?: string; status?: StoryStatusEnum } = {};
@@ -383,7 +379,7 @@ const storyEditCommand = Command.make(
       );
 
       if (updated._tag !== EntityTypeEnum.Story) {
-        return yield* Effect.fail(new NotAStoryError({ id: updated.id }));
+        return yield* new NotAStoryError({ id: updated.id });
       }
 
       yield* Console.log("");
