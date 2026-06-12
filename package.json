@@ -31,11 +31,15 @@
     "test:core": "turbo test --filter=@kioku/core",
     "test:cli": "turbo test --filter=@kioku/cli",
     "test:ai": "turbo test --filter=@kioku/ai",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
     "clean": "turbo clean && rm -rf node_modules"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
     "@effect/language-service": "^0.86.2",
+    "drizzle-kit": "^0.31.10",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2"
   },

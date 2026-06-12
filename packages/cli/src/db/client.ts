@@ -4,7 +4,9 @@
  */
 import { Database } from "bun:sqlite";
 import { DatabaseError, MigrationError } from "@kioku/core";
+import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { Context, Effect, Layer } from "effect";
+import * as schema from "./schema.js";
 import {
   CREATE_TABLES_SQL,
   GET_SCHEMA_VERSION_SQL,
@@ -18,6 +20,7 @@ import {
 
 export interface DatabaseClient {
   readonly db: Database;
+  readonly drizzle: BunSQLiteDatabase<typeof schema>;
   readonly close: () => Effect.Effect<void, DatabaseError>;
 }
 
@@ -79,9 +82,11 @@ export const makeDatabaseClient = (
     });
 
     yield* initializeDatabase(db);
+    const drizzleDb = drizzle({ client: db, schema });
 
     return {
       db,
+      drizzle: drizzleDb,
       close: () =>
         Effect.try({
           try: () => db.close(),
