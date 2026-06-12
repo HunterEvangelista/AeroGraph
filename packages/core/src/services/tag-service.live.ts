@@ -2,10 +2,43 @@
  * Tag Service live implementation
  */
 import { Effect, Layer, Result } from "effect";
-import type { Tag, TagId } from "../domain/tag.js";
+import { type Tag, type TagId, TagIdSchema } from "../domain/tag.js";
 import { TagNotFoundError, ValidationError } from "../errors.js";
+import type { TagRepository } from "../repository/tag-repository.js";
 import { TagRepositoryTag } from "../repository/tag-repository.js";
 import { type TagService, TagServiceTag } from "./tag-service.js";
+
+const parseTagPath = (tagPath: string): Effect.Effect<ReadonlyArray<string>, ValidationError> => {
+  const parts = tagPath
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  return parts.length > 0
+    ? Effect.succeed(parts)
+    : Effect.fail(new ValidationError({ message: `Invalid tag path: ${tagPath}` }));
+};
+
+const tagIdFromParts = (parts: ReadonlyArray<string>, endIndex: number) =>
+  TagIdSchema.make(parts.slice(0, endIndex + 1).join("/"));
+
+const ensureTag = (
+  repo: TagRepository,
+  input: { id: TagId; name: string; parentId: TagId | undefined }
+) =>
+  Effect.gen(function* () {
+    const existing = yield* Effect.result(repo.getById(input.id));
+
+    if (Result.isSuccess(existing)) {
+      return existing.success;
+    }
+
+    if (existing.failure instanceof TagNotFoundError) {
+      return yield* repo.create(input);
+    }
+
+    return yield* existing.failure;
+  });
 
 export const TagServiceLive = Layer.effect(
   TagServiceTag,
@@ -14,39 +47,21 @@ export const TagServiceLive = Layer.effect(
 
     const ensureHierarchy = (tagPath: string) =>
       Effect.gen(function* () {
-        const parts = tagPath.split("/").filter((part) => part);
-        let parentId: string | undefined;
+        const parts = yield* parseTagPath(tagPath);
+        let parentId: TagId | undefined;
         let currentTag: Tag | undefined;
 
         for (let i = 0; i < parts.length; i++) {
-          const part = parts[i];
-          if (!part) continue;
-
-          const tagId = parts.slice(0, i + 1).join("/");
-
-          const existingTag = yield* Effect.result(repo.getById(tagId as TagId));
-
-          if (Result.isSuccess(existingTag)) {
-            currentTag = existingTag.success;
-            parentId = tagId;
-          } else if (existingTag.failure instanceof TagNotFoundError) {
-            currentTag = yield* repo.create({
-              id: tagId,
-              name: part,
-              parentId,
-            });
-            parentId = tagId;
-          } else {
-            return yield* Effect.fail(existingTag.failure);
-          }
+          const id = tagIdFromParts(parts, i);
+          const name = parts[i] ?? id;
+          currentTag = yield* ensureTag(repo, { id, name, parentId });
+          parentId = currentTag.id;
         }
 
         if (!currentTag) {
-          return yield* Effect.fail(
-            new ValidationError({
-              message: `Invalid tag path: ${tagPath}`,
-            })
-          );
+          return yield* new ValidationError({
+            message: `Invalid tag path: ${tagPath}`,
+          });
         }
 
         return currentTag;

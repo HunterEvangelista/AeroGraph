@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { PositiveInteger } from "./scalars.js";
 
 // ============================================================================
 // Entity Types
@@ -67,7 +68,7 @@ const BaseEntityFields = {
   tags: Schema.Array(Schema.String),
   createdAt: Schema.DateFromString,
   updatedAt: Schema.DateFromString,
-  version: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  version: PositiveInteger,
 };
 
 export const BaseEntitySchema = Schema.Struct(BaseEntityFields);
@@ -88,8 +89,8 @@ export const CodeRefSchema = Schema.TaggedStruct(EntityTypeEnum.CodeRef, {
   ...BaseEntityFields,
   repoPath: Schema.String,
   filePath: Schema.String.check(Schema.isNonEmpty()),
-  startLine: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))),
-  endLine: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))),
+  startLine: Schema.optional(PositiveInteger),
+  endLine: Schema.optional(PositiveInteger),
   commitHash: Schema.optional(Schema.String),
   symbol: Schema.optional(Schema.String),
 });
@@ -136,8 +137,8 @@ export const CreateCodeRefInputSchema = Schema.Struct({
   tags: Schema.optional(Schema.Array(Schema.String)),
   repoPath: Schema.String,
   filePath: Schema.String.check(Schema.isNonEmpty()),
-  startLine: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))),
-  endLine: Schema.optional(Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0))),
+  startLine: Schema.optional(PositiveInteger),
+  endLine: Schema.optional(PositiveInteger),
   commitHash: Schema.optional(Schema.String),
   symbol: Schema.optional(Schema.String),
 });

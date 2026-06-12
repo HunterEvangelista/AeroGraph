@@ -1,7 +1,8 @@
 import { type Entity, VersionRepositoryTag } from "@kioku/core";
-import { Console, Data, Effect, Option, Schema } from "effect";
+import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
+import { parsePositiveInteger } from "./validation.js";
 import { withCliServices } from "./workspace.js";
 
 const entitySummary = (entity: Entity): string => `[${entity._tag}] ${entity.title}`;
@@ -19,16 +20,11 @@ class InvalidHistoryArgsError extends Data.TaggedError("InvalidHistoryArgsError"
   readonly message: string;
 }> {}
 
-const VersionInteger = Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0));
-
-const parseVersionInteger = (value: string) => {
-  const parsed = Number.parseInt(value, 10);
-  if (String(parsed) !== value) {
-    throw new Error("Invalid version integer");
-  }
-
-  return Schema.decodeUnknownSync(VersionInteger)(parsed);
-};
+const parseVersionFlag = (value: string) =>
+  Effect.try({
+    try: () => parsePositiveInteger(value),
+    catch: () => new InvalidHistoryArgsError({ message: "--version must be a positive integer." }),
+  });
 
 export const historyCommand = Command.make(
   "history",
@@ -41,14 +37,8 @@ export const historyCommand = Command.make(
       Effect.gen(function* () {
         const versionRepository = yield* VersionRepositoryTag;
         const versionText = Option.getOrUndefined(version);
-        let versionValue: number | undefined;
-        if (versionText !== undefined) {
-          versionValue = yield* Effect.try({
-            try: () => parseVersionInteger(versionText),
-            catch: () =>
-              new InvalidHistoryArgsError({ message: "--version must be a positive integer." }),
-          });
-        }
+        const versionValue =
+          versionText === undefined ? undefined : yield* parseVersionFlag(versionText);
         const resolvedId = yield* resolveEntityId(entityId);
 
         if (versionValue !== undefined) {

@@ -39,9 +39,10 @@ export {
 export type { LinkId } from "./link.js";
 // Link types and schemas
 export { CreateLinkInput, getInverseLinkType, Link, LinkType } from "./link.js";
+export { NonNegativeInteger, PositiveInteger } from "./scalars.js";
 export type { TagId } from "./tag.js";
 // Tag types and schemas
-export { CreateTagInput, Tag, UpdateTagInput } from "./tag.js";
+export { CreateTagInput, Tag, TagIdSchema, UpdateTagInput } from "./tag.js";
 export type { TypedEntityVersion, VersionId } from "./version.js";
 // Version types and schemas
 export { ChangeType, EntityVersion } from "./version.js";

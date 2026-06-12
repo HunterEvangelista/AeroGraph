@@ -8,8 +8,10 @@ import { Schema } from "effect";
 // Tag Schema
 // ============================================================================
 
+export const TagIdSchema = Schema.String.pipe(Schema.brand("TagId"));
+
 export const Tag = Schema.Struct({
-  id: Schema.String.pipe(Schema.brand("TagId")),
+  id: TagIdSchema,
   name: Schema.String.check(Schema.isNonEmpty()),
   description: Schema.optional(Schema.String),
   parentId: Schema.optional(Schema.String),

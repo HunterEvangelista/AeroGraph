@@ -14,6 +14,7 @@ import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config.js";
 import { CliCoreLive } from "../db/index.js";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
+import { isPositiveInteger } from "./validation.js";
 
 // ============================================================================
 // Custom Error Types
@@ -155,6 +156,12 @@ const splitTags = (value: string): ReadonlyArray<string> =>
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+
+const validateDepth = (depth: number | undefined) => {
+  if (depth === undefined || isPositiveInteger(depth)) return Effect.void;
+
+  return Effect.fail(new InvalidQueryError({ message: "--depth must be greater than 0." }));
+};
 
 const runTagsQuery = (graphService: GraphService, tagValue: string) =>
   Effect.gen(function* () {
@@ -309,11 +316,7 @@ const validateQuerySelection = (selection: QuerySelection) =>
       );
     }
 
-    if (selection.depthValue !== undefined && selection.depthValue < 1) {
-      return yield* Effect.fail(
-        new InvalidQueryError({ message: "--depth must be greater than 0." })
-      );
-    }
+    yield* validateDepth(selection.depthValue);
   });
 
 const runStructuredQuery = (graphService: GraphService, selection: QuerySelection) =>

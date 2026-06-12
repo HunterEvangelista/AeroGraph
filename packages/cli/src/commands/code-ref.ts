@@ -13,6 +13,7 @@ import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config.js";
 import { CliCoreLive } from "../db/index.js";
+import { isPositiveInteger } from "./validation.js";
 
 class NotACodeRefError extends Data.TaggedError("NotACodeRefError")<{
   readonly id: string;
@@ -55,6 +56,18 @@ const lineRange = (codeRef: CodeRef): string => {
 
 const validateLineRange = (startLine: number | undefined, endLine: number | undefined) =>
   Effect.gen(function* () {
+    if (startLine !== undefined && !isPositiveInteger(startLine)) {
+      return yield* new InvalidCodeRefInputError({
+        message: "--start-line must be a positive integer",
+      });
+    }
+
+    if (endLine !== undefined && !isPositiveInteger(endLine)) {
+      return yield* new InvalidCodeRefInputError({
+        message: "--end-line must be a positive integer",
+      });
+    }
+
     if (endLine !== undefined && startLine === undefined) {
       return yield* new InvalidCodeRefInputError({ message: "--end-line requires --start-line" });
     }
