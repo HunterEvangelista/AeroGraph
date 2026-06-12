@@ -4,6 +4,7 @@
  */
 import { Schema } from "effect";
 import type { Entity } from "./entity.js";
+import { PositiveInteger } from "./scalars.js";
 
 // ============================================================================
 // Change Types
@@ -19,7 +20,7 @@ export type ChangeType = typeof ChangeType.Type;
 export const EntityVersion = Schema.Struct({
   id: Schema.String.pipe(Schema.brand("VersionId")),
   entityId: Schema.String,
-  version: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0)),
+  version: PositiveInteger,
   data: Schema.Unknown, // JSON snapshot of entity at this version
   changeType: ChangeType,
   changedFields: Schema.optional(Schema.Array(Schema.String)),

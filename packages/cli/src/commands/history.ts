@@ -2,6 +2,7 @@ import { type Entity, VersionRepositoryTag } from "@kioku/core";
 import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
+import { parsePositiveInteger } from "./validation.js";
 import { withCliServices } from "./workspace.js";
 
 const entitySummary = (entity: Entity): string => `[${entity._tag}] ${entity.title}`;
@@ -19,6 +20,12 @@ class InvalidHistoryArgsError extends Data.TaggedError("InvalidHistoryArgsError"
   readonly message: string;
 }> {}
 
+const parseVersionFlag = (value: string) =>
+  Effect.try({
+    try: () => parsePositiveInteger(value),
+    catch: () => new InvalidHistoryArgsError({ message: "--version must be a positive integer." }),
+  });
+
 export const historyCommand = Command.make(
   "history",
   {
@@ -30,20 +37,8 @@ export const historyCommand = Command.make(
       Effect.gen(function* () {
         const versionRepository = yield* VersionRepositoryTag;
         const versionText = Option.getOrUndefined(version);
-        let versionValue: number | undefined;
-        if (versionText !== undefined) {
-          if (!/^\d+$/.test(versionText)) {
-            return yield* new InvalidHistoryArgsError({
-              message: "--version must be a positive integer.",
-            });
-          }
-          versionValue = Number.parseInt(versionText, 10);
-          if (versionValue < 1) {
-            return yield* new InvalidHistoryArgsError({
-              message: "--version must be a positive integer.",
-            });
-          }
-        }
+        const versionValue =
+          versionText === undefined ? undefined : yield* parseVersionFlag(versionText);
         const resolvedId = yield* resolveEntityId(entityId);
 
         if (versionValue !== undefined) {

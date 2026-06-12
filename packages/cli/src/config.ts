@@ -69,16 +69,12 @@ export interface ConfigService {
   ) => Effect.Effect<KiokuConfig, WorkspaceNotFoundError | ConfigError>;
 }
 
-// ============================================================================
-// Config Service Tag
-// ============================================================================
-
 export class ConfigServiceTag extends Context.Service<ConfigServiceTag, ConfigService>()(
   "ConfigService"
 ) {}
 
 // ============================================================================
-// Config Service Implementation
+// Config Servpice Implementation
 // ============================================================================
 
 const findWorkspaceRoot = (startPath: string): string | null => {
@@ -105,12 +101,10 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
 
       // Check if workspace already exists
       if (existsSync(kiokuPath)) {
-        return yield* Effect.fail(
-          new WorkspaceAlreadyExistsError({
-            path: rootPath,
-            message: `Kioku workspace already exists at ${kiokuPath}`,
-          })
-        );
+        return yield* new WorkspaceAlreadyExistsError({
+          path: rootPath,
+          message: `Kioku workspace already exists at ${kiokuPath}`,
+        });
       }
 
       // Create .kioku directory
@@ -155,12 +149,10 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
       const rootPath = findWorkspaceRoot(searchPath);
 
       if (!rootPath) {
-        return yield* Effect.fail(
-          new WorkspaceNotFoundError({
-            path: searchPath,
-            message: `No kioku workspace found. Run 'kioku init' to create one.`,
-          })
-        );
+        return yield* new WorkspaceNotFoundError({
+          path: searchPath,
+          message: `No kioku workspace found. Run 'kioku init' to create one.`,
+        });
       }
 
       const kiokuPath = join(rootPath, KIOKU_DIR);
@@ -200,12 +192,10 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
       const rootPath = findWorkspaceRoot(searchPath);
 
       if (!rootPath) {
-        return yield* Effect.fail(
-          new WorkspaceNotFoundError({
-            path: searchPath,
-            message: `No kioku workspace found. Run 'kioku init' to create one.`,
-          })
-        );
+        return yield* new WorkspaceNotFoundError({
+          path: searchPath,
+          message: `No kioku workspace found. Run 'kioku init' to create one.`,
+        });
       }
 
       return rootPath;
@@ -217,12 +207,10 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
       const rootPath = findWorkspaceRoot(searchPath);
 
       if (!rootPath) {
-        return yield* Effect.fail(
-          new WorkspaceNotFoundError({
-            path: searchPath,
-            message: `No kioku workspace found. Run 'kioku init' to create one.`,
-          })
-        );
+        return yield* new WorkspaceNotFoundError({
+          path: searchPath,
+          message: `No kioku workspace found. Run 'kioku init' to create one.`,
+        });
       }
 
       const configPath = join(rootPath, KIOKU_DIR, CONFIG_FILE);

@@ -11,6 +11,7 @@ import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
 import { type ContextEntity, formatContextMarkdown } from "../ui/context-markdown.js";
+import { isNonNegativeInteger } from "./validation.js";
 import { withCliServices } from "./workspace.js";
 
 class InvalidContextQueryError extends Data.TaggedError("InvalidContextQueryError")<{
@@ -32,6 +33,14 @@ const collectLinks = (
   entityIds: ReadonlySet<string>
 ): ReadonlyArray<Link> =>
   links.filter((link) => entityIds.has(link.sourceId) && entityIds.has(link.targetId));
+
+const validateDepth = (depth: number) => {
+  if (isNonNegativeInteger(depth)) return Effect.void;
+
+  return Effect.fail(
+    new InvalidContextQueryError({ message: "--depth must be a non-negative integer." })
+  );
+};
 
 const loadContextEntities = (entities: ReadonlyArray<Entity>) =>
   Effect.gen(function* () {
@@ -71,6 +80,8 @@ export const contextCommand = Command.make(
       const tagValue = Option.getOrUndefined(tags);
       const outputValue = Option.getOrUndefined(output);
       const hasQuery = query.length > 0;
+
+      yield* validateDepth(depth);
 
       if (tagValue && hasQuery) {
         return yield* Effect.fail(

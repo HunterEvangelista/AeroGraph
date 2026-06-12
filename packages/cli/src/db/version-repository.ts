@@ -70,7 +70,7 @@ export const SqliteVersionRepositoryLive = Layer.effect(
     `);
 
     const selectInTimeRange = db.prepare(`
-      SELECT * FROM entity_versions 
+      SELECT * FROM entity_versions
       WHERE created_at >= ? AND created_at <= ?
       ORDER BY created_at DESC
     `);
@@ -128,7 +128,7 @@ export const SqliteVersionRepositoryLive = Layer.effect(
         });
 
         if (!row) {
-          return yield* Effect.fail(new VersionNotFoundError({ entityId, version }));
+          return yield* new VersionNotFoundError({ entityId, version });
         }
 
         return rowToVersion(row);
@@ -146,7 +146,7 @@ export const SqliteVersionRepositoryLive = Layer.effect(
         });
 
         if (!entityExists) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId }));
+          return yield* new EntityNotFoundError({ entityId });
         }
 
         return yield* Effect.try({
@@ -174,7 +174,7 @@ export const SqliteVersionRepositoryLive = Layer.effect(
         });
 
         if (!row) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId }));
+          return yield* new EntityNotFoundError({ entityId });
         }
 
         return rowToVersion(row);
@@ -202,7 +202,7 @@ export const SqliteVersionRepositoryLive = Layer.effect(
         });
 
         if (!entityExists) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId }));
+          return yield* new EntityNotFoundError({ entityId });
         }
 
         return yield* Effect.try({
