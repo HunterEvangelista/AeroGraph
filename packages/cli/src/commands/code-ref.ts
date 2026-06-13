@@ -14,6 +14,7 @@ import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config.js";
 import { CliServicesLive } from "../db/index.js";
 import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
+import { resolveEntityId } from "../entity-id.js";
 import { isPositiveInteger } from "./validation.js";
 
 class NotACodeRefError extends Data.TaggedError("NotACodeRefError")<{
@@ -180,11 +181,12 @@ const codeRefShowCommand = Command.make(
           const entityService = yield* EntityServiceTag;
           const graphService = yield* GraphServiceTag;
           const tagService = yield* TagServiceTag;
-          const withLinks = yield* graphService.getEntityWithLinks(id);
+          const resolvedId = yield* resolveEntityId(id);
+          const withLinks = yield* graphService.getEntityWithLinks(resolvedId);
           const entity = withLinks.entity;
 
           if (entity._tag !== EntityTypeEnum.CodeRef) {
-            return yield* new NotACodeRefError({ id });
+            return yield* new NotACodeRefError({ id: resolvedId });
           }
 
           const tags = yield* tagService.getTagsForEntity(entity.id);
@@ -334,12 +336,13 @@ const codeRefDeleteCommand = Command.make(
       yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
+          const resolvedId = yield* resolveEntityId(id);
           const existing = yield* entityService.getById(
-            id as Parameters<typeof entityService.getById>[0]
+            resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
           if (existing._tag !== EntityTypeEnum.CodeRef) {
-            return yield* new NotACodeRefError({ id });
+            return yield* new NotACodeRefError({ id: resolvedId });
           }
 
           if (!force) {
@@ -347,7 +350,9 @@ const codeRefDeleteCommand = Command.make(
             yield* Console.log("(Use --force to skip this confirmation in scripts)");
           }
 
-          yield* entityService.delete(id as Parameters<typeof entityService.getById>[0]);
+          yield* entityService.delete(
+            resolvedId as Parameters<typeof entityService.getById>[0]
+          );
         }).pipe(Effect.provide(ServiceLayers))
       );
 

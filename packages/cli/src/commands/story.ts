@@ -11,6 +11,7 @@ import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config.js";
 import { CliServicesLive } from "../db/index.js";
 import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
+import { resolveEntityId } from "../entity-id.js";
 
 // ============================================================================
 // Custom Error Types
@@ -198,11 +199,12 @@ const storyShowCommand = Command.make(
           const entityService = yield* EntityServiceTag;
           const graphService = yield* GraphServiceTag;
           const tagService = yield* TagServiceTag;
-          const withLinks = yield* graphService.getEntityWithLinks(id);
+          const resolvedId = yield* resolveEntityId(id);
+          const withLinks = yield* graphService.getEntityWithLinks(resolvedId);
           const entity = withLinks.entity;
 
           if (entity._tag !== EntityTypeEnum.Story) {
-            return yield* new NotAStoryError({ id });
+            return yield* new NotAStoryError({ id: resolvedId });
           }
 
           const tags = yield* tagService.getTagsForEntity(entity.id);
@@ -367,12 +369,13 @@ const storyEditCommand = Command.make(
       const { updated, displayIds } = yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
+          const resolvedId = yield* resolveEntityId(id);
           const existing = yield* entityService.getById(
-            id as Parameters<typeof entityService.getById>[0]
+            resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
           if (existing._tag !== EntityTypeEnum.Story) {
-            return yield* new NotAStoryError({ id });
+            return yield* new NotAStoryError({ id: resolvedId });
           }
 
           const updates: { title?: string; content?: string; status?: StoryStatusEnum } = {};
@@ -381,7 +384,7 @@ const storyEditCommand = Command.make(
           if (statusValue !== undefined) updates.status = statusValue;
 
           const updated = yield* entityService.update(
-            id as Parameters<typeof entityService.getById>[0],
+            resolvedId as Parameters<typeof entityService.getById>[0],
             updates
           );
           const displayIds = yield* loadFormattedEntityIds([updated.id]);
@@ -427,12 +430,13 @@ const storyDeleteCommand = Command.make(
       yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
+          const resolvedId = yield* resolveEntityId(id);
           const existing = yield* entityService.getById(
-            id as Parameters<typeof entityService.getById>[0]
+            resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
           if (existing._tag !== EntityTypeEnum.Story) {
-            return yield* Effect.fail(new NotAStoryError({ id }));
+            return yield* Effect.fail(new NotAStoryError({ id: resolvedId }));
           }
 
           if (!force) {
@@ -440,7 +444,9 @@ const storyDeleteCommand = Command.make(
             yield* Console.log("(Use --force to skip this confirmation in scripts)");
           }
 
-          yield* entityService.delete(id as Parameters<typeof entityService.getById>[0]);
+          yield* entityService.delete(
+            resolvedId as Parameters<typeof entityService.getById>[0]
+          );
         }).pipe(Effect.provide(ServiceLayers))
       );
 
