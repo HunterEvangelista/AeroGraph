@@ -11,6 +11,7 @@ import { Console, Data, Effect, Option } from "effect";
  * Create, remove, and inspect directed entity relationships.
  */
 import { Argument, Command, Flag } from "effect/unstable/cli";
+import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
 import { withCliServices } from "./workspace.js";
 
@@ -45,7 +46,8 @@ const parseLinkType = (value: string) =>
     ? Effect.succeed(value as LinkType)
     : Effect.fail(new InvalidLinkTypeError({ value }));
 
-const entitySummary = (entity: Entity): string => `${entity.id}  [${entity._tag}] ${entity.title}`;
+const entitySummary = (entity: Entity, displayIds: ReadonlyMap<string, string>): string =>
+  `${formattedEntityId(displayIds, entity.id)}  [${entity._tag}] ${entity.title}`;
 
 const directionLabel = (link: Link, entityId: string): string =>
   link.sourceId === entityId ? `--${link.type}-->` : `<--${link.type}--`;
@@ -65,11 +67,24 @@ const printLinkGroup = (title: string, entityId: string, links: ReadonlyArray<Li
     }
 
     const entityService = yield* EntityServiceTag;
+    const others: Entity[] = [];
     for (const link of links) {
       const other = yield* entityService.getById(
         otherEntityId(link, entityId) as Parameters<typeof entityService.getById>[0]
       );
-      yield* Console.log(`  ${entityId} ${directionLabel(link, entityId)} ${entitySummary(other)}`);
+      others.push(other);
+    }
+
+    const displayIds = yield* loadFormattedEntityIds([
+      entityId,
+      ...others.map((entity) => entity.id),
+    ]);
+    for (const [index, link] of links.entries()) {
+      const other = others[index];
+      if (!other) continue;
+      yield* Console.log(
+        `  ${formattedEntityId(displayIds, entityId)} ${directionLabel(link, entityId)} ${entitySummary(other, displayIds)}`
+      );
     }
   });
 

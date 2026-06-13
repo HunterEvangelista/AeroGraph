@@ -12,7 +12,8 @@ import { Console, Data, Effect, Option } from "effect";
  */
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config.js";
-import { CliCoreLive } from "../db/index.js";
+import { CliServicesLive } from "../db/index.js";
+import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
 import { isPositiveInteger } from "./validation.js";
 
 class NotACodeRefError extends Data.TaggedError("NotACodeRefError")<{
@@ -107,7 +108,7 @@ const codeRefAddCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
+      const ServiceLayers = CliServicesLive(workspace.dbPath);
       const startLineValue = Option.getOrUndefined(startLine);
       const endLineValue = Option.getOrUndefined(endLine);
       const symbolValue = Option.getOrUndefined(symbol);
@@ -116,7 +117,7 @@ const codeRefAddCommand = Command.make(
 
       yield* validateLineRange(startLineValue, endLineValue);
 
-      const codeRef = yield* Effect.scoped(
+      const { codeRef, displayIds } = yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const codeRef = yield* entityService.createCodeRef({
@@ -138,14 +139,15 @@ const codeRefAddCommand = Command.make(
             }
           }
 
-          return codeRef;
+          const displayIds = yield* loadFormattedEntityIds([codeRef.id]);
+          return { codeRef, displayIds };
         }).pipe(Effect.provide(ServiceLayers))
       );
 
       yield* Console.log("");
       yield* Console.log("Code ref created successfully!");
       yield* Console.log("");
-      yield* Console.log(`ID:      ${codeRef.id}`);
+      yield* Console.log(`ID:      ${formattedEntityId(displayIds, codeRef.id)}`);
       yield* Console.log(`Title:   ${codeRef.title}`);
       yield* Console.log(`File:    ${codeRef.filePath}`);
       yield* Console.log(`Lines:   ${lineRange(codeRef)}`);
@@ -171,9 +173,9 @@ const codeRefShowCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
+      const ServiceLayers = CliServicesLive(workspace.dbPath);
 
-      const { codeRef, tags, links, linkedEntities } = yield* Effect.scoped(
+      const { codeRef, tags, links, linkedEntities, displayIds } = yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const graphService = yield* GraphServiceTag;
@@ -197,14 +199,15 @@ const codeRefShowCommand = Command.make(
             linkedEntities.set(other.id, `[${other._tag}] ${other.title}`);
           }
 
-          return { codeRef: entity, tags, links, linkedEntities };
+          const displayIds = yield* loadFormattedEntityIds([entity.id, ...linkedEntities.keys()]);
+          return { codeRef: entity, tags, links, linkedEntities, displayIds };
         }).pipe(Effect.provide(ServiceLayers))
       );
 
       yield* Console.log("");
       yield* Console.log(`# ${codeRef.title}`);
       yield* Console.log("");
-      yield* Console.log(`ID:      ${codeRef.id}`);
+      yield* Console.log(`ID:      ${formattedEntityId(displayIds, codeRef.id)}`);
       yield* Console.log(`File:    ${codeRef.filePath}`);
       yield* Console.log(`Lines:   ${lineRange(codeRef)}`);
       if (codeRef.symbol) yield* Console.log(`Symbol:  ${codeRef.symbol}`);
@@ -228,7 +231,9 @@ const codeRefShowCommand = Command.make(
           const otherId = isOutgoing ? link.targetId : link.sourceId;
           const direction = isOutgoing ? `--${link.type}-->` : `<--${link.type}--`;
           const summary = linkedEntities.get(otherId) ?? otherId;
-          yield* Console.log(`  ${direction} ${otherId}  ${summary}`);
+          yield* Console.log(
+            `  ${direction} ${formattedEntityId(displayIds, otherId)}  ${summary}`
+          );
         }
       }
 
@@ -261,9 +266,9 @@ const codeRefListCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
+      const ServiceLayers = CliServicesLive(workspace.dbPath);
 
-      const codeRefs = yield* Effect.scoped(
+      const { codeRefs, displayIds } = yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const fileValue = Option.getOrUndefined(file);
@@ -275,11 +280,13 @@ const codeRefListCommand = Command.make(
               ? yield* entityService.getByTag(tagValue)
               : yield* entityService.getAll(EntityTypeEnum.CodeRef);
 
-          return results.filter(
+          const codeRefs = results.filter(
             (entity): entity is CodeRef =>
               entity._tag === EntityTypeEnum.CodeRef &&
               (fileValue === undefined || entity.filePath === fileValue)
           );
+          const displayIds = yield* loadFormattedEntityIds(codeRefs.map((codeRef) => codeRef.id));
+          return { codeRefs, displayIds };
         }).pipe(Effect.provide(ServiceLayers))
       );
 
@@ -298,7 +305,7 @@ const codeRefListCommand = Command.make(
         for (const codeRef of codeRefs) {
           const symbol = codeRef.symbol ? ` [${codeRef.symbol}]` : "";
           yield* Console.log(
-            `${codeRef.id.slice(0, 8)}  ${codeRef.filePath}:${lineRange(codeRef)}${symbol}  ${codeRef.title}`
+            `${formattedEntityId(displayIds, codeRef.id)}  ${codeRef.filePath}:${lineRange(codeRef)}${symbol}  ${codeRef.title}`
           );
           yield* Console.log("");
         }
@@ -322,7 +329,7 @@ const codeRefDeleteCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
+      const ServiceLayers = CliServicesLive(workspace.dbPath);
 
       yield* Effect.scoped(
         Effect.gen(function* () {

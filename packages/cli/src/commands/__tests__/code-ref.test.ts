@@ -77,7 +77,9 @@ describe("code-ref command", () => {
 
     expect(byTag.status).toBe(0);
     expect(byTag.stdout).toContain("Code refs (1)");
-    expect(byTag.stdout).toContain("code-aut  src/auth.ts:10-20 [authMiddleware]  Auth Middleware");
+    expect(byTag.stdout).toContain(
+      "code-auth-middleware  src/auth.ts:10-20 [authMiddleware]  Auth Middleware"
+    );
     expect(bySearch.status).toBe(0);
     expect(bySearch.stdout).toContain("Code refs (1)");
     expect(bySearch.stdout).toContain("Auth Middleware");

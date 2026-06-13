@@ -4,6 +4,13 @@
 
 export type { DatabaseClient } from "./client.js";
 export { DatabaseClientLive, DatabaseClientTag, makeDatabaseClient } from "./client.js";
+export {
+  DEFAULT_ENTITY_ID_PREFIX_SCOPE,
+  EntityPrefixIndexLive,
+  EntityPrefixIndexTag,
+  formatEntityIdWithBoldPrefix,
+  rebuildEntityIdPrefixes,
+} from "./entity-prefix-index.js";
 export { SqliteEntityRepositoryLive } from "./entity-repository.js";
 export { CliCoreLive, CliServicesLive, SqliteRepositoriesLive } from "./layers.js";
 export { SqliteLinkRepositoryLive } from "./link-repository.js";

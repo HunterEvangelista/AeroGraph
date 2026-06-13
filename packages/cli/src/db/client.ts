@@ -4,7 +4,7 @@
  */
 import { Database } from "bun:sqlite";
 import { DatabaseError, MigrationError } from "@kioku/core";
-import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
+import { type BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
 import { Context, Effect, Layer } from "effect";
 import * as schema from "./schema.js";
 import {

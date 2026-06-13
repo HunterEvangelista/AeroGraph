@@ -5,6 +5,7 @@ import { Console, Data, Effect, Option } from "effect";
  * CRUD operations for document entities
  */
 import { Argument, Command, Flag } from "effect/unstable/cli";
+import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
 import { withCliServices } from "./workspace.js";
 
@@ -54,7 +55,7 @@ const docCreateCommand = Command.make(
   },
   ({ title, content, tags }) =>
     Effect.gen(function* () {
-      const doc = yield* withCliServices(
+      const { doc, displayIds } = yield* withCliServices(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
 
@@ -79,14 +80,15 @@ const docCreateCommand = Command.make(
             }
           }
 
-          return doc;
+          const displayIds = yield* loadFormattedEntityIds([doc.id]);
+          return { doc, displayIds };
         })
       );
 
       yield* Console.log("");
       yield* Console.log("Document created successfully!");
       yield* Console.log("");
-      yield* Console.log(`ID:      ${doc.id}`);
+      yield* Console.log(`ID:      ${formattedEntityId(displayIds, doc.id)}`);
       yield* Console.log(`Title:   ${doc.title}`);
       yield* Console.log(`Version: ${doc.version}`);
       yield* Console.log("");
@@ -110,7 +112,7 @@ const docShowCommand = Command.make(
   },
   ({ id }) =>
     Effect.gen(function* () {
-      const { doc, links, linkedEntities, tags } = yield* withCliServices(
+      const { doc, links, linkedEntities, tags, displayIds } = yield* withCliServices(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const linkRepository = yield* LinkRepositoryTag;
@@ -137,14 +139,15 @@ const docShowCommand = Command.make(
             linkedEntities.set(other.id, `[${other._tag}] ${other.title}`);
           }
 
-          return { doc: entity, links, linkedEntities, tags };
+          const displayIds = yield* loadFormattedEntityIds([entity.id, ...linkedEntities.keys()]);
+          return { doc: entity, links, linkedEntities, tags, displayIds };
         })
       );
 
       yield* Console.log("");
       yield* Console.log(`# ${doc.title}`);
       yield* Console.log("");
-      yield* Console.log(`ID:      ${doc.id}`);
+      yield* Console.log(`ID:      ${formattedEntityId(displayIds, doc.id)}`);
       yield* Console.log(`Version: ${doc.version}`);
       yield* Console.log(`Created: ${doc.createdAt.toISOString()}`);
       yield* Console.log(`Updated: ${doc.updatedAt.toISOString()}`);
@@ -173,7 +176,9 @@ const docShowCommand = Command.make(
           const otherId = isOutgoing ? link.targetId : link.sourceId;
           const direction = isOutgoing ? `--${link.type}-->` : `<--${link.type}--`;
           const summary = linkedEntities.get(otherId) ?? otherId;
-          yield* Console.log(`  ${direction} ${otherId}  ${summary}`);
+          yield* Console.log(
+            `  ${direction} ${formattedEntityId(displayIds, otherId)}  ${summary}`
+          );
         }
       }
 
@@ -205,7 +210,7 @@ const docListCommand = Command.make(
   },
   ({ tag, search }) =>
     Effect.gen(function* () {
-      const docs = yield* withCliServices(
+      const { docs, displayIds } = yield* withCliServices(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
 
@@ -214,15 +219,21 @@ const docListCommand = Command.make(
 
           if (searchValue) {
             const results = yield* entityService.search(searchValue);
-            return results.filter((e) => e._tag === EntityTypeEnum.Doc);
+            const docs = results.filter((e) => e._tag === EntityTypeEnum.Doc);
+            const displayIds = yield* loadFormattedEntityIds(docs.map((doc) => doc.id));
+            return { docs, displayIds };
           }
 
           if (tagValue) {
             const results = yield* entityService.getByTag(tagValue);
-            return results.filter((e) => e._tag === EntityTypeEnum.Doc);
+            const docs = results.filter((e) => e._tag === EntityTypeEnum.Doc);
+            const displayIds = yield* loadFormattedEntityIds(docs.map((doc) => doc.id));
+            return { docs, displayIds };
           }
 
-          return yield* entityService.getAll(EntityTypeEnum.Doc);
+          const docs = yield* entityService.getAll(EntityTypeEnum.Doc);
+          const displayIds = yield* loadFormattedEntityIds(docs.map((doc) => doc.id));
+          return { docs, displayIds };
         })
       );
 
@@ -239,7 +250,7 @@ const docListCommand = Command.make(
         for (const doc of docs) {
           const preview = doc.content.slice(0, 50).replace(/\n/g, " ");
           const ellipsis = doc.content.length > 50 ? "..." : "";
-          yield* Console.log(`${doc.id.slice(0, 8)}  ${doc.title}`);
+          yield* Console.log(`${formattedEntityId(displayIds, doc.id)}  ${doc.title}`);
           if (preview) {
             yield* Console.log(`          ${preview}${ellipsis}`);
           }

@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { Effect } from "effect";
 import { makeDatabaseClient } from "../../db/client.js";
+import { entities, entityTags, links, tags } from "../../db/schema.js";
 
 const workspacePath = process.argv[2];
 
@@ -27,97 +28,104 @@ await Effect.runPromise(
   Effect.scoped(
     Effect.gen(function* () {
       const client = yield* makeDatabaseClient(dbPath);
-      const { db } = client;
+      const { drizzle } = client;
 
-      const insertEntity = db.prepare(
-        "INSERT INTO entities (id, type, title, content, metadata, created_at, updated_at, version) VALUES (?, ?, ?, ?, ?, ?, ?, 1)"
-      );
-      const insertTag = db.prepare(
-        "INSERT INTO tags (id, name, description, parent_id, aliases, created_at) VALUES (?, ?, NULL, NULL, NULL, ?)"
-      );
-      const insertEntityTag = db.prepare(
-        "INSERT INTO entity_tags (entity_id, tag_id) VALUES (?, ?)"
-      );
-      const insertLink = db.prepare(
-        "INSERT INTO links (id, source_id, target_id, type, created_at) VALUES (?, ?, ?, ?, ?)"
-      );
+      drizzle
+        .insert(entities)
+        .values([
+          {
+            id: "doc-auth-overview",
+            type: "doc",
+            title: "Auth Overview",
+            content: "Canonical auth middleware notes.",
+            metadata: null,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+          {
+            id: "code-auth-middleware",
+            type: "code_ref",
+            title: "Auth Middleware",
+            content: "Middleware checks authenticated sessions.",
+            metadata: metadata.codeRef,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+          {
+            id: "story-auth-hardening",
+            type: "story",
+            title: "Auth Hardening Story",
+            content: "Tighten auth middleware guarantees.",
+            metadata: metadata.story,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+          {
+            id: "diagram-auth-flow",
+            type: "diagram",
+            title: "Auth Flow Diagram",
+            content: "Auth request flow.",
+            metadata: metadata.diagram,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+          {
+            id: "doc-auth-only",
+            type: "doc",
+            title: "Auth Only Doc",
+            content: "Tagged only with auth.",
+            metadata: null,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          },
+        ])
+        .run();
 
-      insertEntity.run(
-        "doc-auth-overview",
-        "doc",
-        "Auth Overview",
-        "Canonical auth middleware notes.",
-        null,
-        timestamp,
-        timestamp
-      );
-      insertEntity.run(
-        "code-auth-middleware",
-        "code_ref",
-        "Auth Middleware",
-        "Middleware checks authenticated sessions.",
-        metadata.codeRef,
-        timestamp,
-        timestamp
-      );
-      insertEntity.run(
-        "story-auth-hardening",
-        "story",
-        "Auth Hardening Story",
-        "Tighten auth middleware guarantees.",
-        metadata.story,
-        timestamp,
-        timestamp
-      );
-      insertEntity.run(
-        "diagram-auth-flow",
-        "diagram",
-        "Auth Flow Diagram",
-        "Auth request flow.",
-        metadata.diagram,
-        timestamp,
-        timestamp
-      );
-      insertEntity.run(
-        "doc-auth-only",
-        "doc",
-        "Auth Only Doc",
-        "Tagged only with auth.",
-        null,
-        timestamp,
-        timestamp
-      );
+      drizzle
+        .insert(tags)
+        .values([
+          { id: "auth", name: "auth", createdAt: timestamp },
+          { id: "middleware", name: "middleware", createdAt: timestamp },
+        ])
+        .run();
 
-      insertTag.run("auth", "auth", timestamp);
-      insertTag.run("middleware", "middleware", timestamp);
+      drizzle
+        .insert(entityTags)
+        .values([
+          { entityId: "doc-auth-overview", tagId: "auth" },
+          { entityId: "doc-auth-overview", tagId: "middleware" },
+          { entityId: "code-auth-middleware", tagId: "auth" },
+          { entityId: "code-auth-middleware", tagId: "middleware" },
+          { entityId: "doc-auth-only", tagId: "auth" },
+        ])
+        .run();
 
-      insertEntityTag.run("doc-auth-overview", "auth");
-      insertEntityTag.run("doc-auth-overview", "middleware");
-      insertEntityTag.run("code-auth-middleware", "auth");
-      insertEntityTag.run("code-auth-middleware", "middleware");
-      insertEntityTag.run("doc-auth-only", "auth");
-
-      insertLink.run(
-        "link-doc-code",
-        "doc-auth-overview",
-        "code-auth-middleware",
-        "references",
-        timestamp
-      );
-      insertLink.run(
-        "link-story-doc",
-        "story-auth-hardening",
-        "doc-auth-overview",
-        "blocks",
-        timestamp
-      );
-      insertLink.run(
-        "link-code-diagram",
-        "code-auth-middleware",
-        "diagram-auth-flow",
-        "related_to",
-        timestamp
-      );
+      drizzle
+        .insert(links)
+        .values([
+          {
+            id: "link-doc-code",
+            sourceId: "doc-auth-overview",
+            targetId: "code-auth-middleware",
+            type: "references",
+            createdAt: timestamp,
+          },
+          {
+            id: "link-story-doc",
+            sourceId: "story-auth-hardening",
+            targetId: "doc-auth-overview",
+            type: "blocks",
+            createdAt: timestamp,
+          },
+          {
+            id: "link-code-diagram",
+            sourceId: "code-auth-middleware",
+            targetId: "diagram-auth-flow",
+            type: "related_to",
+            createdAt: timestamp,
+          },
+        ])
+        .run();
     })
   )
 );

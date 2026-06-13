@@ -94,6 +94,24 @@ export const entityVersions = sqliteTable(
   ]
 );
 
+export const entityIdPrefixes = sqliteTable(
+  "entity_id_prefixes",
+  {
+    scope: text("scope").notNull(),
+    entityId: text("entity_id")
+      .notNull()
+      .references(() => entities.id, { onDelete: "cascade" }),
+    prefix: text("prefix").notNull(),
+    prefixLength: integer("prefix_length").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.scope, table.entityId] }),
+    uniqueIndex("idx_entity_id_prefixes_scope_prefix").on(table.scope, table.prefix),
+    index("idx_entity_id_prefixes_entity").on(table.entityId),
+  ]
+);
+
 export const schemaMeta = sqliteTable("schema_meta", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
@@ -152,6 +170,17 @@ CREATE TABLE IF NOT EXISTS entity_versions (
   UNIQUE(entity_id, version)
 );
 
+-- Shortest runnable entity ID prefixes by scope
+CREATE TABLE IF NOT EXISTS entity_id_prefixes (
+  scope TEXT NOT NULL,
+  entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  prefix TEXT NOT NULL,
+  prefix_length INTEGER NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (scope, entity_id),
+  UNIQUE(scope, prefix)
+);
+
 -- Schema metadata table
 CREATE TABLE IF NOT EXISTS schema_meta (
   key TEXT PRIMARY KEY,
@@ -164,6 +193,7 @@ CREATE INDEX IF NOT EXISTS idx_entity_tags_tag ON entity_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_id);
 CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_id);
 CREATE INDEX IF NOT EXISTS idx_entity_versions_entity ON entity_versions(entity_id);
+CREATE INDEX IF NOT EXISTS idx_entity_id_prefixes_entity ON entity_id_prefixes(entity_id);
 CREATE INDEX IF NOT EXISTS idx_tags_parent ON tags(parent_id);
 
 -- Full-text search for entities

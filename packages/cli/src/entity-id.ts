@@ -1,10 +1,11 @@
-import { type Entity, EntityNotFoundError, EntityServiceTag } from "@kioku/core";
+import { EntityNotFoundError, EntityServiceTag } from "@kioku/core";
 import { Data, Effect, Result } from "effect";
+import { EntityPrefixIndexTag } from "./db/entity-prefix-index.js";
 
 export interface EntityIdMatch {
   readonly id: string;
   readonly title: string;
-  readonly type: Entity["_tag"];
+  readonly type: "doc" | "code_ref" | "story" | "diagram";
 }
 
 export class AmbiguousEntityIdError extends Data.TaggedError("AmbiguousEntityIdError")<{
@@ -18,6 +19,7 @@ export const formatEntityIdMatches = (matches: ReadonlyArray<EntityIdMatch>): st
 export const resolveEntityId = (value: string) =>
   Effect.gen(function* () {
     const entityService = yield* EntityServiceTag;
+    const prefixIndex = yield* EntityPrefixIndexTag;
     const exact = yield* Effect.result(
       entityService.getById(value as Parameters<typeof entityService.getById>[0])
     );
@@ -30,8 +32,12 @@ export const resolveEntityId = (value: string) =>
       return yield* exact.failure;
     }
 
-    const entities = yield* entityService.getAll();
-    const matches = entities.filter((entity) => entity.id.startsWith(value));
+    const indexedId = yield* prefixIndex.resolvePrefix(value);
+    if (indexedId) {
+      return indexedId;
+    }
+
+    const matches = yield* prefixIndex.findMatchesByPrefix(value);
 
     if (matches.length === 1) {
       return matches[0]?.id ?? value;
@@ -40,11 +46,7 @@ export const resolveEntityId = (value: string) =>
     if (matches.length > 1) {
       return yield* new AmbiguousEntityIdError({
         value,
-        matches: matches.map((entity) => ({
-          id: entity.id,
-          title: entity.title,
-          type: entity._tag,
-        })),
+        matches,
       });
     }
 
