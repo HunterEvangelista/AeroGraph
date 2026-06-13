@@ -6,6 +6,7 @@ import { Database } from "bun:sqlite";
 import { DatabaseError, MigrationError } from "@kioku/core";
 import { type BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
 import { Context, Effect, Layer } from "effect";
+import { rebuildEntityIdPrefixes } from "./entity-prefix-index.js";
 import * as schema from "./schema.js";
 import {
   CREATE_TABLES_SQL,
@@ -84,6 +85,7 @@ export const makeDatabaseClient = (
 
     yield* initializeDatabase(db);
     const drizzleDb = drizzle({ client: db, schema });
+    rebuildEntityIdPrefixes(drizzleDb);
 
     return {
       db,
