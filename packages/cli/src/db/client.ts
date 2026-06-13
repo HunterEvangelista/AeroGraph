@@ -42,7 +42,8 @@ const initializeDatabase = (db: Database): Effect.Effect<void, MigrationError> =
       // Enable foreign keys
       db.run("PRAGMA foreign_keys = ON;");
 
-      // Create tables
+      // TODO: This is in a transitional state and requires drizzle running on start up
+      // before we can migrate away.
       db.run(CREATE_TABLES_SQL);
 
       // Check/set schema version
