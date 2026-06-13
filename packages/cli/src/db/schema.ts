@@ -2,6 +2,120 @@
  * SQLite Schema
  * Database DDL for the knowledge graph
  */
+import {
+  type AnySQLiteColumn,
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
+
+export const entities = sqliteTable(
+  "entities",
+  {
+    id: text("id").primaryKey(),
+    type: text("type", { enum: ["doc", "code_ref", "story", "diagram"] }).notNull(),
+    title: text("title").notNull(),
+    content: text("content"),
+    metadata: text("metadata"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    version: integer("version").notNull().default(1),
+  },
+  (table) => [index("idx_entities_type").on(table.type)]
+);
+
+export const tags = sqliteTable(
+  "tags",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description"),
+    parentId: text("parent_id").references((): AnySQLiteColumn => tags.id),
+    aliases: text("aliases"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("idx_tags_parent").on(table.parentId)]
+);
+
+export const entityTags = sqliteTable(
+  "entity_tags",
+  {
+    entityId: text("entity_id")
+      .notNull()
+      .references(() => entities.id, { onDelete: "cascade" }),
+    tagId: text("tag_id")
+      .notNull()
+      .references(() => tags.id, { onDelete: "cascade" }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.entityId, table.tagId] }),
+    index("idx_entity_tags_tag").on(table.tagId),
+  ]
+);
+
+export const links = sqliteTable(
+  "links",
+  {
+    id: text("id").primaryKey(),
+    sourceId: text("source_id")
+      .notNull()
+      .references(() => entities.id, { onDelete: "cascade" }),
+    targetId: text("target_id")
+      .notNull()
+      .references(() => entities.id, { onDelete: "cascade" }),
+    type: text("type", {
+      enum: ["references", "parent_of", "child_of", "blocks", "blocked_by", "related_to"],
+    }).notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    index("idx_links_source").on(table.sourceId),
+    index("idx_links_target").on(table.targetId),
+  ]
+);
+
+export const entityVersions = sqliteTable(
+  "entity_versions",
+  {
+    id: text("id").primaryKey(),
+    entityId: text("entity_id").notNull(),
+    version: integer("version").notNull(),
+    data: text("data").notNull(),
+    changeType: text("change_type", { enum: ["create", "update", "delete"] }).notNull(),
+    changedFields: text("changed_fields"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("entity_versions_entity_id_version_unique").on(table.entityId, table.version),
+    index("idx_entity_versions_entity").on(table.entityId),
+  ]
+);
+
+export const entityIdPrefixes = sqliteTable(
+  "entity_id_prefixes",
+  {
+    scope: text("scope").notNull(),
+    entityId: text("entity_id")
+      .notNull()
+      .references(() => entities.id, { onDelete: "cascade" }),
+    prefix: text("prefix").notNull(),
+    prefixLength: integer("prefix_length").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.scope, table.entityId] }),
+    uniqueIndex("idx_entity_id_prefixes_scope_prefix").on(table.scope, table.prefix),
+    index("idx_entity_id_prefixes_entity").on(table.entityId),
+  ]
+);
+
+export const schemaMeta = sqliteTable("schema_meta", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
 
 export const SCHEMA_VERSION = 1;
 
@@ -56,6 +170,17 @@ CREATE TABLE IF NOT EXISTS entity_versions (
   UNIQUE(entity_id, version)
 );
 
+-- Shortest runnable entity ID prefixes by scope
+CREATE TABLE IF NOT EXISTS entity_id_prefixes (
+  scope TEXT NOT NULL,
+  entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  prefix TEXT NOT NULL,
+  prefix_length INTEGER NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (scope, entity_id),
+  UNIQUE(scope, prefix)
+);
+
 -- Schema metadata table
 CREATE TABLE IF NOT EXISTS schema_meta (
   key TEXT PRIMARY KEY,
@@ -68,6 +193,7 @@ CREATE INDEX IF NOT EXISTS idx_entity_tags_tag ON entity_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_id);
 CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_id);
 CREATE INDEX IF NOT EXISTS idx_entity_versions_entity ON entity_versions(entity_id);
+CREATE INDEX IF NOT EXISTS idx_entity_id_prefixes_entity ON entity_id_prefixes(entity_id);
 CREATE INDEX IF NOT EXISTS idx_tags_parent ON tags(parent_id);
 
 -- Full-text search for entities

@@ -4,7 +4,10 @@
  */
 import { Database } from "bun:sqlite";
 import { DatabaseError, MigrationError } from "@kioku/core";
+import { type BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
 import { Context, Effect, Layer } from "effect";
+import { rebuildEntityIdPrefixes } from "./entity-prefix-index.js";
+import * as schema from "./schema.js";
 import {
   CREATE_TABLES_SQL,
   GET_SCHEMA_VERSION_SQL,
@@ -18,6 +21,7 @@ import {
 
 export interface DatabaseClient {
   readonly db: Database;
+  readonly drizzle: BunSQLiteDatabase<typeof schema>;
   readonly close: () => Effect.Effect<void, DatabaseError>;
 }
 
@@ -39,7 +43,8 @@ const initializeDatabase = (db: Database): Effect.Effect<void, MigrationError> =
       // Enable foreign keys
       db.run("PRAGMA foreign_keys = ON;");
 
-      // Create tables
+      // TODO: This is in a transitional state and requires drizzle running on start up
+      // before we can migrate away.
       db.run(CREATE_TABLES_SQL);
 
       // Check/set schema version
@@ -79,9 +84,12 @@ export const makeDatabaseClient = (
     });
 
     yield* initializeDatabase(db);
+    const drizzleDb = drizzle({ client: db, schema });
+    rebuildEntityIdPrefixes(drizzleDb);
 
     return {
       db,
+      drizzle: drizzleDb,
       close: () =>
         Effect.try({
           try: () => db.close(),

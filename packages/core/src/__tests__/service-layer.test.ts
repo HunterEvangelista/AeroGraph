@@ -1,9 +1,3 @@
-/**
- * Service Layer Unit Tests (KIOKU-17)
- *
- * Tests for TagService and GraphService business logic using mock repositories.
- * These are unit tests - they verify service behavior in isolation.
- */
 import { Cause, Effect, Exit, Layer } from "effect";
 import { describe, expect, it } from "vitest";
 
@@ -131,7 +125,7 @@ const createMockTagRepository = (config: MockTagRepositoryConfig = {}): TagRepos
     create: (input) =>
       Effect.gen(function* () {
         if (config.createBehavior === "error") {
-          return yield* Effect.fail(new RepositoryError({ message: "Create failed" }));
+          return yield* new RepositoryError({ message: "Create failed" });
         }
         const tag: Tag = {
           id: input.id as TagId,
@@ -149,7 +143,7 @@ const createMockTagRepository = (config: MockTagRepositoryConfig = {}): TagRepos
       Effect.gen(function* () {
         const tag = tags.get(id);
         if (!tag) {
-          return yield* Effect.fail(new TagNotFoundError({ tagId: id }));
+          return yield* new TagNotFoundError({ tagId: id });
         }
         return tag;
       }),
@@ -161,13 +155,13 @@ const createMockTagRepository = (config: MockTagRepositoryConfig = {}): TagRepos
       Effect.gen(function* () {
         const tag = tags.get(id);
         if (!tag) {
-          return yield* Effect.fail(new TagNotFoundError({ tagId: id }));
+          return yield* new TagNotFoundError({ tagId: id });
         }
         return tag;
       }),
-    delete: () => Effect.succeed(undefined),
-    applyToEntity: () => Effect.succeed(undefined),
-    removeFromEntity: () => Effect.succeed(undefined),
+    delete: () => Effect.void,
+    applyToEntity: () => Effect.void,
+    removeFromEntity: () => Effect.void,
     getTagsForEntity: () => Effect.succeed([]),
     search: () => Effect.succeed([]),
     count: () => Effect.succeed(tags.size),
@@ -244,7 +238,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
       Effect.gen(function* () {
         const entity = entities.get(id);
         if (!entity) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId: id }));
+          return yield* new EntityNotFoundError({ entityId: id });
         }
         return entity;
       }),
@@ -268,7 +262,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
       Effect.gen(function* () {
         const entity = entities.get(id);
         if (!entity) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId: id }));
+          return yield* new EntityNotFoundError({ entityId: id });
         }
         return entity;
       }),
@@ -324,7 +318,7 @@ const createMockLinkRepository = (config: MockLinkRepositoryConfig = {}): LinkRe
       Effect.gen(function* () {
         const link = links.get(id);
         if (!link) {
-          return yield* Effect.fail(new RepositoryError({ message: `Link ${id} not found` }));
+          return yield* new RepositoryError({ message: `Link ${id} not found` });
         }
         return link;
       }),
@@ -340,9 +334,9 @@ const createMockLinkRepository = (config: MockLinkRepositoryConfig = {}): LinkRe
           (l) => l.sourceId === sourceId && l.targetId === targetId
         ) ?? null
       ),
-    delete: () => Effect.succeed(undefined),
+    delete: () => Effect.void,
     deleteAllForEntity: () => Effect.succeed(0),
-    deleteBetween: () => Effect.succeed(undefined),
+    deleteBetween: () => Effect.void,
     count: () => Effect.succeed(links.size),
   };
 };
@@ -492,8 +486,10 @@ describe("GraphService", () => {
 
       expect(result.entity.id).toBe("e1");
       expect(result.outgoingLinks).toHaveLength(1);
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
       expect(result.outgoingLinks[0]!.targetId).toBe("e2");
       expect(result.incomingLinks).toHaveLength(1);
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
       expect(result.incomingLinks[0]!.sourceId).toBe("e3");
     });
 
@@ -569,6 +565,7 @@ describe("GraphService", () => {
       const result = await Effect.runPromise(Effect.provide(program, layer));
 
       expect(result).toHaveLength(1);
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
       expect(result[0]!.id).toBe("ref");
     });
 
@@ -693,6 +690,7 @@ describe("GraphService", () => {
       const result = await Effect.runPromise(Effect.provide(program, layer));
 
       expect(result).toHaveLength(1);
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
       expect(result[0]!.id).toBe("e1");
     });
 
@@ -719,6 +717,7 @@ describe("GraphService", () => {
 
       // Only e2 has both tags
       expect(result).toHaveLength(1);
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
       expect(result[0]!.id).toBe("e2");
     });
   });
@@ -746,8 +745,10 @@ describe("GraphService", () => {
 
       expect(result).not.toBeNull();
       expect(result).toHaveLength(2);
-      expect(result![0]!.id).toBe("source");
-      expect(result![1]!.id).toBe("target");
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
+      expect(result![0]?.id).toBe("source");
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
+      expect(result![1]?.id).toBe("target");
     });
 
     it("finds shortest multi-hop path", async () => {
@@ -784,8 +785,11 @@ describe("GraphService", () => {
       expect(result).not.toBeNull();
       // BFS finds shortest path: source -> a -> target (3 entities)
       expect(result).toHaveLength(3);
-      expect(result![0]!.id).toBe("source");
-      expect(result![2]!.id).toBe("target");
+
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
+      expect(result![0]?.id).toBe("source");
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
+      expect(result![2]?.id).toBe("target");
     });
 
     it("returns null when no path exists", async () => {

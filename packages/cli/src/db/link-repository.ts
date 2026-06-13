@@ -10,11 +10,13 @@ import {
   type LinkType,
   RepositoryError,
 } from "@kioku/core";
+import { and, desc, count as drizzleCount, eq, or } from "drizzle-orm";
 /**
  * SQLite Link Repository Implementation
  */
 import { Effect, Layer } from "effect";
 import { DatabaseClientTag } from "./client.js";
+import { entities, links } from "./schema.js";
 
 // ============================================================================
 // Helper Functions
@@ -26,18 +28,18 @@ const now = (): string => new Date().toISOString();
 
 interface LinkRow {
   id: string;
-  source_id: string;
-  target_id: string;
-  type: string;
-  created_at: string;
+  sourceId: string;
+  targetId: string;
+  type: LinkType;
+  createdAt: string;
 }
 
 const rowToLink = (row: LinkRow): Link => ({
   id: row.id as LinkId,
-  sourceId: row.source_id,
-  targetId: row.target_id,
-  type: row.type as LinkType,
-  createdAt: new Date(row.created_at),
+  sourceId: row.sourceId,
+  targetId: row.targetId,
+  type: row.type,
+  createdAt: new Date(row.createdAt),
 });
 
 // ============================================================================
@@ -47,59 +49,17 @@ const rowToLink = (row: LinkRow): Link => ({
 export const SqliteLinkRepositoryLive = Layer.effect(
   LinkRepositoryTag,
   Effect.gen(function* () {
-    const { db } = yield* DatabaseClientTag;
-
-    const insertLink = db.prepare(`
-      INSERT INTO links (id, source_id, target_id, type, created_at)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
-    const selectById = db.prepare("SELECT * FROM links WHERE id = ?");
-
-    const selectFromSource = db.prepare(`
-      SELECT * FROM links WHERE source_id = ? ORDER BY created_at DESC
-    `);
-
-    const selectToTarget = db.prepare(`
-      SELECT * FROM links WHERE target_id = ? ORDER BY created_at DESC
-    `);
-
-    const selectForEntity = db.prepare(`
-      SELECT * FROM links WHERE source_id = ? OR target_id = ? ORDER BY created_at DESC
-    `);
-
-    const selectByType = db.prepare("SELECT * FROM links WHERE type = ? ORDER BY created_at DESC");
-
-    const selectBetween = db.prepare(`
-      SELECT * FROM links WHERE source_id = ? AND target_id = ?
-    `);
-
-    const selectBetweenByType = db.prepare(`
-      SELECT * FROM links WHERE source_id = ? AND target_id = ? AND type = ?
-    `);
-
-    const deleteLink = db.prepare("DELETE FROM links WHERE id = ?");
-
-    const deleteForEntity = db.prepare(`
-      DELETE FROM links WHERE source_id = ? OR target_id = ?
-    `);
-
-    const deleteBetweenEntities = db.prepare(`
-      DELETE FROM links WHERE source_id = ? AND target_id = ?
-    `);
-
-    const deleteBetweenEntitiesByType = db.prepare(`
-      DELETE FROM links WHERE source_id = ? AND target_id = ? AND type = ?
-    `);
-
-    const countLinks = db.prepare("SELECT COUNT(*) as count FROM links");
-
-    const checkEntityExists = db.prepare("SELECT 1 FROM entities WHERE id = ?");
+    const { drizzle } = yield* DatabaseClientTag;
 
     const verifyEntityExists = (entityId: string) =>
       Effect.gen(function* () {
         const exists = yield* Effect.try({
-          try: () => checkEntityExists.get(entityId),
+          try: () =>
+            drizzle
+              .select({ id: entities.id })
+              .from(entities)
+              .where(eq(entities.id, entityId))
+              .get(),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to check entity: ${error instanceof Error ? error.message : String(error)}`,
@@ -121,8 +81,18 @@ export const SqliteLinkRepositoryLive = Layer.effect(
           try: () => {
             const id = generateId();
             const timestamp = now();
-            insertLink.run(id, input.sourceId, input.targetId, input.type, timestamp);
-            const row = selectById.get(id) as LinkRow;
+            drizzle
+              .insert(links)
+              .values({
+                id,
+                sourceId: input.sourceId,
+                targetId: input.targetId,
+                type: input.type,
+                createdAt: timestamp,
+              })
+              .run();
+            const row = drizzle.select().from(links).where(eq(links.id, id)).get();
+            if (!row) throw new Error(`Inserted link not found: ${id}`);
             return rowToLink(row);
           },
           catch: (error) =>
@@ -140,23 +110,40 @@ export const SqliteLinkRepositoryLive = Layer.effect(
 
         return yield* Effect.try({
           try: () => {
-            const createPair = db.transaction(() => {
+            const createPair = drizzle.transaction((tx) => {
               const timestamp = now();
 
               const forwardId = generateId();
               const inverseId = generateId();
               const inverseType = getInverseLinkType(input.type);
 
-              insertLink.run(forwardId, input.sourceId, input.targetId, input.type, timestamp);
-              insertLink.run(inverseId, input.targetId, input.sourceId, inverseType, timestamp);
+              tx.insert(links)
+                .values([
+                  {
+                    id: forwardId,
+                    sourceId: input.sourceId,
+                    targetId: input.targetId,
+                    type: input.type,
+                    createdAt: timestamp,
+                  },
+                  {
+                    id: inverseId,
+                    sourceId: input.targetId,
+                    targetId: input.sourceId,
+                    type: inverseType,
+                    createdAt: timestamp,
+                  },
+                ])
+                .run();
 
-              const forwardRow = selectById.get(forwardId) as LinkRow;
-              const inverseRow = selectById.get(inverseId) as LinkRow;
+              const forwardRow = tx.select().from(links).where(eq(links.id, forwardId)).get();
+              const inverseRow = tx.select().from(links).where(eq(links.id, inverseId)).get();
+              if (!forwardRow || !inverseRow) throw new Error("Inserted link pair not found");
 
               return [forwardRow, inverseRow] as const;
             });
 
-            const [forwardRow, inverseRow] = createPair();
+            const [forwardRow, inverseRow] = createPair;
             return [rowToLink(forwardRow), rowToLink(inverseRow)] as const;
           },
           catch: (error) =>
@@ -170,7 +157,7 @@ export const SqliteLinkRepositoryLive = Layer.effect(
     const getById = (id: LinkId) =>
       Effect.gen(function* () {
         const row = yield* Effect.try({
-          try: () => selectById.get(id) as LinkRow | undefined,
+          try: () => drizzle.select().from(links).where(eq(links.id, id)).get(),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to get link: ${error instanceof Error ? error.message : String(error)}`,
@@ -188,7 +175,12 @@ export const SqliteLinkRepositoryLive = Layer.effect(
     const getFromSource = (sourceId: string) =>
       Effect.try({
         try: () => {
-          const rows = selectFromSource.all(sourceId) as LinkRow[];
+          const rows = drizzle
+            .select()
+            .from(links)
+            .where(eq(links.sourceId, sourceId))
+            .orderBy(desc(links.createdAt))
+            .all();
           return rows.map(rowToLink);
         },
         catch: (error) =>
@@ -201,7 +193,12 @@ export const SqliteLinkRepositoryLive = Layer.effect(
     const getToTarget = (targetId: string) =>
       Effect.try({
         try: () => {
-          const rows = selectToTarget.all(targetId) as LinkRow[];
+          const rows = drizzle
+            .select()
+            .from(links)
+            .where(eq(links.targetId, targetId))
+            .orderBy(desc(links.createdAt))
+            .all();
           return rows.map(rowToLink);
         },
         catch: (error) =>
@@ -214,7 +211,12 @@ export const SqliteLinkRepositoryLive = Layer.effect(
     const getAllForEntity = (entityId: string) =>
       Effect.try({
         try: () => {
-          const rows = selectForEntity.all(entityId, entityId) as LinkRow[];
+          const rows = drizzle
+            .select()
+            .from(links)
+            .where(or(eq(links.sourceId, entityId), eq(links.targetId, entityId)))
+            .orderBy(desc(links.createdAt))
+            .all();
           return rows.map(rowToLink);
         },
         catch: (error) =>
@@ -227,7 +229,12 @@ export const SqliteLinkRepositoryLive = Layer.effect(
     const getByType = (type: LinkType) =>
       Effect.try({
         try: () => {
-          const rows = selectByType.all(type) as LinkRow[];
+          const rows = drizzle
+            .select()
+            .from(links)
+            .where(eq(links.type, type))
+            .orderBy(desc(links.createdAt))
+            .all();
           return rows.map(rowToLink);
         },
         catch: (error) =>
@@ -240,7 +247,11 @@ export const SqliteLinkRepositoryLive = Layer.effect(
     const getLinkBetween = (sourceId: string, targetId: string) =>
       Effect.try({
         try: () => {
-          const row = selectBetween.get(sourceId, targetId) as LinkRow | undefined;
+          const row = drizzle
+            .select()
+            .from(links)
+            .where(and(eq(links.sourceId, sourceId), eq(links.targetId, targetId)))
+            .get();
           return row ? rowToLink(row) : null;
         },
         catch: (error) =>
@@ -255,7 +266,7 @@ export const SqliteLinkRepositoryLive = Layer.effect(
         yield* getById(id);
 
         yield* Effect.try({
-          try: () => deleteLink.run(id),
+          try: () => drizzle.delete(links).where(eq(links.id, id)).run(),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to delete link: ${error instanceof Error ? error.message : String(error)}`,
@@ -267,8 +278,17 @@ export const SqliteLinkRepositoryLive = Layer.effect(
     const deleteAllForEntity = (entityId: string) =>
       Effect.try({
         try: () => {
-          const result = deleteForEntity.run(entityId, entityId);
-          return result.changes;
+          const existing = drizzle
+            .select({ id: links.id })
+            .from(links)
+            .where(or(eq(links.sourceId, entityId), eq(links.targetId, entityId)))
+            .all();
+
+          drizzle
+            .delete(links)
+            .where(or(eq(links.sourceId, entityId), eq(links.targetId, entityId)))
+            .run();
+          return existing.length;
         },
         catch: (error) =>
           new RepositoryError({
@@ -282,10 +302,24 @@ export const SqliteLinkRepositoryLive = Layer.effect(
         const link = yield* Effect.try({
           try: () => {
             if (type) {
-              return selectBetweenByType.get(sourceId, targetId, type) as LinkRow | undefined;
+              return drizzle
+                .select()
+                .from(links)
+                .where(
+                  and(
+                    eq(links.sourceId, sourceId),
+                    eq(links.targetId, targetId),
+                    eq(links.type, type)
+                  )
+                )
+                .get();
             }
 
-            return selectBetween.get(sourceId, targetId) as LinkRow | undefined;
+            return drizzle
+              .select()
+              .from(links)
+              .where(and(eq(links.sourceId, sourceId), eq(links.targetId, targetId)))
+              .get();
           },
           catch: (error) =>
             new RepositoryError({
@@ -301,11 +335,23 @@ export const SqliteLinkRepositoryLive = Layer.effect(
         yield* Effect.try({
           try: () => {
             if (type) {
-              deleteBetweenEntitiesByType.run(sourceId, targetId, type);
+              drizzle
+                .delete(links)
+                .where(
+                  and(
+                    eq(links.sourceId, sourceId),
+                    eq(links.targetId, targetId),
+                    eq(links.type, type)
+                  )
+                )
+                .run();
               return;
             }
 
-            deleteBetweenEntities.run(sourceId, targetId);
+            drizzle
+              .delete(links)
+              .where(and(eq(links.sourceId, sourceId), eq(links.targetId, targetId)))
+              .run();
           },
           catch: (error) =>
             new RepositoryError({
@@ -318,8 +364,8 @@ export const SqliteLinkRepositoryLive = Layer.effect(
     const count = () =>
       Effect.try({
         try: () => {
-          const result = countLinks.get() as { count: number };
-          return result.count;
+          const result = drizzle.select({ count: drizzleCount() }).from(links).get();
+          return result?.count ?? 0;
         },
         catch: (error) =>
           new RepositoryError({

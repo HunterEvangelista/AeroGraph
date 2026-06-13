@@ -9,7 +9,9 @@ import {
 import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config.js";
-import { CliCoreLive } from "../db/index.js";
+import { CliServicesLive } from "../db/index.js";
+import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
+import { resolveEntityId } from "../entity-id.js";
 
 // ============================================================================
 // Custom Error Types
@@ -96,12 +98,12 @@ const parseOptionalStatus = (status: Option.Option<string>) =>
     return parsed;
   });
 
-const printStoryDetails = (story: Story) =>
+const printStoryDetails = (story: Story, displayIds: ReadonlyMap<string, string>) =>
   Effect.gen(function* () {
     yield* Console.log("");
     yield* Console.log(`# ${story.title}`);
     yield* Console.log("");
-    yield* Console.log(`ID:      ${story.id}`);
+    yield* Console.log(`ID:      ${formattedEntityId(displayIds, story.id)}`);
     yield* Console.log(`Status:  ${story.status}`);
     if (story.priority) {
       yield* Console.log(`Priority: ${story.priority}`);
@@ -135,10 +137,10 @@ const storyCreateCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
+      const ServiceLayers = CliServicesLive(workspace.dbPath);
       const statusValue = yield* parseOptionalStatus(status);
 
-      const story = yield* Effect.scoped(
+      const { story, displayIds } = yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const contentValue = Option.getOrElse(content, () => "");
@@ -157,14 +159,15 @@ const storyCreateCommand = Command.make(
             }
           }
 
-          return story;
+          const displayIds = yield* loadFormattedEntityIds([story.id]);
+          return { story, displayIds };
         }).pipe(Effect.provide(ServiceLayers))
       );
 
       yield* Console.log("");
       yield* Console.log("Story created successfully!");
       yield* Console.log("");
-      yield* Console.log(`ID:      ${story.id}`);
+      yield* Console.log(`ID:      ${formattedEntityId(displayIds, story.id)}`);
       yield* Console.log(`Title:   ${story.title}`);
       yield* Console.log(`Status:  ${story.status}`);
       yield* Console.log(`Version: ${story.version}`);
@@ -189,18 +192,19 @@ const storyShowCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
+      const ServiceLayers = CliServicesLive(workspace.dbPath);
 
-      const { story, tags, links, linkedEntities } = yield* Effect.scoped(
+      const { story, tags, links, linkedEntities, displayIds } = yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const graphService = yield* GraphServiceTag;
           const tagService = yield* TagServiceTag;
-          const withLinks = yield* graphService.getEntityWithLinks(id);
+          const resolvedId = yield* resolveEntityId(id);
+          const withLinks = yield* graphService.getEntityWithLinks(resolvedId);
           const entity = withLinks.entity;
 
           if (entity._tag !== EntityTypeEnum.Story) {
-            return yield* new NotAStoryError({ id });
+            return yield* new NotAStoryError({ id: resolvedId });
           }
 
           const tags = yield* tagService.getTagsForEntity(entity.id);
@@ -215,11 +219,12 @@ const storyShowCommand = Command.make(
             linkedEntities.set(other.id, `[${other._tag}] ${other.title}`);
           }
 
-          return { story: entity, tags, links, linkedEntities };
+          const displayIds = yield* loadFormattedEntityIds([entity.id, ...linkedEntities.keys()]);
+          return { story: entity, tags, links, linkedEntities, displayIds };
         }).pipe(Effect.provide(ServiceLayers))
       );
 
-      yield* printStoryDetails(story);
+      yield* printStoryDetails(story, displayIds);
 
       if (tags.length > 0) {
         yield* Console.log(`Tags:    ${tags.map((tag) => `#${tag.id}`).join(", ")}`);
@@ -245,7 +250,9 @@ const storyShowCommand = Command.make(
           const otherId = isOutgoing ? link.targetId : link.sourceId;
           const direction = isOutgoing ? `--${link.type}-->` : `<--${link.type}--`;
           const summary = linkedEntities.get(otherId) ?? otherId;
-          yield* Console.log(`  ${direction} ${otherId}  ${summary}`);
+          yield* Console.log(
+            `  ${direction} ${formattedEntityId(displayIds, otherId)}  ${summary}`
+          );
         }
       }
 
@@ -280,10 +287,10 @@ const storyListCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
+      const ServiceLayers = CliServicesLive(workspace.dbPath);
       const statusValue = yield* parseOptionalStatus(status);
 
-      const stories = yield* Effect.scoped(
+      const { stories, displayIds } = yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const tagValue = Option.getOrUndefined(tag);
@@ -295,11 +302,13 @@ const storyListCommand = Command.make(
               ? yield* entityService.getByTag(tagValue)
               : yield* entityService.getAll(EntityTypeEnum.Story);
 
-          return results.filter(
+          const stories = results.filter(
             (entity): entity is Story =>
               entity._tag === EntityTypeEnum.Story &&
               (statusValue === undefined || entity.status === statusValue)
           );
+          const displayIds = yield* loadFormattedEntityIds(stories.map((story) => story.id));
+          return { stories, displayIds };
         }).pipe(Effect.provide(ServiceLayers))
       );
 
@@ -316,7 +325,9 @@ const storyListCommand = Command.make(
         for (const story of stories) {
           const preview = story.content.slice(0, 50).replace(/\n/g, " ");
           const ellipsis = story.content.length > 50 ? "..." : "";
-          yield* Console.log(`${story.id.slice(0, 8)}  [${story.status}] ${story.title}`);
+          yield* Console.log(
+            `${formattedEntityId(displayIds, story.id)}  [${story.status}] ${story.title}`
+          );
           if (preview) {
             yield* Console.log(`          ${preview}${ellipsis}`);
           }
@@ -346,7 +357,7 @@ const storyEditCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
+      const ServiceLayers = CliServicesLive(workspace.dbPath);
       const titleValue = Option.getOrUndefined(title);
       const contentValue = Option.getOrUndefined(content);
       const statusValue = yield* parseOptionalStatus(status);
@@ -355,15 +366,16 @@ const storyEditCommand = Command.make(
         return yield* new NoUpdatesError();
       }
 
-      const updated = yield* Effect.scoped(
+      const { updated, displayIds } = yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
+          const resolvedId = yield* resolveEntityId(id);
           const existing = yield* entityService.getById(
-            id as Parameters<typeof entityService.getById>[0]
+            resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
           if (existing._tag !== EntityTypeEnum.Story) {
-            return yield* new NotAStoryError({ id });
+            return yield* new NotAStoryError({ id: resolvedId });
           }
 
           const updates: { title?: string; content?: string; status?: StoryStatusEnum } = {};
@@ -371,10 +383,12 @@ const storyEditCommand = Command.make(
           if (contentValue !== undefined) updates.content = contentValue;
           if (statusValue !== undefined) updates.status = statusValue;
 
-          return yield* entityService.update(
-            id as Parameters<typeof entityService.getById>[0],
+          const updated = yield* entityService.update(
+            resolvedId as Parameters<typeof entityService.getById>[0],
             updates
           );
+          const displayIds = yield* loadFormattedEntityIds([updated.id]);
+          return { updated, displayIds };
         }).pipe(Effect.provide(ServiceLayers))
       );
 
@@ -385,7 +399,7 @@ const storyEditCommand = Command.make(
       yield* Console.log("");
       yield* Console.log("Story updated successfully!");
       yield* Console.log("");
-      yield* Console.log(`ID:      ${updated.id}`);
+      yield* Console.log(`ID:      ${formattedEntityId(displayIds, updated.id)}`);
       yield* Console.log(`Title:   ${updated.title}`);
       yield* Console.log(`Status:  ${updated.status}`);
       yield* Console.log(`Version: ${updated.version}`);
@@ -411,17 +425,18 @@ const storyDeleteCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
+      const ServiceLayers = CliServicesLive(workspace.dbPath);
 
       yield* Effect.scoped(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
+          const resolvedId = yield* resolveEntityId(id);
           const existing = yield* entityService.getById(
-            id as Parameters<typeof entityService.getById>[0]
+            resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
           if (existing._tag !== EntityTypeEnum.Story) {
-            return yield* Effect.fail(new NotAStoryError({ id }));
+            return yield* Effect.fail(new NotAStoryError({ id: resolvedId }));
           }
 
           if (!force) {
@@ -429,7 +444,9 @@ const storyDeleteCommand = Command.make(
             yield* Console.log("(Use --force to skip this confirmation in scripts)");
           }
 
-          yield* entityService.delete(id as Parameters<typeof entityService.getById>[0]);
+          yield* entityService.delete(
+            resolvedId as Parameters<typeof entityService.getById>[0]
+          );
         }).pipe(Effect.provide(ServiceLayers))
       );
 

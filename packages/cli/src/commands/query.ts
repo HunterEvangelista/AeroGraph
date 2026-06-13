@@ -12,7 +12,8 @@ import { Console, Data, Effect, Option } from "effect";
  */
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config.js";
-import { CliCoreLive } from "../db/index.js";
+import { CliServicesLive } from "../db/index.js";
+import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
 import { isPositiveInteger } from "./validation.js";
 
@@ -71,10 +72,10 @@ const codeLocation = (entity: Entity): string | undefined => {
   return `${entity.filePath}${start}${end}`;
 };
 
-const entitySummary = (entity: Entity): string => {
+const entitySummary = (entity: Entity, displayIds: ReadonlyMap<string, string>): string => {
   const location = codeLocation(entity);
   const suffix = location ? ` (${location})` : "";
-  return `${entity.id}  [${entity._tag}] ${entity.title}${suffix}`;
+  return `${formattedEntityId(displayIds, entity.id)}  [${entity._tag}] ${entity.title}${suffix}`;
 };
 
 const printEntityBody = (entity: Entity) =>
@@ -93,9 +94,9 @@ const printEntityBody = (entity: Entity) =>
     yield* Console.log(`    next: kioku query --traverse ${entity.id} --depth 2`);
   });
 
-const printEntityDetails = (entity: Entity) =>
+const printEntityDetails = (entity: Entity, displayIds: ReadonlyMap<string, string>) =>
   Effect.gen(function* () {
-    yield* Console.log(`  ${entitySummary(entity)}`);
+    yield* Console.log(`  ${entitySummary(entity, displayIds)}`);
     yield* printEntityBody(entity);
   });
 
@@ -112,6 +113,8 @@ const printGroupedEntities = (title: string, entities: ReadonlyArray<Entity>) =>
       return;
     }
 
+    const displayIds = yield* loadFormattedEntityIds(entities.map((entity) => entity.id));
+
     // Follow-up story needed: the product asks for role groupings such as decisions,
     // constraints, risks, canonical docs, and open questions, but the current domain
     // model has no authoritative role field. Entity type is stable and explicit, so
@@ -126,7 +129,7 @@ const printGroupedEntities = (title: string, entities: ReadonlyArray<Entity>) =>
       yield* Console.log("-".repeat(roleLabel(role).length));
 
       for (const entity of roleEntities) {
-        yield* printEntityDetails(entity);
+        yield* printEntityDetails(entity, displayIds);
         yield* Console.log("");
       }
     }
@@ -183,9 +186,15 @@ const runRelatedQuery = (graphService: GraphService, relatedToValue: string) =>
     const center = yield* graphService.getEntityWithLinks(entityId);
     const related = yield* graphService.getRelatedEntities(entityId);
     const relatedById = new Map<string, Entity>(related.map((entity) => [entity.id, entity]));
+    const displayIds = yield* loadFormattedEntityIds([
+      center.entity.id,
+      ...related.map((entity) => entity.id),
+    ]);
 
     yield* Console.log("");
-    yield* Console.log(`Related to ${center.entity.title} (${center.entity.id})`);
+    yield* Console.log(
+      `Related to ${center.entity.title} (${formattedEntityId(displayIds, center.entity.id)})`
+    );
     yield* Console.log("=".repeat(40));
 
     if (related.length === 0) {
@@ -202,7 +211,7 @@ const runRelatedQuery = (graphService: GraphService, relatedToValue: string) =>
 
       yield* Console.log("");
       yield* Console.log(
-        `  ${center.entity.id} ${linkDirectionLabel(link, entityId)} ${entitySummary(target)}`
+        `  ${formattedEntityId(displayIds, center.entity.id)} ${linkDirectionLabel(link, entityId)} ${entitySummary(target, displayIds)}`
       );
       yield* printEntityBody(target);
     }
@@ -235,9 +244,14 @@ const runPathQuery = (graphService: GraphService, pathValue: ReadonlyArray<strin
     const resolvedFromId = yield* resolveEntityId(fromId);
     const resolvedToId = yield* resolveEntityId(toId);
     const pathEntities = yield* graphService.findPath(resolvedFromId, resolvedToId);
+    const displayIds = yield* loadFormattedEntityIds(
+      pathEntities?.map((entity) => entity.id) ?? [resolvedFromId, resolvedToId]
+    );
 
     yield* Console.log("");
-    yield* Console.log(`Shortest path: ${resolvedFromId} -> ${resolvedToId}`);
+    yield* Console.log(
+      `Shortest path: ${formattedEntityId(displayIds, resolvedFromId)} -> ${formattedEntityId(displayIds, resolvedToId)}`
+    );
     yield* Console.log("=".repeat(40));
 
     if (!pathEntities) {
@@ -249,7 +263,7 @@ const runPathQuery = (graphService: GraphService, pathValue: ReadonlyArray<strin
 
     for (const [i, entity] of pathEntities.entries()) {
       yield* Console.log("");
-      yield* Console.log(`${i + 1}. ${entitySummary(entity)}`);
+      yield* Console.log(`${i + 1}. ${entitySummary(entity, displayIds)}`);
 
       const next = pathEntities[i + 1];
       if (next) {
@@ -396,7 +410,7 @@ export const queryCommand = Command.make(
 
       const configService = yield* ConfigServiceTag;
       const workspace = yield* configService.load();
-      const ServiceLayers = CliCoreLive(workspace.dbPath);
+      const ServiceLayers = CliServicesLive(workspace.dbPath);
 
       yield* Effect.scoped(
         Effect.gen(function* () {

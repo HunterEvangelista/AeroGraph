@@ -84,9 +84,9 @@ describe("story command", () => {
     const underscore = workspace.run("story", "list", "--status", "in_progress");
 
     expect(hyphen.status).toBe(0);
-    expect(hyphen.stdout).toContain("story-au  [in_progress] Auth Hardening Story");
+    expect(hyphen.stdout).toContain("story-auth-hardening  [in_progress] Auth Hardening Story");
     expect(underscore.status).toBe(0);
-    expect(underscore.stdout).toContain("story-au  [in_progress] Auth Hardening Story");
+    expect(underscore.stdout).toContain("story-auth-hardening  [in_progress] Auth Hardening Story");
   });
 
   it("edits story fields", () => {

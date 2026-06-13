@@ -17,11 +17,14 @@ import {
   type Story,
   StoryStatusEnum,
 } from "@kioku/core";
+import { desc, count as drizzleCount, eq, inArray, sql } from "drizzle-orm";
 /**
  * SQLite Entity Repository Implementation
  */
 import { Effect, Layer } from "effect";
 import { DatabaseClientTag } from "./client.js";
+import { rebuildEntityIdPrefixes } from "./entity-prefix-index.js";
+import { entities, entityTags } from "./schema.js";
 
 // ============================================================================
 // Helper Functions
@@ -33,7 +36,18 @@ const now = (): string => new Date().toISOString();
 
 interface EntityRow {
   id: string;
-  type: string;
+  type: "doc" | "code_ref" | "story" | "diagram";
+  title: string;
+  content: string | null;
+  metadata: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+interface RawEntityRow {
+  id: string;
+  type: "doc" | "code_ref" | "story" | "diagram";
   title: string;
   content: string | null;
   metadata: string | null;
@@ -42,6 +56,17 @@ interface EntityRow {
   version: number;
 }
 
+const rawRowToEntityRow = (row: RawEntityRow): EntityRow => ({
+  id: row.id,
+  type: row.type,
+  title: row.title,
+  content: row.content,
+  metadata: row.metadata,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+  version: row.version,
+});
+
 const rowToEntity = (row: EntityRow): Entity => {
   const metadata = row.metadata ? JSON.parse(row.metadata) : {};
   const base = {
@@ -49,8 +74,8 @@ const rowToEntity = (row: EntityRow): Entity => {
     title: row.title,
     content: row.content ?? "",
     tags: [], // Tags are loaded separately
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
+    createdAt: new Date(row.createdAt),
+    updatedAt: new Date(row.updatedAt),
     version: row.version,
   };
 
@@ -135,39 +160,7 @@ const mergeEntityMetadata = (existing: Entity, updates: Partial<Entity>): string
 export const SqliteEntityRepositoryLive = Layer.effect(
   EntityRepositoryTag,
   Effect.gen(function* () {
-    const { db } = yield* DatabaseClientTag;
-
-    const insertEntity = db.prepare(`
-      INSERT INTO entities (id, type, title, content, metadata, created_at, updated_at, version)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-    `);
-
-    const selectById = db.prepare("SELECT * FROM entities WHERE id = ?");
-
-    const selectAll = db.prepare("SELECT * FROM entities ORDER BY updated_at DESC");
-
-    const selectByType = db.prepare(
-      "SELECT * FROM entities WHERE type = ? ORDER BY updated_at DESC"
-    );
-
-    const selectByTag = db.prepare(`
-      SELECT e.* FROM entities e
-      JOIN entity_tags et ON e.id = et.entity_id
-      WHERE et.tag_id = ?
-      ORDER BY e.updated_at DESC
-    `);
-
-    const updateEntity = db.prepare(`
-      UPDATE entities
-      SET title = ?, content = ?, metadata = ?, updated_at = ?, version = version + 1
-      WHERE id = ?
-    `);
-
-    const deleteEntity = db.prepare("DELETE FROM entities WHERE id = ?");
-
-    const countAll = db.prepare("SELECT COUNT(*) as count FROM entities");
-
-    const countByType = db.prepare("SELECT COUNT(*) as count FROM entities WHERE type = ?");
+    const { db, drizzle } = yield* DatabaseClientTag;
 
     const searchFts = db.prepare(`
       SELECT e.* FROM entities e
@@ -182,8 +175,21 @@ export const SqliteEntityRepositoryLive = Layer.effect(
         try: () => {
           const id = generateId();
           const timestamp = now();
-          insertEntity.run(id, "doc", input.title, input.content, null, timestamp, timestamp);
-          const row = selectById.get(id) as EntityRow;
+          drizzle
+            .insert(entities)
+            .values({
+              id,
+              type: EntityTypeEnum.Doc,
+              title: input.title,
+              content: input.content,
+              metadata: null,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            })
+            .run();
+          const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
+          if (!row) throw new Error(`Inserted entity not found: ${id}`);
+          rebuildEntityIdPrefixes(drizzle);
           return rowToEntity(row) as Doc;
         },
         catch: (error) =>
@@ -206,16 +212,21 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             commitHash: input.commitHash,
             symbol: input.symbol,
           });
-          insertEntity.run(
-            id,
-            "code_ref",
-            input.title,
-            input.content,
-            metadata,
-            timestamp,
-            timestamp
-          );
-          const row = selectById.get(id) as EntityRow;
+          drizzle
+            .insert(entities)
+            .values({
+              id,
+              type: EntityTypeEnum.CodeRef,
+              title: input.title,
+              content: input.content,
+              metadata,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            })
+            .run();
+          const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
+          if (!row) throw new Error(`Inserted entity not found: ${id}`);
+          rebuildEntityIdPrefixes(drizzle);
           return rowToEntity(row) as CodeRef;
         },
         catch: (error) =>
@@ -235,8 +246,21 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             priority: input.priority,
             parentId: input.parentId,
           });
-          insertEntity.run(id, "story", input.title, input.content, metadata, timestamp, timestamp);
-          const row = selectById.get(id) as EntityRow;
+          drizzle
+            .insert(entities)
+            .values({
+              id,
+              type: EntityTypeEnum.Story,
+              title: input.title,
+              content: input.content,
+              metadata,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            })
+            .run();
+          const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
+          if (!row) throw new Error(`Inserted entity not found: ${id}`);
+          rebuildEntityIdPrefixes(drizzle);
           return rowToEntity(row) as Story;
         },
         catch: (error) =>
@@ -256,16 +280,21 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             source: input.source,
             generatedFrom: input.generatedFrom,
           });
-          insertEntity.run(
-            id,
-            "diagram",
-            input.title,
-            input.content,
-            metadata,
-            timestamp,
-            timestamp
-          );
-          const row = selectById.get(id) as EntityRow;
+          drizzle
+            .insert(entities)
+            .values({
+              id,
+              type: EntityTypeEnum.Diagram,
+              title: input.title,
+              content: input.content,
+              metadata,
+              createdAt: timestamp,
+              updatedAt: timestamp,
+            })
+            .run();
+          const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
+          if (!row) throw new Error(`Inserted entity not found: ${id}`);
+          rebuildEntityIdPrefixes(drizzle);
           return rowToEntity(row) as Diagram;
         },
         catch: (error) =>
@@ -278,7 +307,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
     const getById = (id: EntityId) =>
       Effect.gen(function* () {
         const row = yield* Effect.try({
-          try: () => selectById.get(id) as EntityRow | undefined,
+          try: () => drizzle.select().from(entities).where(eq(entities.id, id)).get(),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to get entity: ${error instanceof Error ? error.message : String(error)}`,
@@ -296,7 +325,14 @@ export const SqliteEntityRepositoryLive = Layer.effect(
     const getAll = (type?: EntityType) =>
       Effect.try({
         try: () => {
-          const rows = (type ? selectByType.all(type) : selectAll.all()) as EntityRow[];
+          const rows = type
+            ? drizzle
+                .select()
+                .from(entities)
+                .where(eq(entities.type, type))
+                .orderBy(desc(entities.updatedAt))
+                .all()
+            : drizzle.select().from(entities).orderBy(desc(entities.updatedAt)).all();
           return rows.map(rowToEntity);
         },
         catch: (error) =>
@@ -309,7 +345,22 @@ export const SqliteEntityRepositoryLive = Layer.effect(
     const getByTag = (tagId: string) =>
       Effect.try({
         try: () => {
-          const rows = selectByTag.all(tagId) as EntityRow[];
+          const rows = drizzle
+            .select({
+              id: entities.id,
+              type: entities.type,
+              title: entities.title,
+              content: entities.content,
+              metadata: entities.metadata,
+              createdAt: entities.createdAt,
+              updatedAt: entities.updatedAt,
+              version: entities.version,
+            })
+            .from(entities)
+            .innerJoin(entityTags, eq(entities.id, entityTags.entityId))
+            .where(eq(entityTags.tagId, tagId))
+            .orderBy(desc(entities.updatedAt))
+            .all();
           return rows.map(rowToEntity);
         },
         catch: (error) =>
@@ -324,18 +375,24 @@ export const SqliteEntityRepositoryLive = Layer.effect(
         try: () => {
           if (tagIds.length === 0) return [];
 
-          // Build query for intersection
-          const placeholders = tagIds.map(() => "?").join(", ");
-          const query = db.prepare(`
-            SELECT e.* FROM entities e
-            JOIN entity_tags et ON e.id = et.entity_id
-            WHERE et.tag_id IN (${placeholders})
-            GROUP BY e.id
-            HAVING COUNT(DISTINCT et.tag_id) = ?
-            ORDER BY e.updated_at DESC
-          `);
-
-          const rows = query.all(...tagIds, tagIds.length) as EntityRow[];
+          const rows = drizzle
+            .select({
+              id: entities.id,
+              type: entities.type,
+              title: entities.title,
+              content: entities.content,
+              metadata: entities.metadata,
+              createdAt: entities.createdAt,
+              updatedAt: entities.updatedAt,
+              version: entities.version,
+            })
+            .from(entities)
+            .innerJoin(entityTags, eq(entities.id, entityTags.entityId))
+            .where(inArray(entityTags.tagId, [...tagIds]))
+            .groupBy(entities.id)
+            .having(sql`count(distinct ${entityTags.tagId}) = ${tagIds.length}`)
+            .orderBy(desc(entities.updatedAt))
+            .all();
           return rows.map(rowToEntity);
         },
         catch: (error) =>
@@ -355,7 +412,18 @@ export const SqliteEntityRepositoryLive = Layer.effect(
         const newMetadata = mergeEntityMetadata(existing, updates);
 
         yield* Effect.try({
-          try: () => updateEntity.run(newTitle, newContent, newMetadata, now(), id),
+          try: () =>
+            drizzle
+              .update(entities)
+              .set({
+                title: newTitle,
+                content: newContent,
+                metadata: newMetadata,
+                updatedAt: now(),
+                version: sql`${entities.version} + 1`,
+              })
+              .where(eq(entities.id, id))
+              .run(),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to update entity: ${error instanceof Error ? error.message : String(error)}`,
@@ -372,7 +440,10 @@ export const SqliteEntityRepositoryLive = Layer.effect(
         yield* getById(id);
 
         yield* Effect.try({
-          try: () => deleteEntity.run(id),
+          try: () => {
+            drizzle.delete(entities).where(eq(entities.id, id)).run();
+            rebuildEntityIdPrefixes(drizzle);
+          },
           catch: (error) =>
             new RepositoryError({
               message: `Failed to delete entity: ${error instanceof Error ? error.message : String(error)}`,
@@ -384,8 +455,14 @@ export const SqliteEntityRepositoryLive = Layer.effect(
     const count = (type?: EntityType) =>
       Effect.try({
         try: () => {
-          const result = (type ? countByType.get(type) : countAll.get()) as { count: number };
-          return result.count;
+          const result = type
+            ? drizzle
+                .select({ count: drizzleCount() })
+                .from(entities)
+                .where(eq(entities.type, type))
+                .get()
+            : drizzle.select({ count: drizzleCount() }).from(entities).get();
+          return result?.count ?? 0;
         },
         catch: (error) =>
           new RepositoryError({
@@ -401,8 +478,8 @@ export const SqliteEntityRepositoryLive = Layer.effect(
           const sanitized = query.replace(/['"]/g, "").trim();
           if (!sanitized) return [];
 
-          const rows = searchFts.all(`${sanitized}*`) as EntityRow[];
-          return rows.map(rowToEntity);
+          const rows = searchFts.all(`${sanitized}*`) as RawEntityRow[];
+          return rows.map((row) => rowToEntity(rawRowToEntityRow(row)));
         },
         catch: (error) =>
           new RepositoryError({
