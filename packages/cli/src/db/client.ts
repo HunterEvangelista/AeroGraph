@@ -55,7 +55,9 @@ const initializeDatabase = (db: Database): Effect.Effect<void, MigrationError> =
         db.run(INSERT_SCHEMA_VERSION_SQL, [String(SCHEMA_VERSION)]);
       } else {
         const currentVersion = Number.parseInt(versionResult.value, 10);
-        if (currentVersion !== SCHEMA_VERSION) {
+        if (currentVersion === 1 && SCHEMA_VERSION === 2) {
+          db.run(INSERT_SCHEMA_VERSION_SQL, [String(SCHEMA_VERSION)]);
+        } else if (currentVersion !== SCHEMA_VERSION) {
           // Future: run migrations here
           throw new Error(
             `Schema version mismatch: expected ${SCHEMA_VERSION}, got ${currentVersion}`

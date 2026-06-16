@@ -1,7 +1,3 @@
-/**
- * Link Repository Interface
- * Storage-agnostic interface for link operations
- */
 import { Context, type Effect } from "effect";
 import type { CreateLinkInput, Link, LinkId, LinkType } from "../domain/link.js";
 import type {

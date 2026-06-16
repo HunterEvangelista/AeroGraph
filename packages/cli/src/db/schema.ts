@@ -1,7 +1,3 @@
-/**
- * SQLite Schema
- * Database DDL for the knowledge graph
- */
 import {
   type AnySQLiteColumn,
   index,
@@ -11,6 +7,14 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+
+/*
+ * TODO: Currently there is a gap in sync between domain objects and db objects
+ * as part of a broader refactor we need to tie Effect schema generation to drizzle schemas
+ * this way our models are synced to the database. You can see an example of this drift in the
+ * link definitions in /packages/cli/src/db/link-repository.ts
+ * packages/core/src/domain/link.ts, and here, where the shape of a link is defined 3 times.
+ */
 
 export const entities = sqliteTable(
   "entities",
@@ -112,12 +116,36 @@ export const entityIdPrefixes = sqliteTable(
   ]
 );
 
+// NOTE: if this is still here in the PR flag to delete comments before merging.
+// next commands are related to an entity
+// if you're shown entity `39` then you get a next --related-to
+// or a next --traverse
+// I think now it may be better to do something like next 39 --related
+// or in plain terms kioku next <id> [--related, --traverse]
+// we could also expose an index: `kioku next --index 1`
+export const nextCommands = sqliteTable(
+  "next_commands",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    entityId: text("entity_id")
+      .notNull()
+      .references(() => entities.id, { onDelete: "cascade" }),
+    prefix: text("prefix").notNull(),
+    commandType: text("command_type", { enum: ["traverse", "related_to"] }).notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    index("idx_next_commands_entity").on(table.entityId),
+    index("idx_next_commands_command_type").on(table.commandType),
+  ]
+);
+
 export const schemaMeta = sqliteTable("schema_meta", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
 });
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const CREATE_TABLES_SQL = `
 -- Entities table (stores current state)
@@ -181,6 +209,15 @@ CREATE TABLE IF NOT EXISTS entity_id_prefixes (
   UNIQUE(scope, prefix)
 );
 
+-- Runnable follow-up actions for entities shown in CLI output
+CREATE TABLE IF NOT EXISTS next_commands (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  prefix TEXT NOT NULL,
+  command_type TEXT NOT NULL CHECK(command_type IN ('traverse', 'related_to')),
+  created_at TEXT NOT NULL
+);
+
 -- Schema metadata table
 CREATE TABLE IF NOT EXISTS schema_meta (
   key TEXT PRIMARY KEY,
@@ -194,6 +231,8 @@ CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_id);
 CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_id);
 CREATE INDEX IF NOT EXISTS idx_entity_versions_entity ON entity_versions(entity_id);
 CREATE INDEX IF NOT EXISTS idx_entity_id_prefixes_entity ON entity_id_prefixes(entity_id);
+CREATE INDEX IF NOT EXISTS idx_next_commands_entity ON next_commands(entity_id);
+CREATE INDEX IF NOT EXISTS idx_next_commands_command_type ON next_commands(command_type);
 CREATE INDEX IF NOT EXISTS idx_tags_parent ON tags(parent_id);
 
 -- Full-text search for entities

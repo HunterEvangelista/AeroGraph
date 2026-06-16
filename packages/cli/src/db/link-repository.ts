@@ -11,12 +11,9 @@ import {
   RepositoryError,
 } from "@kioku/core";
 import { and, desc, count as drizzleCount, eq, or } from "drizzle-orm";
-/**
- * SQLite Link Repository Implementation
- */
 import { Effect, Layer } from "effect";
-import { DatabaseClientTag } from "./client.js";
-import { entities, links } from "./schema.js";
+import { DatabaseClientTag } from "./client";
+import { entities, links } from "./schema";
 
 // ============================================================================
 // Helper Functions
@@ -68,7 +65,7 @@ export const SqliteLinkRepositoryLive = Layer.effect(
         });
 
         if (!exists) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId }));
+          return yield* new EntityNotFoundError({ entityId });
         }
       });
 
@@ -166,7 +163,7 @@ export const SqliteLinkRepositoryLive = Layer.effect(
         });
 
         if (!row) {
-          return yield* Effect.fail(new LinkNotFoundError({ linkId: id }));
+          return yield* new LinkNotFoundError({ linkId: id });
         }
 
         return rowToLink(row);
@@ -329,7 +326,7 @@ export const SqliteLinkRepositoryLive = Layer.effect(
         });
 
         if (!link) {
-          return yield* Effect.fail(new LinkNotFoundError({ linkId: `${sourceId}->${targetId}` }));
+          return yield* new LinkNotFoundError({ linkId: `${sourceId}->${targetId}` });
         }
 
         yield* Effect.try({

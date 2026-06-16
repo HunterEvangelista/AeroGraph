@@ -18,13 +18,10 @@ import {
   StoryStatusEnum,
 } from "@kioku/core";
 import { desc, count as drizzleCount, eq, inArray, sql } from "drizzle-orm";
-/**
- * SQLite Entity Repository Implementation
- */
 import { Effect, Layer } from "effect";
-import { DatabaseClientTag } from "./client.js";
-import { rebuildEntityIdPrefixes } from "./entity-prefix-index.js";
-import { entities, entityTags } from "./schema.js";
+import { DatabaseClientTag } from "./client";
+import { rebuildEntityIdPrefixes } from "./entity-prefix-index";
+import { entities, entityTags } from "./schema";
 
 // ============================================================================
 // Helper Functions
