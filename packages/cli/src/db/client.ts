@@ -37,12 +37,31 @@ export class DatabaseClientTag extends Context.Service<DatabaseClientTag, Databa
 // Database Client Implementation
 // ============================================================================
 
+const configureDatabaseConnection = (
+  db: Database,
+  dbPath: string
+): Effect.Effect<void, MigrationError> =>
+  Effect.try({
+    try: () => {
+      db.run("PRAGMA busy_timeout = 5000;");
+
+      if (dbPath !== ":memory:") {
+        db.run("PRAGMA journal_mode = WAL;");
+        db.run("PRAGMA synchronous = NORMAL;");
+      }
+
+      db.run("PRAGMA foreign_keys = ON;");
+    },
+    catch: (error) =>
+      new MigrationError({
+        message: `Failed to configure database connection: ${error instanceof Error ? error.message : String(error)}`,
+        cause: error,
+      }),
+  });
+
 const initializeDatabase = (db: Database): Effect.Effect<void, MigrationError> =>
   Effect.try({
     try: () => {
-      // Enable foreign keys
-      db.run("PRAGMA foreign_keys = ON;");
-
       // TODO: This is in a transitional state and requires drizzle running on start up
       // before we can migrate away.
       db.run(CREATE_TABLES_SQL);
@@ -83,6 +102,7 @@ export const makeDatabaseClient = (
         }),
     });
 
+    yield* configureDatabaseConnection(db, dbPath);
     yield* initializeDatabase(db);
     const drizzleDb = drizzle({ client: db, schema });
     rebuildEntityIdPrefixes(drizzleDb);

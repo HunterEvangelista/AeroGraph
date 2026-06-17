@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -13,6 +13,7 @@ export interface CliResult {
 export interface CliWorkspace {
   readonly rootPath: string;
   readonly run: (...args: ReadonlyArray<string>) => CliResult;
+  readonly runAsync: (...args: ReadonlyArray<string>) => Promise<CliResult>;
   readonly cleanup: () => void;
 }
 
@@ -37,6 +38,28 @@ const runBun = (args: ReadonlyArray<string>, cwd: string): CliResult => {
     stderr: result.stderr,
   } satisfies CliResult;
 };
+
+const runBunAsync = (args: ReadonlyArray<string>, cwd: string): Promise<CliResult> =>
+  new Promise((resolve, reject) => {
+    const child = spawn("bun", args, {
+      cwd,
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+
+    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.on("error", reject);
+    child.on("close", (status) => {
+      resolve({
+        status,
+        stdout: Buffer.concat(stdout).toString("utf8"),
+        stderr: Buffer.concat(stderr).toString("utf8"),
+      } satisfies CliResult);
+    });
+  });
 
 export const createCliWorkspace = (): CliWorkspace => {
   const rootPath = mkdtempSync(join(tmpdir(), "kioku-cli-test-"));
@@ -64,6 +87,7 @@ export const createCliWorkspace = (): CliWorkspace => {
   return {
     rootPath,
     run: (...args) => runBun(["run", cliEntrypoint, ...args], rootPath),
+    runAsync: (...args) => runBunAsync(["run", cliEntrypoint, ...args], rootPath),
     cleanup: () => rmSync(rootPath, { recursive: true, force: true }),
   } satisfies CliWorkspace;
 };
