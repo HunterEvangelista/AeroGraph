@@ -16,6 +16,7 @@ import { and, desc, count as drizzleCount, eq, gte, lte } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { DatabaseClientTag } from "./client.js";
 import { entities, entityVersions } from "./schema.js";
+import { withSqliteWriteRetry } from "./sqlite-retry.js";
 
 // ============================================================================
 // Helper Functions
@@ -65,18 +66,20 @@ export const SqliteVersionRepositoryLive = Layer.effect(
         try: () => {
           const id = generateId();
           const timestamp = now();
-          drizzle
-            .insert(entityVersions)
-            .values({
-              id,
-              entityId,
-              version,
-              data: JSON.stringify(data),
-              changeType,
-              changedFields: changedFields ? JSON.stringify(changedFields) : null,
-              createdAt: timestamp,
-            })
-            .run();
+          withSqliteWriteRetry(() =>
+            drizzle
+              .insert(entityVersions)
+              .values({
+                id,
+                entityId,
+                version,
+                data: JSON.stringify(data),
+                changeType,
+                changedFields: changedFields ? JSON.stringify(changedFields) : null,
+                createdAt: timestamp,
+              })
+              .run()
+          );
 
           const row = drizzle
             .select()
@@ -260,7 +263,9 @@ export const SqliteVersionRepositoryLive = Layer.effect(
             .where(eq(entityVersions.entityId, entityId))
             .all();
 
-          drizzle.delete(entityVersions).where(eq(entityVersions.entityId, entityId)).run();
+          withSqliteWriteRetry(() =>
+            drizzle.delete(entityVersions).where(eq(entityVersions.entityId, entityId)).run()
+          );
           return existing.length;
         },
         catch: (error) =>

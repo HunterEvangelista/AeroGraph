@@ -16,6 +16,7 @@ import {
 } from "./entity-prefix-format.js";
 import type * as schema from "./schema.js";
 import { entities, entityIdPrefixes } from "./schema.js";
+import { withSqliteWriteRetry } from "./sqlite-retry.js";
 
 export interface EntityPrefixMatch {
   readonly id: string;
@@ -57,13 +58,15 @@ export const rebuildEntityIdPrefixes = (
     scope
   );
 
-  db.transaction((tx) => {
-    tx.delete(entityIdPrefixes).where(eq(entityIdPrefixes.scope, scope)).run();
-    if (prefixRows.length > 0) {
-      tx.insert(entityIdPrefixes)
-        .values([...prefixRows])
-        .run();
-    }
+  withSqliteWriteRetry(() => {
+    db.transaction((tx) => {
+      tx.delete(entityIdPrefixes).where(eq(entityIdPrefixes.scope, scope)).run();
+      if (prefixRows.length > 0) {
+        tx.insert(entityIdPrefixes)
+          .values([...prefixRows])
+          .run();
+      }
+    });
   });
 };
 
