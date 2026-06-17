@@ -67,7 +67,6 @@ export const SqliteTagRepositoryLive = Layer.effect(
                 aliases,
                 createdAt: timestamp,
               })
-              .onConflictDoNothing()
               .run()
           );
           const row = drizzle.select().from(tags).where(eq(tags.id, input.id)).get();
