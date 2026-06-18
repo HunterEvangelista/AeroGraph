@@ -9,10 +9,10 @@ import {
 } from "@kioku/core";
 import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
-import { type ContextEntity, formatContextMarkdown } from "../ui/context-markdown.js";
-import { isNonNegativeInteger } from "./validation.js";
-import { withCliServices } from "./workspace.js";
+import { formatEntityIdMatches, resolveEntityId } from "../entity-id";
+import { type ContextEntity, formatContextMarkdown } from "../ui/context-markdown";
+import { isNonNegativeInteger } from "./validation";
+import { withCliServices } from "./workspace";
 
 class InvalidContextQueryError extends Data.TaggedError("InvalidContextQueryError")<{
   readonly message: string;
@@ -84,17 +84,15 @@ export const contextCommand = Command.make(
       yield* validateDepth(depth);
 
       if (tagValue && hasQuery) {
-        return yield* Effect.fail(
-          new InvalidContextQueryError({ message: "Choose either <entityId> or --tags, not both." })
-        );
+        return yield* new InvalidContextQueryError({
+          message: "Choose either <entityId> or --tags, not both.",
+        });
       }
 
       if (!tagValue && !hasQuery) {
-        return yield* Effect.fail(
-          new InvalidContextQueryError({
-            message: "Provide <entityId>, --tags, or a quoted task prompt.",
-          })
-        );
+        return yield* new InvalidContextQueryError({
+          message: "Provide <entityId>, --tags, or a quoted task prompt.",
+        });
       }
 
       if (!tagValue && (query.length > 1 || /\s/.test(query[0] ?? ""))) {
@@ -114,9 +112,9 @@ export const contextCommand = Command.make(
           if (tagValue) {
             const tagIds = splitTags(tagValue);
             if (tagIds.length === 0) {
-              return yield* Effect.fail(
-                new InvalidContextQueryError({ message: "--tags must include at least one tag." })
-              );
+              return yield* new InvalidContextQueryError({
+                message: "--tags must include at least one tag.",
+              });
             }
             title = `Tags ${tagIds.map((tag) => `#${tag}`).join(", ")}`;
             entities = yield* graphService.findByTagPath(tagIds);
