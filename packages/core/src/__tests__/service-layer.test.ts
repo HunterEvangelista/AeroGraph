@@ -436,6 +436,31 @@ describe("TagService", () => {
       expect(tags.size).toBe(2); // Only 2 tags created, not 4
     });
 
+    it("tolerates concurrent creation races when ensuring a hierarchy", async () => {
+      const tags = new Map<string, Tag>();
+      const baseTagRepo = createMockTagRepository({ tags });
+      const tagRepo: TagRepository = {
+        ...baseTagRepo,
+        create: (input) =>
+          Effect.gen(function* () {
+            tags.set(input.id, createTestTag(input.id, input.name, input.parentId));
+            return yield* new RepositoryError({ message: "Tag was created concurrently" });
+          }),
+      };
+      const layer = createTestLayer({ tagRepo });
+
+      const program = Effect.gen(function* () {
+        const tagService = yield* TagServiceTag;
+        return yield* tagService.ensureHierarchy("concurrency");
+      });
+
+      const result = await Effect.runPromise(Effect.provide(program, layer));
+
+      expect(result.id).toBe("concurrency");
+      expect(result.name).toBe("concurrency");
+      expect(tags.size).toBe(1);
+    });
+
     it("returns ValidationError for empty path", async () => {
       const layer = createTestLayer({});
 

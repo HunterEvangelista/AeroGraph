@@ -22,6 +22,7 @@ import { Effect, Layer } from "effect";
 import { DatabaseClientTag } from "./client";
 import { rebuildEntityIdPrefixes } from "./entity-prefix-index";
 import { entities, entityTags } from "./schema";
+import { withSqliteWriteRetry } from "./sqlite-retry";
 
 // ============================================================================
 // Helper Functions
@@ -172,18 +173,20 @@ export const SqliteEntityRepositoryLive = Layer.effect(
         try: () => {
           const id = generateId();
           const timestamp = now();
-          drizzle
-            .insert(entities)
-            .values({
-              id,
-              type: EntityTypeEnum.Doc,
-              title: input.title,
-              content: input.content,
-              metadata: null,
-              createdAt: timestamp,
-              updatedAt: timestamp,
-            })
-            .run();
+          withSqliteWriteRetry(() =>
+            drizzle
+              .insert(entities)
+              .values({
+                id,
+                type: EntityTypeEnum.Doc,
+                title: input.title,
+                content: input.content,
+                metadata: null,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              })
+              .run()
+          );
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
           rebuildEntityIdPrefixes(drizzle);
@@ -209,18 +212,20 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             commitHash: input.commitHash,
             symbol: input.symbol,
           });
-          drizzle
-            .insert(entities)
-            .values({
-              id,
-              type: EntityTypeEnum.CodeRef,
-              title: input.title,
-              content: input.content,
-              metadata,
-              createdAt: timestamp,
-              updatedAt: timestamp,
-            })
-            .run();
+          withSqliteWriteRetry(() =>
+            drizzle
+              .insert(entities)
+              .values({
+                id,
+                type: EntityTypeEnum.CodeRef,
+                title: input.title,
+                content: input.content,
+                metadata,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              })
+              .run()
+          );
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
           rebuildEntityIdPrefixes(drizzle);
@@ -243,18 +248,20 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             priority: input.priority,
             parentId: input.parentId,
           });
-          drizzle
-            .insert(entities)
-            .values({
-              id,
-              type: EntityTypeEnum.Story,
-              title: input.title,
-              content: input.content,
-              metadata,
-              createdAt: timestamp,
-              updatedAt: timestamp,
-            })
-            .run();
+          withSqliteWriteRetry(() =>
+            drizzle
+              .insert(entities)
+              .values({
+                id,
+                type: EntityTypeEnum.Story,
+                title: input.title,
+                content: input.content,
+                metadata,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              })
+              .run()
+          );
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
           rebuildEntityIdPrefixes(drizzle);
@@ -277,18 +284,20 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             source: input.source,
             generatedFrom: input.generatedFrom,
           });
-          drizzle
-            .insert(entities)
-            .values({
-              id,
-              type: EntityTypeEnum.Diagram,
-              title: input.title,
-              content: input.content,
-              metadata,
-              createdAt: timestamp,
-              updatedAt: timestamp,
-            })
-            .run();
+          withSqliteWriteRetry(() =>
+            drizzle
+              .insert(entities)
+              .values({
+                id,
+                type: EntityTypeEnum.Diagram,
+                title: input.title,
+                content: input.content,
+                metadata,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              })
+              .run()
+          );
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
           rebuildEntityIdPrefixes(drizzle);
@@ -410,17 +419,19 @@ export const SqliteEntityRepositoryLive = Layer.effect(
 
         yield* Effect.try({
           try: () =>
-            drizzle
-              .update(entities)
-              .set({
-                title: newTitle,
-                content: newContent,
-                metadata: newMetadata,
-                updatedAt: now(),
-                version: sql`${entities.version} + 1`,
-              })
-              .where(eq(entities.id, id))
-              .run(),
+            withSqliteWriteRetry(() =>
+              drizzle
+                .update(entities)
+                .set({
+                  title: newTitle,
+                  content: newContent,
+                  metadata: newMetadata,
+                  updatedAt: now(),
+                  version: sql`${entities.version} + 1`,
+                })
+                .where(eq(entities.id, id))
+                .run()
+            ),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to update entity: ${error instanceof Error ? error.message : String(error)}`,
@@ -438,7 +449,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
 
         yield* Effect.try({
           try: () => {
-            drizzle.delete(entities).where(eq(entities.id, id)).run();
+            withSqliteWriteRetry(() => drizzle.delete(entities).where(eq(entities.id, id)).run());
             rebuildEntityIdPrefixes(drizzle);
           },
           catch: (error) =>

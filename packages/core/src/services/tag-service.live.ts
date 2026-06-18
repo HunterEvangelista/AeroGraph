@@ -34,7 +34,17 @@ const ensureTag = (
     }
 
     if (existing.failure instanceof TagNotFoundError) {
-      return yield* repo.create(input);
+      const created = yield* Effect.result(repo.create(input));
+      if (Result.isSuccess(created)) {
+        return created.success;
+      }
+
+      const raced = yield* Effect.result(repo.getById(input.id));
+      if (Result.isSuccess(raced)) {
+        return raced.success;
+      }
+
+      return yield* created.failure;
     }
 
     return yield* existing.failure;

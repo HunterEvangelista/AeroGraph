@@ -54,13 +54,15 @@ export const rebuildEntityIdPrefixes = (
     scope
   );
 
-  db.transaction((tx) => {
-    tx.delete(entityIdPrefixes).where(eq(entityIdPrefixes.scope, scope)).run();
-    if (prefixRows.length > 0) {
-      tx.insert(entityIdPrefixes)
-        .values([...prefixRows])
-        .run();
-    }
+  withSqliteWriteRetry(() => {
+    db.transaction((tx) => {
+      tx.delete(entityIdPrefixes).where(eq(entityIdPrefixes.scope, scope)).run();
+      if (prefixRows.length > 0) {
+        tx.insert(entityIdPrefixes)
+          .values([...prefixRows])
+          .run();
+      }
+    });
   });
 };
 

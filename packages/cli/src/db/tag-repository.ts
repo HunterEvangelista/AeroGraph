@@ -16,6 +16,7 @@ import { and, count as drizzleCount, eq, like, or } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { DatabaseClientTag } from "./client.js";
 import { entities, entityTags, tags } from "./schema.js";
+import { withSqliteWriteRetry } from "./sqlite-retry.js";
 
 // ============================================================================
 // Helper Functions
@@ -55,17 +56,19 @@ export const SqliteTagRepositoryLive = Layer.effect(
         try: () => {
           const timestamp = now();
           const aliases = input.aliases ? JSON.stringify(input.aliases) : null;
-          drizzle
-            .insert(tags)
-            .values({
-              id: input.id,
-              name: input.name,
-              description: input.description ?? null,
-              parentId: input.parentId ?? null,
-              aliases,
-              createdAt: timestamp,
-            })
-            .run();
+          withSqliteWriteRetry(() =>
+            drizzle
+              .insert(tags)
+              .values({
+                id: input.id,
+                name: input.name,
+                description: input.description ?? null,
+                parentId: input.parentId ?? null,
+                aliases,
+                createdAt: timestamp,
+              })
+              .run()
+          );
           const row = drizzle.select().from(tags).where(eq(tags.id, input.id)).get();
           if (!row) throw new Error(`Inserted tag not found: ${input.id}`);
           return rowToTag(row);
@@ -158,16 +161,18 @@ export const SqliteTagRepositoryLive = Layer.effect(
                   ? JSON.stringify(existing.aliases)
                   : null;
 
-            drizzle
-              .update(tags)
-              .set({
-                name: updates.name ?? existing.name,
-                description: updates.description ?? existing.description ?? null,
-                parentId: updates.parentId ?? existing.parentId ?? null,
-                aliases: newAliases,
-              })
-              .where(eq(tags.id, id))
-              .run();
+            withSqliteWriteRetry(() =>
+              drizzle
+                .update(tags)
+                .set({
+                  name: updates.name ?? existing.name,
+                  description: updates.description ?? existing.description ?? null,
+                  parentId: updates.parentId ?? existing.parentId ?? null,
+                  aliases: newAliases,
+                })
+                .where(eq(tags.id, id))
+                .run()
+            );
           },
           catch: (error) =>
             new RepositoryError({
@@ -184,7 +189,7 @@ export const SqliteTagRepositoryLive = Layer.effect(
         yield* getById(id);
 
         yield* Effect.try({
-          try: () => drizzle.delete(tags).where(eq(tags.id, id)).run(),
+          try: () => withSqliteWriteRetry(() => drizzle.delete(tags).where(eq(tags.id, id)).run()),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to delete tag: ${error instanceof Error ? error.message : String(error)}`,
@@ -218,7 +223,9 @@ export const SqliteTagRepositoryLive = Layer.effect(
 
         yield* Effect.try({
           try: () =>
-            drizzle.insert(entityTags).values({ entityId, tagId }).onConflictDoNothing().run(),
+            withSqliteWriteRetry(() =>
+              drizzle.insert(entityTags).values({ entityId, tagId }).onConflictDoNothing().run()
+            ),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to apply tag: ${error instanceof Error ? error.message : String(error)}`,
@@ -251,10 +258,12 @@ export const SqliteTagRepositoryLive = Layer.effect(
 
         yield* Effect.try({
           try: () =>
-            drizzle
-              .delete(entityTags)
-              .where(and(eq(entityTags.entityId, entityId), eq(entityTags.tagId, tagId)))
-              .run(),
+            withSqliteWriteRetry(() =>
+              drizzle
+                .delete(entityTags)
+                .where(and(eq(entityTags.entityId, entityId), eq(entityTags.tagId, tagId)))
+                .run()
+            ),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to remove tag: ${error instanceof Error ? error.message : String(error)}`,
