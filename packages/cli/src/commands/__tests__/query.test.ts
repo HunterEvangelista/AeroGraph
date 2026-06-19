@@ -34,7 +34,7 @@ describe("query command", () => {
       "doc-auth-overview <--blocks-- story-auth-hardening  [story] Auth Hardening Story"
     );
     expect(result.stdout).not.toContain("\n  code-auth-middleware  [code_ref] Auth Middleware");
-    expect(result.stdout).toContain("next: kioku query --traverse doc-auth-overview --depth 2");
+    expect(result.stdout).toContain("next doc-auth-overview --traverse");
   });
 
   it("queries bounded traversals only with explicit depth", () => {

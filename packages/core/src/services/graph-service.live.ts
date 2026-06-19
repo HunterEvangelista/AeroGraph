@@ -1,6 +1,3 @@
-/**
- * Graph Service live implementation
- */
 import { Effect, Layer, Result } from "effect";
 import { type Entity, EntityTypeEnum } from "../domain/entity.js";
 import type { LinkType } from "../domain/link.js";
@@ -55,7 +52,7 @@ export const GraphServiceLive = Layer.effect(
           if (Result.isSuccess(result)) {
             entities.push(result.success);
           } else if (!(result.failure instanceof EntityNotFoundError)) {
-            return yield* Effect.fail(result.failure);
+            return yield* result.failure;
           }
         }
 

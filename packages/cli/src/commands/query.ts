@@ -1,10 +1,4 @@
-import {
-  type Entity,
-  EntityTypeEnum,
-  type GraphService,
-  GraphServiceTag,
-  type Link,
-} from "@kioku/core";
+import { NextServiceTag } from "@kioku/core";
 import { Console, Data, Effect, Option } from "effect";
 /**
  * Query Command
@@ -12,9 +6,10 @@ import { Console, Data, Effect, Option } from "effect";
  */
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config.js";
+import { EntityPrefixIndexTag } from "../db/entity-prefix-index.js";
 import { CliServicesLive } from "../db/index.js";
-import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
+import { runPathQuery, runRelatedQuery, runTagsQuery, runTraverseQuery } from "./query-runners.js";
 import { isPositiveInteger } from "./validation.js";
 
 // ============================================================================
@@ -35,124 +30,8 @@ interface QuerySelection {
 }
 
 // ============================================================================
-// Formatting Helpers
+// Input Validation
 // ============================================================================
-
-const roleOrder = [
-  EntityTypeEnum.Doc,
-  EntityTypeEnum.CodeRef,
-  EntityTypeEnum.Story,
-  EntityTypeEnum.Diagram,
-] as const;
-
-const roleLabel = (type: Entity["_tag"]): string => {
-  switch (type) {
-    case EntityTypeEnum.Doc:
-      return "Docs";
-    case EntityTypeEnum.CodeRef:
-      return "Code refs";
-    case EntityTypeEnum.Story:
-      return "Stories";
-    case EntityTypeEnum.Diagram:
-      return "Diagrams";
-  }
-};
-
-const preview = (content: string): string => {
-  const normalized = content.replace(/\s+/g, " ").trim();
-  if (normalized.length <= 100) return normalized;
-  return `${normalized.slice(0, 100)}...`;
-};
-
-const codeLocation = (entity: Entity): string | undefined => {
-  if (entity._tag !== EntityTypeEnum.CodeRef) return undefined;
-
-  const start = entity.startLine ? `:${entity.startLine}` : "";
-  const end = entity.endLine ? `-${entity.endLine}` : "";
-  return `${entity.filePath}${start}${end}`;
-};
-
-const entitySummary = (entity: Entity, displayIds: ReadonlyMap<string, string>): string => {
-  const location = codeLocation(entity);
-  const suffix = location ? ` (${location})` : "";
-  return `${formattedEntityId(displayIds, entity.id)}  [${entity._tag}] ${entity.title}${suffix}`;
-};
-
-const printEntityBody = (entity: Entity) =>
-  Effect.gen(function* () {
-    if (entity._tag === EntityTypeEnum.Story) {
-      const priority = entity.priority ? `, priority: ${entity.priority}` : "";
-      yield* Console.log(`    status: ${entity.status}${priority}`);
-    }
-
-    const text = preview(entity.content);
-    if (text) {
-      yield* Console.log(`    ${text}`);
-    }
-
-    yield* Console.log(`    next: kioku query --related-to ${entity.id}`);
-    yield* Console.log(`    next: kioku query --traverse ${entity.id} --depth 2`);
-  });
-
-const printEntityDetails = (entity: Entity, displayIds: ReadonlyMap<string, string>) =>
-  Effect.gen(function* () {
-    yield* Console.log(`  ${entitySummary(entity, displayIds)}`);
-    yield* printEntityBody(entity);
-  });
-
-const printGroupedEntities = (title: string, entities: ReadonlyArray<Entity>) =>
-  Effect.gen(function* () {
-    yield* Console.log("");
-    yield* Console.log(`${title} (${entities.length})`);
-    yield* Console.log("=".repeat(40));
-
-    if (entities.length === 0) {
-      yield* Console.log("");
-      yield* Console.log("No matching entities found.");
-      yield* Console.log("");
-      return;
-    }
-
-    const displayIds = yield* loadFormattedEntityIds(entities.map((entity) => entity.id));
-
-    // Follow-up story needed: the product asks for role groupings such as decisions,
-    // constraints, risks, canonical docs, and open questions, but the current domain
-    // model has no authoritative role field. Entity type is stable and explicit, so
-    // we use it here instead of inferring roles from titles/content or baking in tag
-    // naming conventions that could become hard to unwind later.
-    for (const role of roleOrder) {
-      const roleEntities = entities.filter((entity) => entity._tag === role);
-      if (roleEntities.length === 0) continue;
-
-      yield* Console.log("");
-      yield* Console.log(roleLabel(role));
-      yield* Console.log("-".repeat(roleLabel(role).length));
-
-      for (const entity of roleEntities) {
-        yield* printEntityDetails(entity, displayIds);
-        yield* Console.log("");
-      }
-    }
-  });
-
-const linkDirectionLabel = (link: Link, entityId: string): string => {
-  if (link.sourceId === entityId) return `--${link.type}-->`;
-  return `<--${link.type}--`;
-};
-
-const otherEntityId = (link: Link, entityId: string): string =>
-  link.sourceId === entityId ? link.targetId : link.sourceId;
-
-const findLinkBetween = (
-  links: ReadonlyArray<Link>,
-  fromId: string,
-  toId: string
-): Link | undefined =>
-  links.find(
-    (link) =>
-      (link.sourceId === fromId && link.targetId === toId) ||
-      (link.sourceId === toId && link.targetId === fromId)
-  );
 
 const splitTags = (value: string): ReadonlyArray<string> =>
   value
@@ -165,125 +44,6 @@ const validateDepth = (depth: number | undefined) => {
 
   return Effect.fail(new InvalidQueryError({ message: "--depth must be greater than 0." }));
 };
-
-const runTagsQuery = (graphService: GraphService, tagValue: string) =>
-  Effect.gen(function* () {
-    const tagIds = splitTags(tagValue);
-    if (tagIds.length === 0) {
-      return yield* new InvalidQueryError({ message: "--tags must include at least one tag." });
-    }
-
-    const entities = yield* graphService.findByTagPath(tagIds);
-    yield* printGroupedEntities(
-      `Tag intersection: ${tagIds.map((tag) => `#${tag}`).join(", ")}`,
-      entities
-    );
-  });
-
-const runRelatedQuery = (graphService: GraphService, relatedToValue: string) =>
-  Effect.gen(function* () {
-    const entityId = yield* resolveEntityId(relatedToValue);
-    const center = yield* graphService.getEntityWithLinks(entityId);
-    const related = yield* graphService.getRelatedEntities(entityId);
-    const relatedById = new Map<string, Entity>(related.map((entity) => [entity.id, entity]));
-    const displayIds = yield* loadFormattedEntityIds([
-      center.entity.id,
-      ...related.map((entity) => entity.id),
-    ]);
-
-    yield* Console.log("");
-    yield* Console.log(
-      `Related to ${center.entity.title} (${formattedEntityId(displayIds, center.entity.id)})`
-    );
-    yield* Console.log("=".repeat(40));
-
-    if (related.length === 0) {
-      yield* Console.log("");
-      yield* Console.log("No linked entities found.");
-      yield* Console.log("");
-      return;
-    }
-
-    const links = [...center.outgoingLinks, ...center.incomingLinks];
-    for (const link of links) {
-      const target = relatedById.get(otherEntityId(link, entityId));
-      if (!target) continue;
-
-      yield* Console.log("");
-      yield* Console.log(
-        `  ${formattedEntityId(displayIds, center.entity.id)} ${linkDirectionLabel(link, entityId)} ${entitySummary(target, displayIds)}`
-      );
-      yield* printEntityBody(target);
-    }
-
-    yield* Console.log("");
-    yield* Console.log(`next: kioku query --traverse ${center.entity.id} --depth 2`);
-    yield* Console.log("");
-  });
-
-const runTraverseQuery = (graphService: GraphService, traverseValue: string, depthValue: number) =>
-  Effect.gen(function* () {
-    const entityId = yield* resolveEntityId(traverseValue);
-    const result = yield* graphService.traverse(entityId, depthValue);
-    yield* printGroupedEntities(
-      `Traversal from ${entityId} to depth ${depthValue} (visited depth ${result.depth})`,
-      result.entities
-    );
-  });
-
-const runPathQuery = (graphService: GraphService, pathValue: ReadonlyArray<string>) =>
-  Effect.gen(function* () {
-    if (pathValue.length !== 2) {
-      return yield* Effect.fail(
-        new InvalidQueryError({ message: "--path requires <fromId> and <toId>." })
-      );
-    }
-
-    const [fromId, toId] = pathValue as readonly [string, string];
-
-    const resolvedFromId = yield* resolveEntityId(fromId);
-    const resolvedToId = yield* resolveEntityId(toId);
-    const pathEntities = yield* graphService.findPath(resolvedFromId, resolvedToId);
-    const displayIds = yield* loadFormattedEntityIds(
-      pathEntities?.map((entity) => entity.id) ?? [resolvedFromId, resolvedToId]
-    );
-
-    yield* Console.log("");
-    yield* Console.log(
-      `Shortest path: ${formattedEntityId(displayIds, resolvedFromId)} -> ${formattedEntityId(displayIds, resolvedToId)}`
-    );
-    yield* Console.log("=".repeat(40));
-
-    if (!pathEntities) {
-      yield* Console.log("");
-      yield* Console.log("No path found.");
-      yield* Console.log("");
-      return;
-    }
-
-    for (const [i, entity] of pathEntities.entries()) {
-      yield* Console.log("");
-      yield* Console.log(`${i + 1}. ${entitySummary(entity, displayIds)}`);
-
-      const next = pathEntities[i + 1];
-      if (next) {
-        const withLinks = yield* graphService.getEntityWithLinks(entity.id);
-        const link = findLinkBetween(
-          [...withLinks.outgoingLinks, ...withLinks.incomingLinks],
-          entity.id,
-          next.id
-        );
-
-        const label = link ? linkDirectionLabel(link, entity.id) : "--related-->";
-        yield* Console.log(`   ${label}`);
-      }
-    }
-
-    yield* Console.log("");
-    yield* Console.log(`next: kioku query --related-to ${resolvedFromId}`);
-    yield* Console.log(`next: kioku query --related-to ${resolvedToId}`);
-    yield* Console.log("");
-  });
 
 const printNaturalLanguageStub = () =>
   Effect.gen(function* () {
@@ -333,25 +93,57 @@ const validateQuerySelection = (selection: QuerySelection) =>
     yield* validateDepth(selection.depthValue);
   });
 
-const runStructuredQuery = (graphService: GraphService, selection: QuerySelection) =>
+const recordDisplayedEntities = (entityIds: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const nextService = yield* NextServiceTag;
+    const prefixIndex = yield* EntityPrefixIndexTag;
+    const prefixes = yield* prefixIndex.getDisplayPrefixes(entityIds);
+
+    return yield* nextService.recordDisplayedEntities(
+      entityIds.map((entityId) => ({
+        entityId,
+        prefix: prefixes.get(entityId) ?? entityId,
+      }))
+    );
+  });
+
+const runStructuredQuery = (selection: QuerySelection) =>
   Effect.gen(function* () {
     if (selection.tagValue) {
-      yield* runTagsQuery(graphService, selection.tagValue);
+      const tagIds = splitTags(selection.tagValue);
+      if (tagIds.length === 0) {
+        return yield* new InvalidQueryError({ message: "--tags must include at least one tag." });
+      }
+      const result = yield* runTagsQuery(tagIds);
+      yield* recordDisplayedEntities(result.displayedEntityIds);
       return;
     }
 
     if (selection.relatedToValue) {
-      yield* runRelatedQuery(graphService, selection.relatedToValue);
+      const entityId = yield* resolveEntityId(selection.relatedToValue);
+      const result = yield* runRelatedQuery(entityId);
+      yield* recordDisplayedEntities(result.displayedEntityIds);
       return;
     }
 
     if (selection.traverseValue && selection.depthValue !== undefined) {
-      yield* runTraverseQuery(graphService, selection.traverseValue, selection.depthValue);
+      const entityId = yield* resolveEntityId(selection.traverseValue);
+      const result = yield* runTraverseQuery(entityId, selection.depthValue);
+      yield* recordDisplayedEntities(result.displayedEntityIds);
       return;
     }
 
     if (selection.pathValue) {
-      yield* runPathQuery(graphService, selection.pathValue);
+      if (selection.pathValue.length !== 2) {
+        return yield* Effect.fail(
+          new InvalidQueryError({ message: "--path requires <fromId> and <toId>." })
+        );
+      }
+      const [fromId, toId] = selection.pathValue as readonly [string, string];
+      const resolvedFromId = yield* resolveEntityId(fromId);
+      const resolvedToId = yield* resolveEntityId(toId);
+      const result = yield* runPathQuery(resolvedFromId, resolvedToId);
+      yield* recordDisplayedEntities(result.displayedEntityIds);
     }
   });
 
@@ -414,8 +206,7 @@ export const queryCommand = Command.make(
 
       yield* Effect.scoped(
         Effect.gen(function* () {
-          const graphService = yield* GraphServiceTag;
-          yield* runStructuredQuery(graphService, selection);
+          yield* runStructuredQuery(selection);
         }).pipe(Effect.provide(ServiceLayers))
       );
     }).pipe(

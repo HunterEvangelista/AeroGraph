@@ -39,6 +39,18 @@ export {
 export type { LinkId } from "./link.js";
 // Link types and schemas
 export { CreateLinkInput, getInverseLinkType, Link, LinkType } from "./link.js";
+export type {
+  CreateNextCommandInput,
+  NextCommand,
+  NextCommandId,
+  NextCommandType,
+} from "./next-command.js";
+export {
+  CreateNextCommandInputSchema,
+  NextCommandIdSchema,
+  NextCommandSchema,
+  NextCommandTypeSchema,
+} from "./next-command.js";
 export { NonNegativeInteger, PositiveInteger } from "./scalars.js";
 export type { TagId } from "./tag.js";
 // Tag types and schemas
