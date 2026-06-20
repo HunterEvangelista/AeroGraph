@@ -13,6 +13,7 @@ export {
 import { calculateEntityIdPrefixes, DEFAULT_ENTITY_ID_PREFIX_SCOPE } from "./entity-prefix-format";
 import type * as schema from "./schema";
 import { entities, entityIdPrefixes } from "./schema";
+import { withSqliteWriteRetry } from "./sqlite-retry";
 
 export interface EntityPrefixMatch {
   readonly id: string;
