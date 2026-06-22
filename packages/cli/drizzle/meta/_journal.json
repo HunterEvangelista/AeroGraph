@@ -15,6 +15,13 @@
       "when": 1781307735538,
       "tag": "0001_normal_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782165620000,
+      "tag": "0002_term_registry",
+      "breakpoints": true
     }
   ]
 }

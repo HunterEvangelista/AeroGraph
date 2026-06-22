@@ -7,6 +7,7 @@ import {
   TagNotFoundError,
   type TagRepository,
   TagRepositoryTag,
+  type TermId,
   type UpdateTagInput,
 } from "@kioku/core";
 import { and, count as drizzleCount, eq, like, or } from "drizzle-orm";
@@ -30,6 +31,7 @@ interface TagRow {
   description: string | null;
   parentId: string | null;
   aliases: string | null;
+  termId: string | null;
   createdAt: string;
 }
 
@@ -39,6 +41,7 @@ const rowToTag = (row: TagRow): Tag => ({
   description: row.description ?? undefined,
   parentId: row.parentId ?? undefined,
   aliases: row.aliases ? JSON.parse(row.aliases) : undefined,
+  termId: (row.termId ?? undefined) as TermId | undefined,
   createdAt: new Date(row.createdAt),
 });
 
@@ -65,6 +68,7 @@ export const SqliteTagRepositoryLive = Layer.effect(
                 description: input.description ?? null,
                 parentId: input.parentId ?? null,
                 aliases,
+                termId: input.termId ?? null,
                 createdAt: timestamp,
               })
               .run()
@@ -169,6 +173,10 @@ export const SqliteTagRepositoryLive = Layer.effect(
                   description: updates.description ?? existing.description ?? null,
                   parentId: updates.parentId ?? existing.parentId ?? null,
                   aliases: newAliases,
+                  termId:
+                    updates.termId !== undefined
+                      ? (updates.termId ?? null)
+                      : (existing.termId ?? null),
                 })
                 .where(eq(tags.id, id))
                 .run()
@@ -301,6 +309,7 @@ export const SqliteTagRepositoryLive = Layer.effect(
                 description: tags.description,
                 parentId: tags.parentId,
                 aliases: tags.aliases,
+                termId: tags.termId,
                 createdAt: tags.createdAt,
               })
               .from(tags)

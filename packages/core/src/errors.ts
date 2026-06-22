@@ -33,6 +33,28 @@ export class TagNotFoundError extends Data.TaggedError("TagNotFoundError")<{
   readonly message?: string;
 }> {}
 
+export class TermNotFoundError extends Data.TaggedError("TermNotFoundError")<{
+  readonly name: string;
+  readonly message?: string;
+}> {}
+
+export class TermAlreadyExistsError extends Data.TaggedError("TermAlreadyExistsError")<{
+  readonly name: string;
+  readonly message?: string;
+}> {}
+
+export class AmbiguousTermNameError extends Data.TaggedError("AmbiguousTermNameError")<{
+  readonly name: string;
+  readonly candidates: ReadonlyArray<string>;
+  readonly message?: string;
+}> {}
+
+export class TermMigrationError extends Data.TaggedError("TermMigrationError")<{
+  readonly message: string;
+  readonly operation?: string;
+  readonly cause?: unknown;
+}> {}
+
 export class LinkNotFoundError extends Data.TaggedError("LinkNotFoundError")<{
   readonly linkId: string;
   readonly message?: string;
@@ -88,6 +110,10 @@ export type KiokuError =
   | ValidationError
   | EntityNotFoundError
   | TagNotFoundError
+  | TermNotFoundError
+  | TermAlreadyExistsError
+  | AmbiguousTermNameError
+  | TermMigrationError
   | LinkNotFoundError
   | VersionNotFoundError
   | ConfigError

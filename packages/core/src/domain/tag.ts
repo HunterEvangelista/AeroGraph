@@ -3,6 +3,7 @@
  * Hierarchical tags for connecting entities
  */
 import { Schema } from "effect";
+import { TermIdSchema } from "./term.js";
 
 // ============================================================================
 // Tag Schema
@@ -16,6 +17,7 @@ export const Tag = Schema.Struct({
   description: Schema.optional(Schema.String),
   parentId: Schema.optional(Schema.String),
   aliases: Schema.optional(Schema.Array(Schema.String)),
+  termId: Schema.optional(TermIdSchema),
   createdAt: Schema.DateFromString,
 });
 
@@ -32,6 +34,7 @@ export const CreateTagInput = Schema.Struct({
   description: Schema.optional(Schema.String),
   parentId: Schema.optional(Schema.String),
   aliases: Schema.optional(Schema.Array(Schema.String)),
+  termId: Schema.optional(TermIdSchema),
 });
 
 export type CreateTagInput = typeof CreateTagInput.Type;
@@ -45,6 +48,7 @@ export const UpdateTagInput = Schema.Struct({
   description: Schema.optional(Schema.String),
   parentId: Schema.optional(Schema.String),
   aliases: Schema.optional(Schema.Array(Schema.String)),
+  termId: Schema.optional(TermIdSchema),
 });
 
 export type UpdateTagInput = typeof UpdateTagInput.Type;

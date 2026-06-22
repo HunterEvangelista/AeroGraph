@@ -9,6 +9,7 @@ import { Context, Effect, Layer } from "effect";
 import { rebuildEntityIdPrefixes } from "./entity-prefix-index.js";
 import * as schema from "./schema.js";
 import {
+  CREATE_SCHEMA_META_SQL,
   CREATE_TABLES_SQL,
   GET_SCHEMA_VERSION_SQL,
   INSERT_SCHEMA_VERSION_SQL,
@@ -59,28 +60,74 @@ const configureDatabaseConnection = (
       }),
   });
 
+const addColumnIfMissing = (
+  db: Database,
+  table: string,
+  column: string,
+  definition: string
+): void => {
+  const columns = db.query(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (columns.length === 0) return;
+  if (!columns.some((c) => c.name === column)) {
+    db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
+  }
+};
+
+const tableExists = (db: Database, table: string): boolean =>
+  Boolean(db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(table));
+
+const runMigrations = (db: Database, fromVersion: number): void => {
+  if (fromVersion < 2) {
+    // v1 -> v2: entity_id_prefixes table (created by CREATE_TABLES_SQL IF NOT EXISTS)
+  }
+  if (fromVersion < 3) {
+    // v2 -> v3: governed term registry. New tables (terms, term_names,
+    // migration_journal) are created by CREATE_TABLES_SQL. Only the tags.term_id
+    // column requires an explicit ALTER because CREATE TABLE IF NOT EXISTS won't
+    // modify an existing table. Must run before CREATE_TABLES_SQL so the index
+    // idx_tags_term can reference the column.
+    addColumnIfMissing(db, "tags", "term_id", "TEXT");
+  }
+  if (fromVersion < 4 && tableExists(db, "term_names")) {
+    // v3 -> v4: term names became kind-scoped and normalized. This guards
+    // local databases created while the v3 shape was still in flight.
+    addColumnIfMissing(db, "term_names", "kind", "TEXT");
+    db.run(
+      "UPDATE term_names SET kind = COALESCE((SELECT kind FROM terms WHERE terms.id = term_names.term_id), 'other') WHERE kind IS NULL;"
+    );
+    db.run("DROP INDEX IF EXISTS idx_term_names_name;");
+    db.run("DROP INDEX IF EXISTS idx_terms_canonical_name;");
+  }
+};
+
 const initializeDatabase = (db: Database): Effect.Effect<void, MigrationError> =>
   Effect.try({
     try: () => {
       // TODO: This is in a transitional state and requires drizzle running on start up
       // before we can migrate away.
-      db.run(CREATE_TABLES_SQL);
+      db.run(CREATE_SCHEMA_META_SQL);
 
       // Check/set schema version
       const versionResult = db.query(GET_SCHEMA_VERSION_SQL).get() as { value: string } | undefined;
 
       if (!versionResult) {
-        // First time setup
+        // First time setup — CREATE_TABLES_SQL creates everything fresh
+        db.run(CREATE_TABLES_SQL);
         db.run(INSERT_SCHEMA_VERSION_SQL, [String(SCHEMA_VERSION)]);
       } else {
         const currentVersion = Number.parseInt(versionResult.value, 10);
-        if (currentVersion === 1 && SCHEMA_VERSION === 2) {
+        if (currentVersion < SCHEMA_VERSION) {
+          // Run column migrations before CREATE_TABLES_SQL so indexes can
+          // reference newly added columns.
+          runMigrations(db, currentVersion);
+          db.run(CREATE_TABLES_SQL);
           db.run(INSERT_SCHEMA_VERSION_SQL, [String(SCHEMA_VERSION)]);
-        } else if (currentVersion !== SCHEMA_VERSION) {
-          // Future: run migrations here
+        } else if (currentVersion > SCHEMA_VERSION) {
           throw new Error(
             `Schema version mismatch: expected ${SCHEMA_VERSION}, got ${currentVersion}`
           );
+        } else {
+          db.run(CREATE_TABLES_SQL);
         }
       }
     },
