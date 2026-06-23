@@ -7,8 +7,10 @@ import { DatabaseClientLive } from "./client.js";
 import { EntityPrefixIndexLive } from "./entity-prefix-index.js";
 import { SqliteEntityRepositoryLive } from "./entity-repository.js";
 import { SqliteLinkRepositoryLive } from "./link-repository.js";
+import { SqliteMigrationJournalRepositoryLive } from "./migration-journal-repository.js";
 import { SqliteNextRepositoryLive } from "./next-repository.js";
 import { SqliteTagRepositoryLive } from "./tag-repository.js";
+import { SqliteTermRepositoryLive } from "./term-repository.js";
 import { SqliteVersionRepositoryLive } from "./version-repository.js";
 
 export const SqliteRepositoriesLive = (dbPath: string) =>
@@ -18,6 +20,8 @@ export const SqliteRepositoriesLive = (dbPath: string) =>
     SqliteLinkRepositoryLive,
     SqliteVersionRepositoryLive,
     SqliteNextRepositoryLive,
+    SqliteTermRepositoryLive,
+    SqliteMigrationJournalRepositoryLive,
     EntityPrefixIndexLive
   ).pipe(Layer.provide(DatabaseClientLive(dbPath)));
 

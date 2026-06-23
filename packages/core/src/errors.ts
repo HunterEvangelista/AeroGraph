@@ -55,6 +55,13 @@ export class TermMigrationError extends Data.TaggedError("TermMigrationError")<{
   readonly cause?: unknown;
 }> {}
 
+export class MigrationJournalEntryNotFoundError extends Data.TaggedError(
+  "MigrationJournalEntryNotFoundError"
+)<{
+  readonly id: string;
+  readonly message?: string;
+}> {}
+
 export class LinkNotFoundError extends Data.TaggedError("LinkNotFoundError")<{
   readonly linkId: string;
   readonly message?: string;
@@ -114,6 +121,7 @@ export type KiokuError =
   | TermAlreadyExistsError
   | AmbiguousTermNameError
   | TermMigrationError
+  | MigrationJournalEntryNotFoundError
   | LinkNotFoundError
   | VersionNotFoundError
   | ConfigError
