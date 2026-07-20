@@ -23,10 +23,6 @@
     "typecheck:core": "turbo typecheck --filter=@kioku/core",
     "typecheck:cli": "turbo typecheck --filter=@kioku/cli",
     "typecheck:ai": "turbo typecheck --filter=@kioku/ai",
-    "typecheck:tsgo": "bun run typecheck:tsgo:core && bun run typecheck:tsgo:cli && bun run typecheck:tsgo:ai",
-    "typecheck:tsgo:core": "tsgo --noEmit -p packages/core/tsconfig.json",
-    "typecheck:tsgo:cli": "tsgo --noEmit -p packages/cli/tsconfig.json",
-    "typecheck:tsgo:ai": "tsgo --noEmit -p packages/ai/tsconfig.json",
     "test": "turbo test",
     "test:core": "turbo test --filter=@kioku/core",
     "test:cli": "turbo test --filter=@kioku/cli",
@@ -41,7 +37,7 @@
     "@effect/language-service": "^0.86.2",
     "drizzle-kit": "^0.31.10",
     "turbo": "^2.3.3",
-    "typescript": "^5.7.2"
+    "typescript": "^7.0.1-rc"
   },
   "packageManager": "bun@1.1.38",
   "engines": {
