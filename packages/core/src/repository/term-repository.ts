@@ -11,6 +11,7 @@ import type {
   TermKind,
   TermName,
   UpdateTermInput,
+  UpdateTermNameInput,
 } from "../domain/term.js";
 import type {
   RepositoryError,
@@ -76,6 +77,15 @@ export interface TermRepository {
   readonly listNames: (
     termId: TermId
   ) => Effect.Effect<ReadonlyArray<TermName>, TermNotFoundError | RepositoryError>;
+
+  /**
+   * Update a registered term name's display text or kind.
+   */
+  readonly updateName: (
+    termId: TermId,
+    name: string,
+    updates: UpdateTermNameInput
+  ) => Effect.Effect<TermName, TermNotFoundError | ValidationError | RepositoryError>;
 
   /**
    * Update mutable term fields.

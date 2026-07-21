@@ -85,9 +85,15 @@ const runTermUpdateScenario = Effect.gen(function* () {
     canonicalName: "Governed Memory Graph",
     status: "deprecated",
   });
+  const renamedName = yield* repo.updateName(term.id, "Project Memory", {
+    nameKind: "alias",
+    displayName: "Project Memory Legacy",
+  });
 
   assert.equal(deprecatedName.name, "project-memory");
   assert.equal(deprecatedName.displayName, "Project Memory");
+  assert.equal(renamedName.nameKind, "alias");
+  assert.equal(renamedName.displayName, "Project Memory Legacy");
   assert.equal(updated.canonicalName, "Governed Memory Graph");
   assert.equal(updated.status, "deprecated");
 });

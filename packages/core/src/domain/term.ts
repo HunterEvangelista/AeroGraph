@@ -160,6 +160,17 @@ export const CreateTermNameInput = Schema.Struct({
 export type CreateTermNameInput = typeof CreateTermNameInput.Type;
 
 // ============================================================================
+// Term Name Update Input
+// ============================================================================
+
+export const UpdateTermNameInput = Schema.Struct({
+  displayName: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
+  nameKind: Schema.optional(TermNameKind),
+});
+
+export type UpdateTermNameInput = typeof UpdateTermNameInput.Type;
+
+// ============================================================================
 // Migration Journal Record Input
 // ============================================================================
 

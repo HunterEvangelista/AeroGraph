@@ -77,6 +77,7 @@ export {
   TermNameKind,
   TermStatus,
   UpdateTermInput,
+  UpdateTermNameInput,
 } from "./term.js";
 export type { TypedEntityVersion, VersionId } from "./version.js";
 // Version types and schemas

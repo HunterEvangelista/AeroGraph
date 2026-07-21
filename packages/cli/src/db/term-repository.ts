@@ -12,6 +12,7 @@ import {
   type TermRepository,
   TermRepositoryTag,
   type UpdateTermInput,
+  type UpdateTermNameInput,
   ValidationError,
 } from "@kioku/core";
 import { and, eq } from "drizzle-orm";
@@ -313,6 +314,69 @@ export const SqliteTermRepositoryLive = Layer.effect(
         });
       });
 
+    const updateName = (termId: TermId, name: string, updates: UpdateTermNameInput) =>
+      Effect.gen(function* () {
+        yield* getById(termId);
+        const normalizedName = normalizeTermName(name);
+
+        const existing = yield* Effect.try({
+          try: () =>
+            drizzle
+              .select()
+              .from(termNames)
+              .where(and(eq(termNames.termId, termId), eq(termNames.name, normalizedName)))
+              .get(),
+          catch: (error) =>
+            new RepositoryError({
+              message: `Failed to get term name: ${error instanceof Error ? error.message : String(error)}`,
+              cause: error,
+            }),
+        });
+
+        if (!existing) {
+          return yield* new TermNotFoundError({ name: normalizedName });
+        }
+
+        yield* Effect.try({
+          try: () =>
+            withSqliteWriteRetry(() =>
+              drizzle
+                .update(termNames)
+                .set({
+                  displayName: updates.displayName ?? existing.displayName,
+                  nameKind: updates.nameKind ?? existing.nameKind,
+                })
+                .where(and(eq(termNames.termId, termId), eq(termNames.name, normalizedName)))
+                .run()
+            ),
+          catch: (error) =>
+            new RepositoryError({
+              message: `Failed to update term name: ${error instanceof Error ? error.message : String(error)}`,
+              cause: error,
+            }),
+        });
+
+        const row = yield* Effect.try({
+          try: () =>
+            drizzle
+              .select()
+              .from(termNames)
+              .where(and(eq(termNames.termId, termId), eq(termNames.name, normalizedName)))
+              .get(),
+          catch: (error) =>
+            new RepositoryError({
+              message: `Failed to get updated term name: ${error instanceof Error ? error.message : String(error)}`,
+              cause: error,
+            }),
+        });
+
+        if (!row) {
+          return yield* new TermNotFoundError({ name: normalizedName });
+        }
+
+        return rowToTermName(row);
+      });
+
     const update = (id: TermId, updates: UpdateTermInput) =>
       Effect.gen(function* () {
         const existing = yield* getById(id);
@@ -350,6 +414,7 @@ export const SqliteTermRepositoryLive = Layer.effect(
       list,
       addName,
       listNames,
+      updateName,
       update,
     } satisfies TermRepository;
   })
