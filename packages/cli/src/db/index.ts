@@ -17,6 +17,14 @@ export { SqliteLinkRepositoryLive } from "./link-repository.js";
 export { SqliteMigrationJournalRepositoryLive } from "./migration-journal-repository.js";
 export { SqliteNextRepositoryLive } from "./next-repository.js";
 export { CREATE_TABLES_SQL, SCHEMA_VERSION } from "./schema.js";
+export type { DatabaseExecutor, DatabaseSession } from "./session.js";
+export {
+  DatabaseSessionTag,
+  makeRootDatabaseSession,
+  makeTransactionDatabaseSession,
+  RootDatabaseSessionLive,
+} from "./session.js";
 export { SqliteTagRepositoryLive } from "./tag-repository.js";
 export { SqliteTermRepositoryLive } from "./term-repository.js";
+export { TransactionEngineLive } from "./transaction-engine.js";
 export { SqliteVersionRepositoryLive } from "./version-repository.js";

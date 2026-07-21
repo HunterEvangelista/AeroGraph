@@ -10,9 +10,8 @@ import {
 } from "@kioku/core";
 import { desc, eq } from "drizzle-orm";
 import { Effect, Layer } from "effect";
-import { DatabaseClientTag } from "./client.js";
 import { migrationJournal } from "./schema.js";
-import { withSqliteWriteRetry } from "./sqlite-retry.js";
+import { DatabaseSessionTag } from "./session.js";
 
 const now = (): string => new Date().toISOString();
 
@@ -36,13 +35,13 @@ const rowToJournalEntry = (row: MigrationJournalRow): MigrationJournalEntry => (
 export const SqliteMigrationJournalRepositoryLive = Layer.effect(
   MigrationJournalRepositoryTag,
   Effect.gen(function* () {
-    const { drizzle } = yield* DatabaseClientTag;
+    const { drizzle, write } = yield* DatabaseSessionTag;
 
     const record = (input: RecordJournalEntryInput) =>
       Effect.try({
         try: () => {
           const timestamp = now();
-          withSqliteWriteRetry(() =>
+          write(() =>
             drizzle
               .insert(migrationJournal)
               .values({

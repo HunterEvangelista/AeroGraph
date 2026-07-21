@@ -8,12 +8,15 @@ import {
 import { Effect, Layer } from "effect";
 import { DatabaseClientLive } from "../../client.js";
 import { SqliteMigrationJournalRepositoryLive } from "../../migration-journal-repository.js";
+import { RootDatabaseSessionLive } from "../../session.js";
 import { SqliteTermRepositoryLive } from "../../term-repository.js";
 
-const createRepositoryLayer = () =>
-  Layer.mergeAll(SqliteTermRepositoryLive, SqliteMigrationJournalRepositoryLive).pipe(
-    Layer.provide(DatabaseClientLive(":memory:"))
+const createRepositoryLayer = () => {
+  const session = RootDatabaseSessionLive.pipe(Layer.provideMerge(DatabaseClientLive(":memory:")));
+  return Layer.mergeAll(SqliteTermRepositoryLive, SqliteMigrationJournalRepositoryLive).pipe(
+    Layer.provide(session)
   );
+};
 
 const runTermCreateScenario = Effect.gen(function* () {
   const repo = yield* TermRepositoryTag;

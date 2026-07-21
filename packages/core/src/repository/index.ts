@@ -14,5 +14,7 @@ export type { TagRepository } from "./tag-repository.js";
 export { TagRepositoryTag } from "./tag-repository.js";
 export type { ResolvedTermName, TermRepository } from "./term-repository.js";
 export { TermRepositoryTag } from "./term-repository.js";
+export type { TransactionEngine, TransactionRepositories } from "./transaction-engine.js";
+export { TransactionEngineTag } from "./transaction-engine.js";
 export type { VersionRepository } from "./version-repository.js";
 export { VersionRepositoryTag } from "./version-repository.js";

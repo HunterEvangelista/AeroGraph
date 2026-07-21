@@ -17,9 +17,8 @@ import {
 } from "@kioku/core";
 import { and, eq } from "drizzle-orm";
 import { Effect, Layer } from "effect";
-import { DatabaseClientTag } from "./client.js";
 import { termNames, terms } from "./schema.js";
-import { withSqliteWriteRetry } from "./sqlite-retry.js";
+import { DatabaseSessionTag } from "./session.js";
 
 const now = (): string => new Date().toISOString();
 
@@ -77,7 +76,7 @@ const toUniqueNames = (canonicalName: string, aliases: ReadonlyArray<string> | u
 export const SqliteTermRepositoryLive = Layer.effect(
   TermRepositoryTag,
   Effect.gen(function* () {
-    const { drizzle } = yield* DatabaseClientTag;
+    const { drizzle, transaction, write } = yield* DatabaseSessionTag;
 
     const getById = (id: TermId) =>
       Effect.gen(function* () {
@@ -101,38 +100,36 @@ export const SqliteTermRepositoryLive = Layer.effect(
       Effect.try({
         try: () => {
           const timestamp = now();
-          withSqliteWriteRetry(() =>
-            drizzle.transaction((tx) => {
-              tx.insert(terms)
-                .values({
-                  id: input.id,
-                  canonicalName: input.canonicalName,
-                  kind: input.kind,
-                  description: input.description ?? null,
-                  status: "active",
-                  mergedIntoId: null,
-                  createdAt: timestamp,
-                  updatedAt: timestamp,
-                })
-                .run();
+          transaction((tx) => {
+            tx.insert(terms)
+              .values({
+                id: input.id,
+                canonicalName: input.canonicalName,
+                kind: input.kind,
+                description: input.description ?? null,
+                status: "active",
+                mergedIntoId: null,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+              })
+              .run();
 
-              const names = toUniqueNames(input.canonicalName, input.aliases);
-              if (names.length > 0) {
-                tx.insert(termNames)
-                  .values(
-                    names.map((name) => ({
-                      termId: input.id,
-                      kind: input.kind,
-                      name: name.name,
-                      displayName: name.displayName,
-                      nameKind: name.nameKind,
-                      createdAt: timestamp,
-                    }))
-                  )
-                  .run();
-              }
-            })
-          );
+            const names = toUniqueNames(input.canonicalName, input.aliases);
+            if (names.length > 0) {
+              tx.insert(termNames)
+                .values(
+                  names.map((name) => ({
+                    termId: input.id,
+                    kind: input.kind,
+                    name: name.name,
+                    displayName: name.displayName,
+                    nameKind: name.nameKind,
+                    createdAt: timestamp,
+                  }))
+                )
+                .run();
+            }
+          });
 
           const row = drizzle.select().from(terms).where(eq(terms.id, input.id)).get();
           if (!row) throw new Error(`Inserted term not found: ${input.id}`);
@@ -257,7 +254,7 @@ export const SqliteTermRepositoryLive = Layer.effect(
           try: () => {
             const timestamp = now();
             const normalizedName = normalizeTermName(input.name);
-            withSqliteWriteRetry(() =>
+            write(() =>
               drizzle
                 .insert(termNames)
                 .values({
@@ -339,7 +336,7 @@ export const SqliteTermRepositoryLive = Layer.effect(
 
         yield* Effect.try({
           try: () =>
-            withSqliteWriteRetry(() =>
+            write(() =>
               drizzle
                 .update(termNames)
                 .set({
@@ -383,7 +380,7 @@ export const SqliteTermRepositoryLive = Layer.effect(
 
         yield* Effect.try({
           try: () =>
-            withSqliteWriteRetry(() =>
+            write(() =>
               drizzle
                 .update(terms)
                 .set({

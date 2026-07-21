@@ -12,9 +12,8 @@ import {
 } from "@kioku/core";
 import { and, desc, count as drizzleCount, eq, or } from "drizzle-orm";
 import { Effect, Layer } from "effect";
-import { DatabaseClientTag } from "./client";
 import { entities, links } from "./schema";
-import { withSqliteWriteRetry } from "./sqlite-retry";
+import { DatabaseSessionTag } from "./session";
 
 // ============================================================================
 // Helper Functions
@@ -47,7 +46,7 @@ const rowToLink = (row: LinkRow): Link => ({
 export const SqliteLinkRepositoryLive = Layer.effect(
   LinkRepositoryTag,
   Effect.gen(function* () {
-    const { drizzle } = yield* DatabaseClientTag;
+    const { drizzle, transaction, write } = yield* DatabaseSessionTag;
 
     const verifyEntityExists = (entityId: string) =>
       Effect.gen(function* () {
@@ -79,7 +78,7 @@ export const SqliteLinkRepositoryLive = Layer.effect(
           try: () => {
             const id = generateId();
             const timestamp = now();
-            withSqliteWriteRetry(() =>
+            write(() =>
               drizzle
                 .insert(links)
                 .values({
@@ -110,40 +109,38 @@ export const SqliteLinkRepositoryLive = Layer.effect(
 
         return yield* Effect.try({
           try: () => {
-            const createPair = withSqliteWriteRetry(() =>
-              drizzle.transaction((tx) => {
-                const timestamp = now();
+            const createPair = transaction((tx) => {
+              const timestamp = now();
 
-                const forwardId = generateId();
-                const inverseId = generateId();
-                const inverseType = getInverseLinkType(input.type);
+              const forwardId = generateId();
+              const inverseId = generateId();
+              const inverseType = getInverseLinkType(input.type);
 
-                tx.insert(links)
-                  .values([
-                    {
-                      id: forwardId,
-                      sourceId: input.sourceId,
-                      targetId: input.targetId,
-                      type: input.type,
-                      createdAt: timestamp,
-                    },
-                    {
-                      id: inverseId,
-                      sourceId: input.targetId,
-                      targetId: input.sourceId,
-                      type: inverseType,
-                      createdAt: timestamp,
-                    },
-                  ])
-                  .run();
+              tx.insert(links)
+                .values([
+                  {
+                    id: forwardId,
+                    sourceId: input.sourceId,
+                    targetId: input.targetId,
+                    type: input.type,
+                    createdAt: timestamp,
+                  },
+                  {
+                    id: inverseId,
+                    sourceId: input.targetId,
+                    targetId: input.sourceId,
+                    type: inverseType,
+                    createdAt: timestamp,
+                  },
+                ])
+                .run();
 
-                const forwardRow = tx.select().from(links).where(eq(links.id, forwardId)).get();
-                const inverseRow = tx.select().from(links).where(eq(links.id, inverseId)).get();
-                if (!forwardRow || !inverseRow) throw new Error("Inserted link pair not found");
+              const forwardRow = tx.select().from(links).where(eq(links.id, forwardId)).get();
+              const inverseRow = tx.select().from(links).where(eq(links.id, inverseId)).get();
+              if (!forwardRow || !inverseRow) throw new Error("Inserted link pair not found");
 
-                return [forwardRow, inverseRow] as const;
-              })
-            );
+              return [forwardRow, inverseRow] as const;
+            });
 
             const [forwardRow, inverseRow] = createPair;
             return [rowToLink(forwardRow), rowToLink(inverseRow)] as const;
@@ -268,8 +265,7 @@ export const SqliteLinkRepositoryLive = Layer.effect(
         yield* getById(id);
 
         yield* Effect.try({
-          try: () =>
-            withSqliteWriteRetry(() => drizzle.delete(links).where(eq(links.id, id)).run()),
+          try: () => write(() => drizzle.delete(links).where(eq(links.id, id)).run()),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to delete link: ${error instanceof Error ? error.message : String(error)}`,
@@ -287,7 +283,7 @@ export const SqliteLinkRepositoryLive = Layer.effect(
             .where(or(eq(links.sourceId, entityId), eq(links.targetId, entityId)))
             .all();
 
-          withSqliteWriteRetry(() =>
+          write(() =>
             drizzle
               .delete(links)
               .where(or(eq(links.sourceId, entityId), eq(links.targetId, entityId)))
@@ -340,7 +336,7 @@ export const SqliteLinkRepositoryLive = Layer.effect(
         yield* Effect.try({
           try: () => {
             if (type) {
-              withSqliteWriteRetry(() =>
+              write(() =>
                 drizzle
                   .delete(links)
                   .where(
@@ -355,7 +351,7 @@ export const SqliteLinkRepositoryLive = Layer.effect(
               return;
             }
 
-            withSqliteWriteRetry(() =>
+            write(() =>
               drizzle
                 .delete(links)
                 .where(and(eq(links.sourceId, sourceId), eq(links.targetId, targetId)))
