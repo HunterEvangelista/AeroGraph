@@ -6,7 +6,6 @@ import {
   MigrationServiceTag,
   type TagId,
   TagRepositoryTag,
-  type TermId,
   TermRepositoryTag,
   TransactionEngineTag,
 } from "@kioku/core";
@@ -30,15 +29,15 @@ const program = Effect.gen(function* () {
     title: "Rename rollback",
     content: "Historical Kioku context.",
   });
-  const tagId = "kioku" as TagId;
-  yield* tagRepo.create({ id: tagId, name: "Kioku" });
-  yield* tagRepo.applyToEntity(tagId, document.id);
-
-  const seedTerm = yield* termRepo.create({
-    id: "term-brand-seed",
-    canonicalName: "Seed",
+  const sourceTerm = yield* termRepo.create({
+    id: "term-brand-kioku",
+    canonicalName: "Kioku",
     kind: "brand",
   });
+  const tagId = "kioku" as TagId;
+  yield* tagRepo.create({ id: tagId, name: "Kioku", termId: sourceTerm.id });
+  yield* tagRepo.applyToEntity(tagId, document.id);
+
   const duplicateJournalId = "journal-duplicate" as JournalEntryId;
   yield* journalRepo.record({
     id: duplicateJournalId,
@@ -46,7 +45,7 @@ const program = Effect.gen(function* () {
     kind: "brand",
     fromName: "seed-old",
     toName: "seed",
-    termId: seedTerm.id,
+    termId: sourceTerm.id,
     affectedEntityIds: [],
     dryRun: false,
   });
@@ -56,7 +55,6 @@ const program = Effect.gen(function* () {
       kind: "brand",
       fromName: "kioku",
       toName: "AeroGraph",
-      termId: "term-brand-aerograph" as TermId,
       journalEntryId: duplicateJournalId,
     })
   );
@@ -67,7 +65,7 @@ const program = Effect.gen(function* () {
   const tag = yield* tagRepo.getById(tagId);
   assert.equal(tag.name, "Kioku");
   assert.equal(tag.aliases, undefined);
-  assert.equal(tag.termId, undefined);
+  assert.equal(tag.termId, sourceTerm.id);
 
   const attachedEntities = yield* entityRepo.getByTag(tagId);
   assert.deepEqual(

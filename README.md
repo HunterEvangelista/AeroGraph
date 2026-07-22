@@ -59,6 +59,8 @@ The term ID, tag ID, entity ID, and entity-to-tag attachment do not change. This
 
 Use a term migration when a concept is renamed rather than replacing tag strings directly. A migration updates the governed term and matching tags while preserving stable IDs and entity attachments.
 
+Rename migrations do not create terms or infer tag ownership. The source term must already exist, and existing tags for that concept must be explicitly governed by it before migration. This preparation keeps semantic ownership separate from the rename itself.
+
 Always preview a migration first:
 
 ```bash
@@ -75,6 +77,14 @@ kioku migrate brand AcmeCorp AeroGraph \
 ```
 
 Applying a rename performs the term, registered-name, tag, and migration-journal updates in one SQLite transaction. If any update fails, the complete migration is rolled back. Successful migrations record the old and new names, term ID, affected entity IDs, reason, actor, and application time in the durable migration journal.
+
+Queries and context selection resolve canonical, alias, and deprecated term names to every tag governed by that term. Comma-separated selectors still intersect, while selectors that are not registered term names retain exact tag-ID behavior. Context can render governed tags using their current canonical names without rewriting entity titles or historical content:
+
+```bash
+kioku query --tags AcmeCorp
+kioku query --tags AeroGraph
+kioku context --tags AcmeCorp --canonical-terms
+```
 
 ## Repo Layout
 

@@ -24,6 +24,8 @@ export { MigrationServiceLive } from "./migration-service.live.js";
 export type { NextService, NextSuggestedEntity } from "./next-service.js";
 export { NextServiceTag } from "./next-service.js";
 export { NextServiceLive } from "./next-service.live.js";
+export type { ResolvedTagSelector } from "./tag-selector.js";
+export { resolveTagSelectors } from "./tag-selector.js";
 export type { TagService } from "./tag-service.js";
 export { TagServiceTag } from "./tag-service.js";
 export { TagServiceLive } from "./tag-service.live.js";

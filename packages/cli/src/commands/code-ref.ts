@@ -350,9 +350,7 @@ const codeRefDeleteCommand = Command.make(
             yield* Console.log("(Use --force to skip this confirmation in scripts)");
           }
 
-          yield* entityService.delete(
-            resolvedId as Parameters<typeof entityService.getById>[0]
-          );
+          yield* entityService.delete(resolvedId as Parameters<typeof entityService.getById>[0]);
         }).pipe(Effect.provide(ServiceLayers))
       );
 

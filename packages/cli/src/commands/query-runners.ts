@@ -1,4 +1,10 @@
-import { type Entity, EntityTypeEnum, GraphServiceTag, type Link } from "@kioku/core";
+import {
+  type Entity,
+  EntityTypeEnum,
+  GraphServiceTag,
+  type Link,
+  resolveTagSelectors,
+} from "@kioku/core";
 import { Console, Effect } from "effect";
 import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
 
@@ -126,12 +132,15 @@ const findLinkBetween = (
 // Query Runners
 // ============================================================================
 
-export const runTagsQuery = (tagIds: ReadonlyArray<string>) =>
+export const runTagsQuery = (selectors: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     const graphService = yield* GraphServiceTag;
-    const entities = yield* graphService.findByTagPath(tagIds);
+    const resolved = yield* resolveTagSelectors(selectors);
+    const entities = yield* graphService.findByTagGroups(
+      resolved.map((selector) => selector.tagIds)
+    );
     yield* printGroupedEntities(
-      `Tag intersection: ${tagIds.map((tag) => `#${tag}`).join(", ")}`,
+      `Tag intersection: ${selectors.map((tag) => `#${tag}`).join(", ")}`,
       entities
     );
     return { displayedEntityIds: entities.map((entity) => entity.id) } satisfies QueryRunResult;

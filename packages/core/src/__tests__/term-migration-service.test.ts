@@ -23,6 +23,7 @@ import {
   MigrationJournalEntryNotFoundError,
   TagNotFoundError,
   TermAlreadyExistsError,
+  TermMigrationError,
   TermNotFoundError,
   ValidationError,
 } from "../errors.js";
@@ -41,6 +42,7 @@ import type {
 import { TransactionEngineTag } from "../repository/transaction-engine.js";
 import { MigrationServiceTag } from "../services/migration-service.js";
 import { MigrationServiceLive } from "../services/migration-service.live.js";
+import { resolveTagSelectors } from "../services/tag-selector.js";
 import { TermServiceTag } from "../services/term-service.js";
 import { TermServiceLive } from "../services/term-service.live.js";
 import { FIXED_TIMESTAMP_ISO } from "./helpers/index.js";
@@ -438,6 +440,35 @@ const createTestLayer = (config: {
 };
 
 describe("TermService", () => {
+  it("resolves canonical, alias, and deprecated selectors to every tag governed by a term", async () => {
+    const termStore = createTermStore();
+    const term = createTestTerm("term-concept-auth", "Authentication", "concept");
+    termStore.terms.set(term.id, term);
+    termStore.names.push(createTestTermName(term.id, "concept", "Authentication", "canonical"));
+    termStore.names.push(createTestTermName(term.id, "concept", "Auth", "alias"));
+    termStore.names.push(createTestTermName(term.id, "concept", "Login", "deprecated"));
+
+    const tags = new Map<string, Tag>();
+    tags.set("auth", createTestTag("auth", "Auth", { termId: term.id }));
+    tags.set("login", createTestTag("login", "Login", { termId: term.id }));
+    tags.set("legacy", createTestTag("legacy", "Legacy"));
+
+    const program = Effect.all([
+      resolveTagSelectors(["Authentication"]),
+      resolveTagSelectors(["Auth"]),
+      resolveTagSelectors(["Login"]),
+      resolveTagSelectors(["legacy"]),
+    ]);
+    const [canonical, alias, deprecated, literal] = await Effect.runPromise(
+      Effect.provide(program, createTestLayer({ termStore, tags }))
+    );
+
+    expect(canonical[0]?.tagIds).toEqual(["auth", "login"]);
+    expect(alias[0]?.tagIds).toEqual(canonical[0]?.tagIds);
+    expect(deprecated[0]?.tagIds).toEqual(canonical[0]?.tagIds);
+    expect(literal[0]).toEqual({ selector: "legacy", tagIds: ["legacy"] });
+  });
+
   it("resolves deprecated names with user-facing notes", async () => {
     const termStore = createTermStore();
     const term = createTestTerm("term-brand-aerograph", "AeroGraph", "brand");
@@ -485,8 +516,13 @@ describe("TermService", () => {
 
 describe("MigrationService", () => {
   it("plans a rename with affected tags and entities without writing", async () => {
+    const termStore = createTermStore();
+    const sourceTerm = createTestTerm("term-brand-kioku", "Kioku", "brand");
+    termStore.terms.set(sourceTerm.id, sourceTerm);
+    termStore.names.push(createTestTermName(sourceTerm.id, "brand", "Kioku", "canonical"));
+
     const tags = new Map<string, Tag>();
-    tags.set("kioku", createTestTag("kioku", "Kioku"));
+    tags.set("kioku", createTestTag("kioku", "Kioku", { termId: sourceTerm.id }));
 
     const entities = new Map<string, Entity>();
     entities.set("doc-1", createTestEntity("doc-1", ["kioku"]));
@@ -506,17 +542,23 @@ describe("MigrationService", () => {
     });
 
     const result = await Effect.runPromise(
-      Effect.provide(program, createTestLayer({ tags, entities, taggedEntities, migrationStore }))
+      Effect.provide(
+        program,
+        createTestLayer({ termStore, tags, entities, taggedEntities, migrationStore })
+      )
     );
 
-    expect(result.willCreateTerm).toBe(true);
+    expect(result.term.id).toBe(sourceTerm.id);
     expect(result.affectedTags.map(({ id }) => id)).toEqual(["kioku"]);
     expect(result.affectedEntityIds).toEqual(["doc-1", "doc-2"]);
     expect(migrationStore.entries).toHaveLength(0);
   });
 
-  it("applies a rename by creating the destination term, preserving tag identity, and journaling", async () => {
+  it("rejects an ungoverned source instead of creating a term during migration", async () => {
     const termStore = createTermStore();
+    const sourceTerm = createTestTerm("term-brand-kioku", "Kioku", "brand");
+    termStore.terms.set(sourceTerm.id, sourceTerm);
+    termStore.names.push(createTestTermName(sourceTerm.id, "brand", "Kioku", "canonical"));
     const migrationStore = { entries: [] };
     const tags = new Map<string, Tag>();
     tags.set("kioku", createTestTag("kioku", "Kioku"));
@@ -534,38 +576,74 @@ describe("MigrationService", () => {
         kind: "brand",
         fromName: "kioku",
         toName: "AeroGraph",
-        termId: "term-brand-aerograph" as TermId,
         journalEntryId: "journal-rename-1" as JournalEntryId,
         reason: "Project rename",
         appliedBy: "test",
       });
     });
 
-    const result = await Effect.runPromise(
-      Effect.provide(
-        program,
-        createTestLayer({ termStore, tags, entities, taggedEntities, migrationStore })
+    const error = await Effect.runPromise(
+      Effect.flip(
+        Effect.provide(
+          program,
+          createTestLayer({ termStore, tags, entities, taggedEntities, migrationStore })
+        )
       )
     );
-    const updatedTag = tags.get("kioku");
-    const termNames = termStore.names.map(({ name, nameKind }) => [name, nameKind]);
 
-    expect(result.term.id).toBe("term-brand-aerograph");
-    expect(result.term.canonicalName).toBe("AeroGraph");
-    expect(updatedTag?.id).toBe("kioku");
-    expect(updatedTag?.name).toBe("AeroGraph");
-    expect(updatedTag?.aliases).toEqual(["Kioku"]);
-    expect(updatedTag?.termId).toBe("term-brand-aerograph");
-    expect(termNames).toEqual([
-      ["aerograph", "canonical"],
-      ["kioku", "deprecated"],
-    ]);
-    expect(result.journalEntry.affectedEntityIds).toEqual(["doc-1", "doc-2"]);
-    expect(migrationStore.entries).toHaveLength(1);
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.message).toContain("Matching tags must be governed before migration: #kioku");
+    expect(termStore.terms.size).toBe(1);
+    expect(tags.get("kioku")?.name).toBe("Kioku");
+    expect(migrationStore.entries).toHaveLength(0);
     expect(taggedEntities.get("kioku")).toEqual(new Set(["doc-1", "doc-2"]));
   });
 
-  it("converts an existing source term into the renamed canonical term", async () => {
+  it("rejects a missing governed source term", async () => {
+    const program = Effect.gen(function* () {
+      const service = yield* MigrationServiceTag;
+      return yield* service.planRename({
+        kind: "brand",
+        fromName: "kioku",
+        toName: "AeroGraph",
+      });
+    });
+
+    const error = await Effect.runPromise(
+      Effect.flip(Effect.provide(program, createTestLayer({})))
+    );
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.message).toContain("No governed brand term matches 'kioku'");
+  });
+
+  it("rejects a destination owned by a different term", async () => {
+    const termStore = createTermStore();
+    const sourceTerm = createTestTerm("term-brand-kioku", "Kioku", "brand");
+    const destinationTerm = createTestTerm("term-brand-aerograph", "AeroGraph", "brand");
+    termStore.terms.set(sourceTerm.id, sourceTerm);
+    termStore.terms.set(destinationTerm.id, destinationTerm);
+    termStore.names.push(createTestTermName(sourceTerm.id, "brand", "Kioku", "canonical"));
+    termStore.names.push(createTestTermName(destinationTerm.id, "brand", "AeroGraph", "canonical"));
+
+    const program = Effect.gen(function* () {
+      const service = yield* MigrationServiceTag;
+      return yield* service.planRename({
+        kind: "brand",
+        fromName: "Kioku",
+        toName: "AeroGraph",
+      });
+    });
+
+    const error = await Effect.runPromise(
+      Effect.flip(Effect.provide(program, createTestLayer({ termStore })))
+    );
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.message).toContain("destination belongs to a different term");
+  });
+
+  it("rejects an ungoverned destination tag that would split the concept cluster", async () => {
     const termStore = createTermStore();
     const sourceTerm = createTestTerm("term-brand-kioku", "Kioku", "brand");
     termStore.terms.set(sourceTerm.id, sourceTerm);
@@ -573,31 +651,119 @@ describe("MigrationService", () => {
 
     const tags = new Map<string, Tag>();
     tags.set("kioku", createTestTag("kioku", "Kioku", { termId: sourceTerm.id }));
+    tags.set("aerograph", createTestTag("aerograph", "AeroGraph"));
+
+    const program = Effect.gen(function* () {
+      const service = yield* MigrationServiceTag;
+      return yield* service.planRename({
+        kind: "brand",
+        fromName: "Kioku",
+        toName: "AeroGraph",
+      });
+    });
+    const error = await Effect.runPromise(
+      Effect.flip(Effect.provide(program, createTestLayer({ termStore, tags })))
+    );
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.message).toContain(
+      "Destination tags must be governed by the source term or merged before migration: #aerograph"
+    );
+  });
+
+  it("rejects merged source terms during planning", async () => {
+    const termStore = createTermStore();
+    const sourceTerm = createTestTerm("term-brand-kioku", "Kioku", "brand", {
+      status: "merged",
+      mergedIntoId: "term-brand-aerograph" as TermId,
+    });
+    termStore.terms.set(sourceTerm.id, sourceTerm);
+    termStore.names.push(createTestTermName(sourceTerm.id, "brand", "Kioku", "canonical"));
+
+    const program = Effect.gen(function* () {
+      const service = yield* MigrationServiceTag;
+      return yield* service.planRename({
+        kind: "brand",
+        fromName: "Kioku",
+        toName: "AeroGraph",
+      });
+    });
+    const error = await Effect.runPromise(
+      Effect.flip(Effect.provide(program, createTestLayer({ termStore })))
+    );
+
+    expect(error).toBeInstanceOf(TermMigrationError);
+    expect(error.message).toContain("Cannot rename merged term 'Kioku'");
+  });
+
+  it("rejects a rename that is already canonical", async () => {
+    const termStore = createTermStore();
+    const term = createTestTerm("term-brand-kioku", "AeroGraph", "brand");
+    termStore.terms.set(term.id, term);
+    termStore.names.push(createTestTermName(term.id, "brand", "AeroGraph", "canonical"));
+    termStore.names.push(createTestTermName(term.id, "brand", "Kioku", "deprecated"));
+
+    const program = Effect.gen(function* () {
+      const service = yield* MigrationServiceTag;
+      return yield* service.planRename({
+        kind: "brand",
+        fromName: "Kioku",
+        toName: "AeroGraph",
+      });
+    });
+
+    const error = await Effect.runPromise(
+      Effect.flip(Effect.provide(program, createTestLayer({ termStore })))
+    );
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.message).toContain("already the canonical name");
+  });
+
+  it("applies a non-brand rename to an existing governed term", async () => {
+    const termStore = createTermStore();
+    const sourceTerm = createTestTerm("term-package-client", "Legacy Client", "package");
+    termStore.terms.set(sourceTerm.id, sourceTerm);
+    termStore.names.push(
+      createTestTermName(sourceTerm.id, "package", "Legacy Client", "canonical")
+    );
+
+    const tags = new Map<string, Tag>();
+    tags.set(
+      "legacy-client",
+      createTestTag("legacy-client", "Legacy Client", { termId: sourceTerm.id })
+    );
+
+    const entities = new Map<string, Entity>();
+    entities.set("doc-1", createTestEntity("doc-1", ["legacy-client"]));
+    const taggedEntities = new Map<string, Set<string>>();
+    taggedEntities.set("legacy-client", new Set(["doc-1"]));
 
     const program = Effect.gen(function* () {
       const service = yield* MigrationServiceTag;
       return yield* service.applyRename({
-        kind: "brand",
-        fromName: "kioku",
-        toName: "AeroGraph",
+        kind: "package",
+        fromName: "Legacy Client",
+        toName: "Platform Client",
         journalEntryId: "journal-rename-2" as JournalEntryId,
       });
     });
 
     const result = await Effect.runPromise(
-      Effect.provide(program, createTestLayer({ termStore, tags }))
+      Effect.provide(program, createTestLayer({ termStore, tags, entities, taggedEntities }))
     );
 
-    expect(result.term.id).toBe("term-brand-kioku");
-    expect(result.term.canonicalName).toBe("AeroGraph");
+    expect(result.term.id).toBe("term-package-client");
+    expect(result.term.canonicalName).toBe("Platform Client");
     expect(
       termStore.names
         .map(({ name, nameKind }) => ({ name, nameKind }))
         .sort((a, b) => a.name.localeCompare(b.name))
     ).toEqual([
-      { name: "aerograph", nameKind: "canonical" },
-      { name: "kioku", nameKind: "deprecated" },
+      { name: "legacy-client", nameKind: "deprecated" },
+      { name: "platform-client", nameKind: "canonical" },
     ]);
-    expect(tags.get("kioku")?.termId).toBe("term-brand-kioku");
+    expect(tags.get("legacy-client")?.termId).toBe("term-package-client");
+    expect(taggedEntities.get("legacy-client")).toEqual(new Set(["doc-1"]));
   });
 });

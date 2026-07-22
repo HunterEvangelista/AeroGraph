@@ -747,6 +747,35 @@ describe("GraphService", () => {
     });
   });
 
+  describe("findByTagGroups()", () => {
+    it("unions tags within groups and intersects separate groups", async () => {
+      const entities = new Map<string, Entity>();
+      entities.set("e1", createTestEntity("e1"));
+      entities.set("e2", createTestEntity("e2"));
+      entities.set("e3", createTestEntity("e3"));
+
+      const taggedEntities = new Map<string, Set<string>>();
+      taggedEntities.set("legacy-auth", new Set(["e1"]));
+      taggedEntities.set("current-auth", new Set(["e2", "e3"]));
+      taggedEntities.set("middleware", new Set(["e2"]));
+
+      const layer = createTestLayer({
+        entityRepo: createMockEntityRepository({ entities, taggedEntities }),
+      });
+      const program = Effect.gen(function* () {
+        const graphService = yield* GraphServiceTag;
+        return yield* graphService.findByTagGroups([
+          ["legacy-auth", "current-auth"],
+          ["middleware"],
+        ]);
+      });
+
+      const result = await Effect.runPromise(Effect.provide(program, layer));
+
+      expect(result.map(({ id }) => id)).toEqual(["e2"]);
+    });
+  });
+
   describe("findPath()", () => {
     it("finds direct connection as 2-entity path", async () => {
       const entities = new Map<string, Entity>();

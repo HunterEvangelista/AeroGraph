@@ -9,12 +9,9 @@ import {
   type JournalEntryId,
   normalizeTermName,
   type Term,
-  type TermId,
-  type TermKind,
   type TermName,
 } from "../domain/term.js";
 import {
-  AmbiguousTermNameError,
   type RepositoryError,
   TermAlreadyExistsError,
   TermMigrationError,
@@ -24,7 +21,7 @@ import { EntityRepositoryTag } from "../repository/entity-repository.js";
 import { MigrationJournalRepositoryTag } from "../repository/migration-journal-repository.js";
 import type { TagRepository } from "../repository/tag-repository.js";
 import { TagRepositoryTag } from "../repository/tag-repository.js";
-import type { ResolvedTermName, TermRepository } from "../repository/term-repository.js";
+import type { TermRepository } from "../repository/term-repository.js";
 import { TermRepositoryTag } from "../repository/term-repository.js";
 import type { TransactionRepositories } from "../repository/transaction-engine.js";
 import { TransactionEngineTag } from "../repository/transaction-engine.js";
@@ -40,14 +37,8 @@ interface NormalizedRenameInput extends RenameTermInput {
   readonly normalizedToName: string;
 }
 
-const termIdFor = (kind: TermKind, normalizedName: string): TermId =>
-  `term-${kind}-${normalizedName}` as TermId;
-
 const journalEntryIdFor = (input: NormalizedRenameInput): JournalEntryId =>
   `journal-rename-${input.kind}-${input.normalizedFromName}-${input.normalizedToName}-${Date.now()}` as JournalEntryId;
-
-const candidateLabel = ({ term, termName }: ResolvedTermName): string =>
-  `${term.kind}:${term.canonicalName} (${termName.nameKind})`;
 
 const validateRenameInput = (input: RenameTermInput) =>
   Effect.gen(function* () {
@@ -87,36 +78,6 @@ const validateRenameInput = (input: RenameTermInput) =>
     } satisfies NormalizedRenameInput;
   });
 
-const findSingleNameMatch = (repo: TermRepository, name: string, kind: TermKind) =>
-  Effect.gen(function* () {
-    const matches = yield* repo.findByName(name, kind);
-
-    if (matches.length > 1) {
-      return yield* new AmbiguousTermNameError({
-        name,
-        candidates: matches.map(candidateLabel),
-        message: `Term name '${name}' is ambiguous for kind '${kind}'.`,
-      });
-    }
-
-    return matches[0];
-  });
-
-const selectRenameTerm = (repo: TermRepository, input: NormalizedRenameInput) =>
-  Effect.gen(function* () {
-    const source = yield* findSingleNameMatch(repo, input.fromName, input.kind);
-    const destination = yield* findSingleNameMatch(repo, input.toName, input.kind);
-
-    if (source && destination && source.term.id !== destination.term.id) {
-      return yield* new TermMigrationError({
-        operation: "rename",
-        message: `Cannot rename '${input.fromName}' to '${input.toName}' because both names already belong to different terms.`,
-      });
-    }
-
-    return destination?.term ?? source?.term;
-  });
-
 const tagMatchesName = (tag: Tag, normalizedName: string): boolean => {
   const names = [tag.id, tag.name, ...(tag.aliases ?? [])];
   return names.some((name) => normalizeTermName(name) === normalizedName);
@@ -141,19 +102,13 @@ const collectAffectedEntities = (
 
 const notesForPlan = (
   input: NormalizedRenameInput,
-  term: Term | undefined,
+  term: Term,
   affectedTags: ReadonlyArray<Tag>
 ): ReadonlyArray<string> => {
-  const notes: string[] = [];
-
-  notes.push(
-    term
-      ? `Will use existing ${input.kind} term '${term.canonicalName}'.`
-      : `Will create ${input.kind} term '${input.toName}'.`
-  );
+  const notes = [`Will rename existing ${input.kind} term '${term.canonicalName}'.`];
 
   if (affectedTags.length === 0) {
-    notes.push(`No tags currently match '${input.fromName}'.`);
+    notes.push(`No tags are currently governed by '${input.fromName}'.`);
   }
 
   return notes;
@@ -207,26 +162,19 @@ const aliasesForRenamedTag = (tag: Tag, input: NormalizedRenameInput): ReadonlyA
   return aliases;
 };
 
-const ensureRenameTerm = (
-  repo: TermRepository,
-  input: NormalizedRenameInput,
-  term: Term | undefined
-) =>
-  Effect.gen(function* () {
-    if (term?.status === "merged") {
-      return yield* new TermMigrationError({
-        operation: "rename",
-        message: `Cannot rename merged term '${term.canonicalName}'.`,
-      });
-    }
+const validateRenameTerm = (term: Term) =>
+  term.status === "merged"
+    ? Effect.fail(
+        new TermMigrationError({
+          operation: "rename",
+          message: `Cannot rename merged term '${term.canonicalName}'.`,
+        })
+      )
+    : Effect.void;
 
-    if (!term) {
-      return yield* repo.create({
-        id: input.termId ?? termIdFor(input.kind, input.normalizedToName),
-        canonicalName: input.toName,
-        kind: input.kind,
-      });
-    }
+const ensureRenameTerm = (repo: TermRepository, input: NormalizedRenameInput, term: Term) =>
+  Effect.gen(function* () {
+    yield* validateRenameTerm(term);
 
     if (term.canonicalName === input.toName && term.status === "active") {
       return term;
@@ -283,12 +231,85 @@ interface RenameRepositories {
   readonly terms: TransactionRepositories["terms"];
 }
 
+const validateDestinationTags = (
+  tags: ReadonlyArray<Tag>,
+  sourceTerm: Term,
+  input: NormalizedRenameInput
+) => {
+  const conflictingTags = tags.filter(
+    (tag) => tagMatchesName(tag, input.normalizedToName) && tag.termId !== sourceTerm.id
+  );
+  if (conflictingTags.length === 0) return Effect.void;
+
+  return Effect.fail(
+    new ValidationError({
+      field: "toName",
+      message: `Destination tags must be governed by the source term or merged before migration: ${conflictingTags.map(({ id }) => `#${id}`).join(", ")}.`,
+    })
+  );
+};
+
 const planRenameWith = (repositories: RenameRepositories, input: RenameTermInput) =>
   Effect.gen(function* () {
     const normalized = yield* validateRenameInput(input);
-    const term = yield* selectRenameTerm(repositories.terms, normalized);
+    const source = (yield* repositories.terms.findByName(normalized.fromName, normalized.kind))[0];
+    if (!source) {
+      return yield* new ValidationError({
+        field: "fromName",
+        message: `No governed ${normalized.kind} term matches '${normalized.fromName}'. Govern existing tags before migrating them.`,
+      });
+    }
+
+    yield* validateRenameTerm(source.term);
+
+    const destination = (yield* repositories.terms.findByName(
+      normalized.toName,
+      normalized.kind
+    ))[0];
+    if (destination && destination.term.id !== source.term.id) {
+      return yield* new ValidationError({
+        field: "toName",
+        message: `Cannot rename '${normalized.fromName}' to '${normalized.toName}' because the destination belongs to a different term. Merge the terms instead.`,
+      });
+    }
+
+    if (normalizeTermName(source.term.canonicalName) === normalized.normalizedToName) {
+      return yield* new ValidationError({
+        field: "toName",
+        message: `'${normalized.toName}' is already the canonical name for this term.`,
+      });
+    }
+
+    if (normalizeTermName(source.term.canonicalName) !== normalized.normalizedFromName) {
+      return yield* new ValidationError({
+        field: "fromName",
+        message: `'${normalized.fromName}' is not the canonical name for this term. Rename from '${source.term.canonicalName}' instead.`,
+      });
+    }
+
     const tags = yield* repositories.tags.getAll();
-    const affectedTags = tags.filter((tag) => tagMatchesName(tag, normalized.normalizedFromName));
+    yield* validateDestinationTags(tags, source.term, normalized);
+
+    const matchingTags = tags.filter((tag) => tagMatchesName(tag, normalized.normalizedFromName));
+    const ungovernedTags = matchingTags.filter((tag) => !tag.termId);
+    if (ungovernedTags.length > 0) {
+      return yield* new ValidationError({
+        field: "fromName",
+        message: `Matching tags must be governed before migration: ${ungovernedTags.map(({ id }) => `#${id}`).join(", ")}.`,
+      });
+    }
+
+    const conflictingTags = matchingTags.filter((tag) => tag.termId !== source.term.id);
+    if (conflictingTags.length > 0) {
+      return yield* new ValidationError({
+        field: "fromName",
+        message: `Matching tags belong to a different governed term: ${conflictingTags.map(({ id }) => `#${id}`).join(", ")}.`,
+      });
+    }
+
+    const term = source.term;
+    const affectedTags = tags.filter((tag) => tag.termId === term.id);
+
     const affectedEntities = yield* collectAffectedEntities(
       repositories.entities.getByTag,
       affectedTags
@@ -303,7 +324,6 @@ const planRenameWith = (repositories: RenameRepositories, input: RenameTermInput
       normalizedFromName: normalized.normalizedFromName,
       normalizedToName: normalized.normalizedToName,
       term,
-      willCreateTerm: !term,
       affectedTags,
       affectedEntities,
       affectedEntityIds,
@@ -365,7 +385,6 @@ export const MigrationServiceLive = Layer.effect(
           return {
             ...plan,
             term,
-            willCreateTerm: plan.willCreateTerm,
             updatedTags,
             journalEntry,
           };

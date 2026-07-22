@@ -12,6 +12,7 @@ import {
   historyCommand,
   initCommand,
   linkCommand,
+  migrateCommand,
   nextCommand,
   queryCommand,
   statusCommand,
@@ -41,6 +42,7 @@ const command = kioku.pipe(
     tagCommand,
     linkCommand,
     unlinkCommand,
+    migrateCommand,
     queryCommand,
     nextCommand,
   ])

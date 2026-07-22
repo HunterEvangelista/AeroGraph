@@ -66,6 +66,13 @@ export interface GraphService {
   ) => Effect.Effect<ReadonlyArray<Entity>, RepositoryError>;
 
   /**
+   * Find entities matching any tag within each group and every group.
+   */
+  readonly findByTagGroups: (
+    tagIdGroups: ReadonlyArray<ReadonlyArray<string>>
+  ) => Effect.Effect<ReadonlyArray<Entity>, RepositoryError>;
+
+  /**
    * Get graph statistics
    */
   readonly getStats: () => Effect.Effect<GraphStats, RepositoryError>;
