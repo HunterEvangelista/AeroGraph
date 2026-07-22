@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
+  check,
   index,
   integer,
   primaryKey,
@@ -7,6 +9,35 @@ import {
   text,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
+
+export const TERM_KIND_VALUES = [
+  "brand",
+  "project",
+  "feature",
+  "api",
+  "concept",
+  "package",
+  "other",
+] as const;
+
+export const TERM_STATUS_VALUES = ["active", "deprecated", "merged"] as const;
+
+export const TERM_NAME_KIND_VALUES = ["canonical", "alias", "deprecated"] as const;
+
+export const MIGRATION_OPERATION_VALUES = ["rename", "merge", "deprecate", "create"] as const;
+
+export const sqlStringList = (values: readonly string[]): string =>
+  values.map((value) => `'${value}'`).join(", ");
+
+export const TERM_NAME_NORMALIZED_CHECK =
+  "name = lower(name) AND name = trim(name) AND instr(name, ' ') = 0 AND instr(name, '_') = 0 AND instr(name, ',') = 0";
+export const TERM_CANONICAL_NAME_CHECK = "instr(canonical_name, ',') = 0";
+export const TERM_DISPLAY_NAME_CHECK = "instr(display_name, ',') = 0";
+
+const TERM_KIND_CHECK_VALUES = sqlStringList(TERM_KIND_VALUES);
+const TERM_STATUS_CHECK_VALUES = sqlStringList(TERM_STATUS_VALUES);
+const TERM_NAME_KIND_CHECK_VALUES = sqlStringList(TERM_NAME_KIND_VALUES);
+const MIGRATION_OPERATION_CHECK_VALUES = sqlStringList(MIGRATION_OPERATION_VALUES);
 
 /*
  * TODO: Currently there is a gap in sync between domain objects and db objects
@@ -31,6 +62,91 @@ export const entities = sqliteTable(
   (table) => [index("idx_entities_type").on(table.type)]
 );
 
+export const terms = sqliteTable(
+  "terms",
+  {
+    id: text("id").primaryKey(),
+    canonicalName: text("canonical_name").notNull(),
+    kind: text("kind", { enum: TERM_KIND_VALUES }).notNull(),
+    description: text("description"),
+    status: text("status", { enum: TERM_STATUS_VALUES }).notNull().default("active"),
+    mergedIntoId: text("merged_into_id").references((): AnySQLiteColumn => terms.id),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_terms_kind_canonical_name").on(table.kind, table.canonicalName),
+    index("idx_terms_status").on(table.status),
+    check("terms_kind_check", sql`${table.kind} in (${sql.raw(TERM_KIND_CHECK_VALUES)})`),
+    check("terms_status_check", sql`${table.status} in (${sql.raw(TERM_STATUS_CHECK_VALUES)})`),
+    check("terms_canonical_name_check", sql`instr(${table.canonicalName}, ',') = 0`),
+  ]
+);
+
+export const termNames = sqliteTable(
+  "term_names",
+  {
+    termId: text("term_id")
+      .notNull()
+      .references(() => terms.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: TERM_KIND_VALUES }).notNull(),
+    name: text("name").notNull(),
+    displayName: text("display_name").notNull(),
+    nameKind: text("name_kind", { enum: TERM_NAME_KIND_VALUES }).notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.termId, table.name] }),
+    uniqueIndex("idx_term_names_kind_name").on(table.kind, table.name),
+    uniqueIndex("idx_term_names_one_canonical")
+      .on(table.termId)
+      .where(sql`${table.nameKind} = 'canonical'`),
+    index("idx_term_names_name").on(table.name),
+    check("term_names_kind_check", sql`${table.kind} in (${sql.raw(TERM_KIND_CHECK_VALUES)})`),
+    check(
+      "term_names_name_normalized_check",
+      sql`${table.name} = lower(${table.name}) AND ${table.name} = trim(${table.name}) AND instr(${table.name}, ' ') = 0 AND instr(${table.name}, '_') = 0 AND instr(${table.name}, ',') = 0`
+    ),
+    check(
+      "term_names_name_kind_check",
+      sql`${table.nameKind} in (${sql.raw(TERM_NAME_KIND_CHECK_VALUES)})`
+    ),
+    check("term_names_display_name_check", sql`instr(${table.displayName}, ',') = 0`),
+  ]
+);
+
+export const migrationJournal = sqliteTable(
+  "migration_journal",
+  {
+    id: text("id").primaryKey(),
+    operation: text("operation", { enum: MIGRATION_OPERATION_VALUES }).notNull(),
+    kind: text("kind", { enum: TERM_KIND_VALUES }),
+    fromName: text("from_name").notNull(),
+    toName: text("to_name").notNull(),
+    termId: text("term_id")
+      .notNull()
+      .references(() => terms.id),
+    affectedEntityIds: text("affected_entity_ids").notNull(),
+    affectedCount: integer("affected_count").notNull(),
+    reason: text("reason"),
+    appliedAt: text("applied_at").notNull(),
+    appliedBy: text("applied_by"),
+    dryRun: integer("dry_run", { mode: "boolean" }).notNull().default(false),
+  },
+  (table) => [
+    index("idx_journal_term").on(table.termId),
+    index("idx_journal_applied_at").on(table.appliedAt),
+    check(
+      "migration_journal_operation_check",
+      sql`${table.operation} in (${sql.raw(MIGRATION_OPERATION_CHECK_VALUES)})`
+    ),
+    check(
+      "migration_journal_kind_check",
+      sql`${table.kind} is null OR ${table.kind} in (${sql.raw(TERM_KIND_CHECK_VALUES)})`
+    ),
+  ]
+);
+
 export const tags = sqliteTable(
   "tags",
   {
@@ -39,9 +155,10 @@ export const tags = sqliteTable(
     description: text("description"),
     parentId: text("parent_id").references((): AnySQLiteColumn => tags.id),
     aliases: text("aliases"),
+    termId: text("term_id"),
     createdAt: text("created_at").notNull(),
   },
-  (table) => [index("idx_tags_parent").on(table.parentId)]
+  (table) => [index("idx_tags_parent").on(table.parentId), index("idx_tags_term").on(table.termId)]
 );
 
 export const entityTags = sqliteTable(
@@ -145,7 +262,14 @@ export const schemaMeta = sqliteTable("schema_meta", {
   value: text("value").notNull(),
 });
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 4;
+
+export const CREATE_SCHEMA_META_SQL = `
+CREATE TABLE IF NOT EXISTS schema_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+`;
 
 export const CREATE_TABLES_SQL = `
 -- Entities table (stores current state)
@@ -160,6 +284,45 @@ CREATE TABLE IF NOT EXISTS entities (
   version INTEGER NOT NULL DEFAULT 1
 );
 
+-- Terms registry (governed canonical identity for tags)
+CREATE TABLE IF NOT EXISTS terms (
+  id TEXT PRIMARY KEY,
+  canonical_name TEXT NOT NULL CHECK(${TERM_CANONICAL_NAME_CHECK}),
+  kind TEXT NOT NULL CHECK(kind IN (${TERM_KIND_CHECK_VALUES})),
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN (${TERM_STATUS_CHECK_VALUES})),
+  merged_into_id TEXT REFERENCES terms(id),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+-- Term names (maps canonical, alias, and deprecated names to a term)
+CREATE TABLE IF NOT EXISTS term_names (
+  term_id TEXT NOT NULL REFERENCES terms(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK(kind IN (${TERM_KIND_CHECK_VALUES})),
+  name TEXT NOT NULL CHECK(${TERM_NAME_NORMALIZED_CHECK}),
+  display_name TEXT NOT NULL CHECK(${TERM_DISPLAY_NAME_CHECK}),
+  name_kind TEXT NOT NULL CHECK(name_kind IN (${TERM_NAME_KIND_CHECK_VALUES})),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (term_id, name)
+);
+
+-- Migration journal (audit log of rename/merge/deprecate operations)
+CREATE TABLE IF NOT EXISTS migration_journal (
+  id TEXT PRIMARY KEY,
+  operation TEXT NOT NULL CHECK(operation IN (${MIGRATION_OPERATION_CHECK_VALUES})),
+  kind TEXT CHECK(kind IN (${TERM_KIND_CHECK_VALUES})),
+  from_name TEXT NOT NULL,
+  to_name TEXT NOT NULL,
+  term_id TEXT NOT NULL REFERENCES terms(id),
+  affected_entity_ids TEXT NOT NULL,
+  affected_count INTEGER NOT NULL,
+  reason TEXT,
+  applied_at TEXT NOT NULL,
+  applied_by TEXT,
+  dry_run INTEGER NOT NULL DEFAULT 0
+);
+
 -- Tags table
 CREATE TABLE IF NOT EXISTS tags (
   id TEXT PRIMARY KEY,
@@ -167,6 +330,7 @@ CREATE TABLE IF NOT EXISTS tags (
   description TEXT,
   parent_id TEXT REFERENCES tags(id),
   aliases TEXT,
+  term_id TEXT,
   created_at TEXT NOT NULL
 );
 
@@ -219,10 +383,7 @@ CREATE TABLE IF NOT EXISTS next_commands (
 );
 
 -- Schema metadata table
-CREATE TABLE IF NOT EXISTS schema_meta (
-  key TEXT PRIMARY KEY,
-  value TEXT NOT NULL
-);
+${CREATE_SCHEMA_META_SQL}
 
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type);
@@ -234,6 +395,14 @@ CREATE INDEX IF NOT EXISTS idx_entity_id_prefixes_entity ON entity_id_prefixes(e
 CREATE INDEX IF NOT EXISTS idx_next_commands_entity ON next_commands(entity_id);
 CREATE INDEX IF NOT EXISTS idx_next_commands_command_type ON next_commands(command_type);
 CREATE INDEX IF NOT EXISTS idx_tags_parent ON tags(parent_id);
+CREATE INDEX IF NOT EXISTS idx_tags_term ON tags(term_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_terms_kind_canonical_name ON terms(kind, canonical_name);
+CREATE INDEX IF NOT EXISTS idx_terms_status ON terms(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_term_names_kind_name ON term_names(kind, name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_term_names_one_canonical ON term_names(term_id) WHERE name_kind = 'canonical';
+CREATE INDEX IF NOT EXISTS idx_term_names_name ON term_names(name);
+CREATE INDEX IF NOT EXISTS idx_journal_term ON migration_journal(term_id);
+CREATE INDEX IF NOT EXISTS idx_journal_applied_at ON migration_journal(applied_at);
 
 -- Full-text search for entities
 CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(

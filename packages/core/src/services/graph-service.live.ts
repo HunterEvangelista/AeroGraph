@@ -89,6 +89,29 @@ export const GraphServiceLive = Layer.effect(
 
     const findByTagPath = (tagIds: ReadonlyArray<string>) => entityRepo.getByTags(tagIds);
 
+    const findByTagGroups = (tagIdGroups: ReadonlyArray<ReadonlyArray<string>>) =>
+      Effect.gen(function* () {
+        if (tagIdGroups.length === 0 || tagIdGroups.some((group) => group.length === 0)) {
+          return [];
+        }
+
+        const matchesByGroup = yield* Effect.all(
+          tagIdGroups.map((group) =>
+            Effect.all([...new Set(group)].map((tagId) => entityRepo.getByTag(tagId))).pipe(
+              Effect.map(
+                (matches) => new Map(matches.flat().map((entity) => [entity.id, entity] as const))
+              )
+            )
+          )
+        );
+        const [first, ...rest] = matchesByGroup;
+        if (!first) return [];
+
+        return [...first.values()].filter((entity) =>
+          rest.every((matches) => matches.has(entity.id))
+        );
+      });
+
     const getStats = () =>
       Effect.gen(function* () {
         const [totalEntities, totalTags, totalLinks] = yield* Effect.all([
@@ -153,6 +176,7 @@ export const GraphServiceLive = Layer.effect(
       getRelatedEntities,
       traverse,
       findByTagPath,
+      findByTagGroups,
       getStats,
       findPath,
     } satisfies GraphService;

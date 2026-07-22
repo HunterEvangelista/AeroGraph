@@ -3,6 +3,7 @@ import { type Entity, EntityTypeEnum, type Link } from "@kioku/core";
 export interface ContextEntity {
   readonly entity: Entity;
   readonly tags: ReadonlyArray<string>;
+  readonly displayTags?: ReadonlyArray<string>;
 }
 
 export interface ContextMarkdownInput {
@@ -27,7 +28,7 @@ const codeLocation = (entity: Entity): string | undefined => {
 
 const escapeHeading = (value: string): string => value.replace(/#/g, "\\#");
 
-const entityBlock = ({ entity, tags }: ContextEntity): string => {
+const entityBlock = ({ entity, tags, displayTags }: ContextEntity): string => {
   const lines = [
     `### ${escapeHeading(entity.title)}`,
     "",
@@ -36,7 +37,10 @@ const entityBlock = ({ entity, tags }: ContextEntity): string => {
   ];
   const location = codeLocation(entity);
   if (location) lines.push(`- Location: ${location}`);
-  if (tags.length > 0) lines.push(`- Tags: ${tags.map((tag) => `#${tag}`).join(", ")}`);
+  const renderedTags = displayTags ?? tags;
+  if (renderedTags.length > 0) {
+    lines.push(`- Tags: ${renderedTags.map((tag) => `#${tag}`).join(", ")}`);
+  }
   lines.push("", entity.content || "(No content)", "");
   return lines.join("\n");
 };

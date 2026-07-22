@@ -155,7 +155,7 @@ export const queryCommand = Command.make(
   "query",
   {
     tags: Flag.string("tags").pipe(
-      Flag.withDescription("Comma-separated tags to intersect, matched exactly"),
+      Flag.withDescription("Comma-separated governed terms or literal tag IDs to intersect"),
       Flag.optional
     ),
     relatedTo: Flag.string("related-to").pipe(
@@ -219,6 +219,8 @@ export const queryCommand = Command.make(
           Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
           Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
+        AmbiguousTermNameError: (e) =>
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         EntityNotFoundError: (e) =>
           Console.error(`Error: Entity not found: ${e.entityId}`).pipe(
             Effect.andThen(Effect.fail(e))

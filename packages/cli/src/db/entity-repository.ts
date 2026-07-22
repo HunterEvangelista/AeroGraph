@@ -19,10 +19,9 @@ import {
 } from "@kioku/core";
 import { desc, count as drizzleCount, eq, inArray, sql } from "drizzle-orm";
 import { Effect, Layer } from "effect";
-import { DatabaseClientTag } from "./client";
 import { rebuildEntityIdPrefixes } from "./entity-prefix-index";
 import { entities, entityTags } from "./schema";
-import { withSqliteWriteRetry } from "./sqlite-retry";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
 // ============================================================================
 // Helper Functions
@@ -155,10 +154,10 @@ const mergeEntityMetadata = (existing: Entity, updates: Partial<Entity>): string
 // Repository Implementation
 // ============================================================================
 
-export const SqliteEntityRepositoryLive = Layer.effect(
+export const SqliteEntityRepositorySessionLive = Layer.effect(
   EntityRepositoryTag,
   Effect.gen(function* () {
-    const { db, drizzle } = yield* DatabaseClientTag;
+    const { db, drizzle, transaction, write } = yield* DatabaseSessionTag;
 
     const searchFts = db.prepare(`
       SELECT e.* FROM entities e
@@ -173,7 +172,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
         try: () => {
           const id = generateId();
           const timestamp = now();
-          withSqliteWriteRetry(() =>
+          write(() =>
             drizzle
               .insert(entities)
               .values({
@@ -189,7 +188,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
           );
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
-          rebuildEntityIdPrefixes(drizzle);
+          rebuildEntityIdPrefixes(drizzle, undefined, transaction);
           return rowToEntity(row) as Doc;
         },
         catch: (error) =>
@@ -212,7 +211,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             commitHash: input.commitHash,
             symbol: input.symbol,
           });
-          withSqliteWriteRetry(() =>
+          write(() =>
             drizzle
               .insert(entities)
               .values({
@@ -228,7 +227,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
           );
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
-          rebuildEntityIdPrefixes(drizzle);
+          rebuildEntityIdPrefixes(drizzle, undefined, transaction);
           return rowToEntity(row) as CodeRef;
         },
         catch: (error) =>
@@ -248,7 +247,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             priority: input.priority,
             parentId: input.parentId,
           });
-          withSqliteWriteRetry(() =>
+          write(() =>
             drizzle
               .insert(entities)
               .values({
@@ -264,7 +263,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
           );
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
-          rebuildEntityIdPrefixes(drizzle);
+          rebuildEntityIdPrefixes(drizzle, undefined, transaction);
           return rowToEntity(row) as Story;
         },
         catch: (error) =>
@@ -284,7 +283,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
             source: input.source,
             generatedFrom: input.generatedFrom,
           });
-          withSqliteWriteRetry(() =>
+          write(() =>
             drizzle
               .insert(entities)
               .values({
@@ -300,7 +299,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
           );
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
-          rebuildEntityIdPrefixes(drizzle);
+          rebuildEntityIdPrefixes(drizzle, undefined, transaction);
           return rowToEntity(row) as Diagram;
         },
         catch: (error) =>
@@ -419,7 +418,7 @@ export const SqliteEntityRepositoryLive = Layer.effect(
 
         yield* Effect.try({
           try: () =>
-            withSqliteWriteRetry(() =>
+            write(() =>
               drizzle
                 .update(entities)
                 .set({
@@ -449,8 +448,8 @@ export const SqliteEntityRepositoryLive = Layer.effect(
 
         yield* Effect.try({
           try: () => {
-            withSqliteWriteRetry(() => drizzle.delete(entities).where(eq(entities.id, id)).run());
-            rebuildEntityIdPrefixes(drizzle);
+            write(() => drizzle.delete(entities).where(eq(entities.id, id)).run());
+            rebuildEntityIdPrefixes(drizzle, undefined, transaction);
           },
           catch: (error) =>
             new RepositoryError({
@@ -511,4 +510,8 @@ export const SqliteEntityRepositoryLive = Layer.effect(
       search,
     } satisfies EntityRepository;
   })
+);
+
+export const SqliteEntityRepositoryLive = SqliteEntityRepositorySessionLive.pipe(
+  Layer.provide(RootDatabaseSessionLive)
 );

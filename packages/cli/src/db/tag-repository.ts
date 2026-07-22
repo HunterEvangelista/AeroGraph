@@ -7,6 +7,7 @@ import {
   TagNotFoundError,
   type TagRepository,
   TagRepositoryTag,
+  type TermId,
   type UpdateTagInput,
 } from "@kioku/core";
 import { and, count as drizzleCount, eq, like, or } from "drizzle-orm";
@@ -14,9 +15,8 @@ import { and, count as drizzleCount, eq, like, or } from "drizzle-orm";
  * SQLite Tag Repository Implementation
  */
 import { Effect, Layer } from "effect";
-import { DatabaseClientTag } from "./client.js";
 import { entities, entityTags, tags } from "./schema.js";
-import { withSqliteWriteRetry } from "./sqlite-retry.js";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session.js";
 
 // ============================================================================
 // Helper Functions
@@ -30,6 +30,7 @@ interface TagRow {
   description: string | null;
   parentId: string | null;
   aliases: string | null;
+  termId: string | null;
   createdAt: string;
 }
 
@@ -39,6 +40,7 @@ const rowToTag = (row: TagRow): Tag => ({
   description: row.description ?? undefined,
   parentId: row.parentId ?? undefined,
   aliases: row.aliases ? JSON.parse(row.aliases) : undefined,
+  termId: (row.termId ?? undefined) as TermId | undefined,
   createdAt: new Date(row.createdAt),
 });
 
@@ -46,17 +48,17 @@ const rowToTag = (row: TagRow): Tag => ({
 // Repository Implementation
 // ============================================================================
 
-export const SqliteTagRepositoryLive = Layer.effect(
+export const SqliteTagRepositorySessionLive = Layer.effect(
   TagRepositoryTag,
   Effect.gen(function* () {
-    const { drizzle } = yield* DatabaseClientTag;
+    const { drizzle, write } = yield* DatabaseSessionTag;
 
     const create = (input: CreateTagInput) =>
       Effect.try({
         try: () => {
           const timestamp = now();
           const aliases = input.aliases ? JSON.stringify(input.aliases) : null;
-          withSqliteWriteRetry(() =>
+          write(() =>
             drizzle
               .insert(tags)
               .values({
@@ -65,6 +67,7 @@ export const SqliteTagRepositoryLive = Layer.effect(
                 description: input.description ?? null,
                 parentId: input.parentId ?? null,
                 aliases,
+                termId: input.termId ?? null,
                 createdAt: timestamp,
               })
               .run()
@@ -161,7 +164,7 @@ export const SqliteTagRepositoryLive = Layer.effect(
                   ? JSON.stringify(existing.aliases)
                   : null;
 
-            withSqliteWriteRetry(() =>
+            write(() =>
               drizzle
                 .update(tags)
                 .set({
@@ -169,6 +172,10 @@ export const SqliteTagRepositoryLive = Layer.effect(
                   description: updates.description ?? existing.description ?? null,
                   parentId: updates.parentId ?? existing.parentId ?? null,
                   aliases: newAliases,
+                  termId:
+                    updates.termId !== undefined
+                      ? (updates.termId ?? null)
+                      : (existing.termId ?? null),
                 })
                 .where(eq(tags.id, id))
                 .run()
@@ -189,7 +196,7 @@ export const SqliteTagRepositoryLive = Layer.effect(
         yield* getById(id);
 
         yield* Effect.try({
-          try: () => withSqliteWriteRetry(() => drizzle.delete(tags).where(eq(tags.id, id)).run()),
+          try: () => write(() => drizzle.delete(tags).where(eq(tags.id, id)).run()),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to delete tag: ${error instanceof Error ? error.message : String(error)}`,
@@ -223,7 +230,7 @@ export const SqliteTagRepositoryLive = Layer.effect(
 
         yield* Effect.try({
           try: () =>
-            withSqliteWriteRetry(() =>
+            write(() =>
               drizzle.insert(entityTags).values({ entityId, tagId }).onConflictDoNothing().run()
             ),
           catch: (error) =>
@@ -258,7 +265,7 @@ export const SqliteTagRepositoryLive = Layer.effect(
 
         yield* Effect.try({
           try: () =>
-            withSqliteWriteRetry(() =>
+            write(() =>
               drizzle
                 .delete(entityTags)
                 .where(and(eq(entityTags.entityId, entityId), eq(entityTags.tagId, tagId)))
@@ -301,6 +308,7 @@ export const SqliteTagRepositoryLive = Layer.effect(
                 description: tags.description,
                 parentId: tags.parentId,
                 aliases: tags.aliases,
+                termId: tags.termId,
                 createdAt: tags.createdAt,
               })
               .from(tags)
@@ -368,4 +376,8 @@ export const SqliteTagRepositoryLive = Layer.effect(
       count,
     } satisfies TagRepository;
   })
+);
+
+export const SqliteTagRepositoryLive = SqliteTagRepositorySessionLive.pipe(
+  Layer.provide(RootDatabaseSessionLive)
 );

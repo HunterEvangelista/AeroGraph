@@ -5,7 +5,10 @@ import {
   GraphServiceTag,
   type Link,
   LinkRepositoryTag,
+  resolveTagSelectors,
+  type Tag,
   TagServiceTag,
+  TermServiceTag,
 } from "@kioku/core";
 import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
@@ -42,17 +45,80 @@ const validateDepth = (depth: number) => {
   );
 };
 
-const loadContextEntities = (entities: ReadonlyArray<Entity>) =>
+const canonicalTagName = (tag: Tag, canonicalNames: Map<string, string>) =>
+  Effect.gen(function* () {
+    if (!tag.termId) return tag.id;
+    const cached = canonicalNames.get(tag.termId);
+    if (cached) return cached;
+
+    const termService = yield* TermServiceTag;
+    const term = yield* termService.getById(tag.termId);
+    canonicalNames.set(tag.termId, term.canonicalName);
+    return term.canonicalName;
+  });
+
+const loadContextEntities = (entities: ReadonlyArray<Entity>, canonicalTerms: boolean) =>
   Effect.gen(function* () {
     const tagService = yield* TagServiceTag;
     const results: ContextEntity[] = [];
+    const canonicalNames = new Map<string, string>();
 
     for (const entity of entities) {
       const tags = yield* tagService.getTagsForEntity(entity.id);
-      results.push({ entity, tags: tags.map((tag) => tag.id) });
+      const tagIds = tags.map((tag) => tag.id);
+      if (!canonicalTerms) {
+        results.push({ entity, tags: tagIds });
+        continue;
+      }
+
+      const displayTags: string[] = [];
+      for (const tag of tags) {
+        const displayName = yield* canonicalTagName(tag, canonicalNames);
+        if (!displayTags.includes(displayName)) displayTags.push(displayName);
+      }
+      results.push({ entity, tags: tagIds, displayTags });
     }
 
     return results;
+  });
+
+const loadTagSelection = (tagValue: string, canonicalTerms: boolean) =>
+  Effect.gen(function* () {
+    const selectors = splitTags(tagValue);
+    if (selectors.length === 0) {
+      return yield* new InvalidContextQueryError({
+        message: "--tags must include at least one tag.",
+      });
+    }
+
+    const graphService = yield* GraphServiceTag;
+    const resolved = yield* resolveTagSelectors(selectors);
+    const titleSelectors = canonicalTerms
+      ? resolved.map((selector) => selector.canonicalName ?? selector.selector)
+      : selectors;
+    const entities = yield* graphService.findByTagGroups(
+      resolved.map((selector) => selector.tagIds)
+    );
+    return {
+      title: `Tags ${titleSelectors.map((tag) => `#${tag}`).join(", ")}`,
+      entities,
+    };
+  });
+
+const loadEntitySelection = (query: ReadonlyArray<string>, depth: number) =>
+  Effect.gen(function* () {
+    const entityService = yield* EntityServiceTag;
+    const graphService = yield* GraphServiceTag;
+    const resolvedId = yield* resolveEntityId(query[0] ?? "");
+    const root = yield* entityService.getById(
+      resolvedId as Parameters<typeof entityService.getById>[0]
+    );
+    const traversal =
+      depth > 0 ? yield* graphService.traverse(resolvedId, depth) : { entities: [] };
+    return {
+      title: root.title,
+      entities: uniqueEntities([root, ...traversal.entities]),
+    };
   });
 
 const printTaskStub = (task: string) =>
@@ -73,9 +139,13 @@ export const contextCommand = Command.make(
     tags: Flag.string("tags").pipe(Flag.optional),
     depth: Flag.integer("depth").pipe(Flag.withDefault(1)),
     output: Flag.string("output").pipe(Flag.optional),
+    canonicalTerms: Flag.boolean("canonical-terms").pipe(
+      Flag.withDescription("Display governed tags using canonical term names"),
+      Flag.withDefault(false)
+    ),
     query: Argument.string("query").pipe(Argument.variadic()),
   },
-  ({ tags, depth, output, query }) =>
+  ({ tags, depth, output, canonicalTerms, query }) =>
     Effect.gen(function* () {
       const tagValue = Option.getOrUndefined(tags);
       const outputValue = Option.getOrUndefined(output);
@@ -102,32 +172,10 @@ export const contextCommand = Command.make(
 
       const markdown = yield* withCliServices(
         Effect.gen(function* () {
-          const entityService = yield* EntityServiceTag;
-          const graphService = yield* GraphServiceTag;
           const linkRepository = yield* LinkRepositoryTag;
-
-          let title: string;
-          let entities: ReadonlyArray<Entity>;
-
-          if (tagValue) {
-            const tagIds = splitTags(tagValue);
-            if (tagIds.length === 0) {
-              return yield* new InvalidContextQueryError({
-                message: "--tags must include at least one tag.",
-              });
-            }
-            title = `Tags ${tagIds.map((tag) => `#${tag}`).join(", ")}`;
-            entities = yield* graphService.findByTagPath(tagIds);
-          } else {
-            const resolvedId = yield* resolveEntityId(query[0] ?? "");
-            const root = yield* entityService.getById(
-              resolvedId as Parameters<typeof entityService.getById>[0]
-            );
-            const traversal =
-              depth > 0 ? yield* graphService.traverse(resolvedId, depth) : { entities: [] };
-            title = root.title;
-            entities = uniqueEntities([root, ...traversal.entities]);
-          }
+          const { title, entities } = tagValue
+            ? yield* loadTagSelection(tagValue, canonicalTerms)
+            : yield* loadEntitySelection(query, depth);
 
           const entityIds = new Set(entities.map((entity) => entity.id));
           const links: Link[] = [];
@@ -137,7 +185,7 @@ export const contextCommand = Command.make(
 
           return formatContextMarkdown({
             title,
-            entities: yield* loadContextEntities(entities),
+            entities: yield* loadContextEntities(entities, canonicalTerms),
             links: collectLinks(links, entityIds),
           });
         })
@@ -173,6 +221,10 @@ export const contextCommand = Command.make(
           Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
           Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
+        AmbiguousTermNameError: (e) =>
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
+        TermNotFoundError: (e) =>
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
 ).pipe(Command.withDescription("Export agent-ready markdown context"));

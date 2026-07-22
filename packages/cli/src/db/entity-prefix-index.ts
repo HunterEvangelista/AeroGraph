@@ -13,6 +13,7 @@ export {
 import { calculateEntityIdPrefixes, DEFAULT_ENTITY_ID_PREFIX_SCOPE } from "./entity-prefix-format";
 import type * as schema from "./schema";
 import { entities, entityIdPrefixes } from "./schema";
+import type { DatabaseSession } from "./session.js";
 import { withSqliteWriteRetry } from "./sqlite-retry";
 
 export interface EntityPrefixMatch {
@@ -47,7 +48,8 @@ export class EntityPrefixIndexTag extends Context.Service<
 
 export const rebuildEntityIdPrefixes = (
   db: BunSQLiteDatabase<typeof schema>,
-  scope = DEFAULT_ENTITY_ID_PREFIX_SCOPE
+  scope = DEFAULT_ENTITY_ID_PREFIX_SCOPE,
+  runTransaction?: DatabaseSession["transaction"]
 ): void => {
   const rows = db.select({ id: entities.id }).from(entities).orderBy(entities.id).all();
   const prefixRows = calculateEntityIdPrefixes(
@@ -55,15 +57,16 @@ export const rebuildEntityIdPrefixes = (
     scope
   );
 
-  withSqliteWriteRetry(() => {
-    db.transaction((tx) => {
-      tx.delete(entityIdPrefixes).where(eq(entityIdPrefixes.scope, scope)).run();
-      if (prefixRows.length > 0) {
-        tx.insert(entityIdPrefixes)
-          .values([...prefixRows])
-          .run();
-      }
-    });
+  const transaction =
+    runTransaction ?? ((operation) => withSqliteWriteRetry(() => db.transaction(operation)));
+
+  transaction((tx) => {
+    tx.delete(entityIdPrefixes).where(eq(entityIdPrefixes.scope, scope)).run();
+    if (prefixRows.length > 0) {
+      tx.insert(entityIdPrefixes)
+        .values([...prefixRows])
+        .run();
+    }
   });
 };
 

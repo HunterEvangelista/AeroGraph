@@ -1,7 +1,26 @@
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type CliWorkspace, createCliWorkspace } from "../../__tests__/helpers/cli.js";
+
+const governTagFixture = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../__tests__/helpers/govern-tag-fixture.ts"
+);
+const updateTagFixture = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../__tests__/helpers/update-tag-fixture.ts"
+);
+
+const governTags = (workspace: CliWorkspace, ...args: ReadonlyArray<string>) => {
+  const result = spawnSync("bun", ["run", governTagFixture, workspace.rootPath, ...args], {
+    encoding: "utf8",
+    shell: false,
+  });
+  expect(result.status, `${result.stderr}\n${result.stdout}`).toBe(0);
+};
 
 describe("context command", () => {
   let workspace: CliWorkspace;
@@ -68,5 +87,42 @@ describe("context command", () => {
     expect(result.status).toBe(0);
     expect(result.stdout.match(/### Multi Role Memory/g)).toHaveLength(1);
     expect(result.stdout).toContain("## Relevant Decisions");
+  });
+
+  it("renders canonical terms without changing semantic section classification", () => {
+    const create = workspace.run(
+      "doc",
+      "create",
+      "--tags",
+      "auth,decision",
+      "--content",
+      "Keep this decision in its semantic section.",
+      "Governed Decision"
+    );
+    expect(create.status, `${create.stderr}\n${create.stdout}`).toBe(0);
+    governTags(workspace, "Architecture Choice", "concept", "term-concept-decision", "decision");
+
+    const result = workspace.run("context", "--tags", "auth", "--canonical-terms");
+
+    expect(result.status, `${result.stderr}\n${result.stdout}`).toBe(0);
+    expect(result.stdout).toContain("## Relevant Decisions");
+    expect(result.stdout).toContain("### Governed Decision");
+    expect(result.stdout).toContain("- Tags: #auth, #Architecture Choice");
+    expect(result.stdout).not.toContain("- Tags: #auth, #decision");
+  });
+
+  it("keeps ungoverned tag IDs round-trippable in canonical output", () => {
+    const update = spawnSync(
+      "bun",
+      ["run", updateTagFixture, workspace.rootPath, "auth", "Authentication Label"],
+      { encoding: "utf8", shell: false }
+    );
+    expect(update.status, `${update.stderr}\n${update.stdout}`).toBe(0);
+
+    const result = workspace.run("context", "--tags", "auth", "--canonical-terms");
+
+    expect(result.status, `${result.stderr}\n${result.stdout}`).toBe(0);
+    expect(result.stdout).toContain("- Tags: #auth, #middleware");
+    expect(result.stdout).not.toContain("#Authentication Label");
   });
 });

@@ -13,13 +13,22 @@ import type {
 import { DiagramTypeEnum, EntityTypeEnum, StoryStatusEnum } from "../domain/entity.js";
 import type { Link, LinkId, LinkType } from "../domain/link.js";
 import type { Tag, TagId } from "../domain/tag.js";
-import { EntityNotFoundError, RepositoryError, TagNotFoundError } from "../errors.js";
+import type { Term, TermId, TermName } from "../domain/term.js";
+import { normalizeTermName } from "../domain/term.js";
+import {
+  EntityNotFoundError,
+  RepositoryError,
+  TagNotFoundError,
+  ValidationError,
+} from "../errors.js";
 import type { EntityRepository } from "../repository/entity-repository.js";
 import { EntityRepositoryTag } from "../repository/entity-repository.js";
 import type { LinkRepository } from "../repository/link-repository.js";
 import { LinkRepositoryTag } from "../repository/link-repository.js";
 import type { TagRepository } from "../repository/tag-repository.js";
 import { TagRepositoryTag } from "../repository/tag-repository.js";
+import type { ResolvedTermName, TermRepository } from "../repository/term-repository.js";
+import { TermRepositoryTag } from "../repository/term-repository.js";
 import { GraphServiceTag } from "../services/graph-service.js";
 import { GraphServiceLive } from "../services/graph-service.live.js";
 import { TagServiceTag } from "../services/tag-service.js";
@@ -167,6 +176,22 @@ const createMockTagRepository = (config: MockTagRepositoryConfig = {}): TagRepos
     count: () => Effect.succeed(tags.size),
   };
 };
+
+const createMockTermRepository = (
+  matches: ReadonlyArray<ResolvedTermName> = []
+): TermRepository => ({
+  create: () => Effect.die(new Error("not implemented")),
+  getById: () => Effect.die(new Error("not implemented")),
+  getByCanonicalName: () => Effect.die(new Error("not implemented")),
+  findByName: (name) =>
+    Effect.succeed(matches.filter(({ termName }) => termName.name === normalizeTermName(name))),
+  list: () => Effect.succeed([]),
+  addName: () => Effect.die(new Error("not implemented")),
+  listNames: () => Effect.succeed([]),
+  updateName: () => Effect.die(new Error("not implemented")),
+  update: () => Effect.die(new Error("not implemented")),
+  renameCanonical: () => Effect.die(new Error("not implemented")),
+});
 
 interface MockEntityRepositoryConfig {
   entities?: Map<string, Entity>;
@@ -349,6 +374,7 @@ const createTestLayer = (config: {
   tagRepo?: TagRepository;
   entityRepo?: EntityRepository;
   linkRepo?: LinkRepository;
+  termRepo?: TermRepository;
 }) => {
   const tagRepoLayer = Layer.succeed(TagRepositoryTag, config.tagRepo ?? createMockTagRepository());
   const entityRepoLayer = Layer.succeed(
@@ -359,8 +385,12 @@ const createTestLayer = (config: {
     LinkRepositoryTag,
     config.linkRepo ?? createMockLinkRepository()
   );
+  const termRepoLayer = Layer.succeed(
+    TermRepositoryTag,
+    config.termRepo ?? createMockTermRepository()
+  );
 
-  const repoLayer = Layer.mergeAll(tagRepoLayer, entityRepoLayer, linkRepoLayer);
+  const repoLayer = Layer.mergeAll(tagRepoLayer, entityRepoLayer, linkRepoLayer, termRepoLayer);
 
   return Layer.provideMerge(Layer.merge(TagServiceLive, GraphServiceLive), repoLayer);
 };
@@ -371,6 +401,142 @@ const createTestLayer = (config: {
 
 describe("TagService", () => {
   describe("ensureHierarchy()", () => {
+    it("reuses a single stable tag when an attachment uses a governed term name", async () => {
+      const term: Term = {
+        id: "term-brand-aerograph" as TermId,
+        canonicalName: "AeroGraph",
+        kind: "brand",
+        status: "active",
+        createdAt: FIXED_DATE,
+        updatedAt: FIXED_DATE,
+      };
+      const termName: TermName = {
+        termId: term.id,
+        kind: term.kind,
+        name: "aerograph",
+        displayName: "AeroGraph",
+        nameKind: "canonical",
+        createdAt: FIXED_DATE,
+      };
+      const tags = new Map<string, Tag>([
+        [
+          "kioku",
+          {
+            id: "kioku" as TagId,
+            name: "AeroGraph",
+            termId: term.id,
+            createdAt: FIXED_DATE,
+          },
+        ],
+      ]);
+      const layer = createTestLayer({
+        tagRepo: createMockTagRepository({ tags }),
+        termRepo: createMockTermRepository([{ term, termName }]),
+      });
+
+      const result = await Effect.runPromise(
+        Effect.provide(
+          Effect.gen(function* () {
+            const tagService = yield* TagServiceTag;
+            return yield* tagService.ensureHierarchy("AeroGraph");
+          }),
+          layer
+        )
+      );
+
+      expect(result.id).toBe("kioku");
+      expect(tags.has("AeroGraph")).toBe(false);
+    });
+
+    it("resolves slash-bearing governed names before applying hierarchy semantics", async () => {
+      const term: Term = {
+        id: "term-feature-editor-indexer" as TermId,
+        canonicalName: "editor/indexer",
+        kind: "feature",
+        status: "active",
+        createdAt: FIXED_DATE,
+        updatedAt: FIXED_DATE,
+      };
+      const termName: TermName = {
+        termId: term.id,
+        kind: term.kind,
+        name: "editor/indexer",
+        displayName: "editor/indexer",
+        nameKind: "canonical",
+        createdAt: FIXED_DATE,
+      };
+      const tags = new Map<string, Tag>([
+        [
+          "editor-indexer",
+          {
+            id: "editor-indexer" as TagId,
+            name: "editor/indexer",
+            termId: term.id,
+            createdAt: FIXED_DATE,
+          },
+        ],
+      ]);
+      const layer = createTestLayer({
+        tagRepo: createMockTagRepository({ tags }),
+        termRepo: createMockTermRepository([{ term, termName }]),
+      });
+
+      const result = await Effect.runPromise(
+        Effect.provide(
+          Effect.gen(function* () {
+            const tagService = yield* TagServiceTag;
+            return yield* tagService.ensureHierarchy("editor/indexer");
+          }),
+          layer
+        )
+      );
+
+      expect(result.id).toBe("editor-indexer");
+      expect(tags.has("editor")).toBe(false);
+    });
+
+    it("rejects governed attachment names with multiple possible physical tags", async () => {
+      const term: Term = {
+        id: "term-concept-auth" as TermId,
+        canonicalName: "Authentication",
+        kind: "concept",
+        status: "active",
+        createdAt: FIXED_DATE,
+        updatedAt: FIXED_DATE,
+      };
+      const termName: TermName = {
+        termId: term.id,
+        kind: term.kind,
+        name: "authentication",
+        displayName: "Authentication",
+        nameKind: "canonical",
+        createdAt: FIXED_DATE,
+      };
+      const tags = new Map<string, Tag>([
+        ["auth", { id: "auth" as TagId, name: "Auth", termId: term.id, createdAt: FIXED_DATE }],
+        ["login", { id: "login" as TagId, name: "Login", termId: term.id, createdAt: FIXED_DATE }],
+      ]);
+      const layer = createTestLayer({
+        tagRepo: createMockTagRepository({ tags }),
+        termRepo: createMockTermRepository([{ term, termName }]),
+      });
+
+      const error = await Effect.runPromise(
+        Effect.flip(
+          Effect.provide(
+            Effect.gen(function* () {
+              const tagService = yield* TagServiceTag;
+              return yield* tagService.ensureHierarchy("Authentication");
+            }),
+            layer
+          )
+        )
+      );
+
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(error.message).toContain("multiple attachment tags");
+    });
+
     it("creates nested tags from a path with proper parent relationships", async () => {
       const tags = new Map<string, Tag>();
       const tagRepo = createMockTagRepository({ tags });
@@ -744,6 +910,35 @@ describe("GraphService", () => {
       expect(result).toHaveLength(1);
       // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
       expect(result[0]!.id).toBe("e2");
+    });
+  });
+
+  describe("findByTagGroups()", () => {
+    it("unions tags within groups and intersects separate groups", async () => {
+      const entities = new Map<string, Entity>();
+      entities.set("e1", createTestEntity("e1"));
+      entities.set("e2", createTestEntity("e2"));
+      entities.set("e3", createTestEntity("e3"));
+
+      const taggedEntities = new Map<string, Set<string>>();
+      taggedEntities.set("legacy-auth", new Set(["e1"]));
+      taggedEntities.set("current-auth", new Set(["e2", "e3"]));
+      taggedEntities.set("middleware", new Set(["e2"]));
+
+      const layer = createTestLayer({
+        entityRepo: createMockEntityRepository({ entities, taggedEntities }),
+      });
+      const program = Effect.gen(function* () {
+        const graphService = yield* GraphServiceTag;
+        return yield* graphService.findByTagGroups([
+          ["legacy-auth", "current-auth"],
+          ["middleware"],
+        ]);
+      });
+
+      const result = await Effect.runPromise(Effect.provide(program, layer));
+
+      expect(result.map(({ id }) => id)).toEqual(["e2"]);
     });
   });
 

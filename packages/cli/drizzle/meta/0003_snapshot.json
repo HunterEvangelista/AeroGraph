@@ -1,0 +1,949 @@
+{
+  "version": "6",
+  "dialect": "sqlite",
+  "id": "3e216e9b-4da7-4c6e-873f-dcd3310f1b2b",
+  "prevId": "3912d826-1440-47ea-88e4-b74bf6e1fd01",
+  "tables": {
+    "entities": {
+      "name": "entities",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "content": {
+          "name": "content",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        }
+      },
+      "indexes": {
+        "idx_entities_type": {
+          "name": "idx_entities_type",
+          "columns": [
+            "type"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "entity_id_prefixes": {
+      "name": "entity_id_prefixes",
+      "columns": {
+        "scope": {
+          "name": "scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "prefix": {
+          "name": "prefix",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "prefix_length": {
+          "name": "prefix_length",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_entity_id_prefixes_scope_prefix": {
+          "name": "idx_entity_id_prefixes_scope_prefix",
+          "columns": [
+            "scope",
+            "prefix"
+          ],
+          "isUnique": true
+        },
+        "idx_entity_id_prefixes_entity": {
+          "name": "idx_entity_id_prefixes_entity",
+          "columns": [
+            "entity_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "entity_id_prefixes_entity_id_entities_id_fk": {
+          "name": "entity_id_prefixes_entity_id_entities_id_fk",
+          "tableFrom": "entity_id_prefixes",
+          "tableTo": "entities",
+          "columnsFrom": [
+            "entity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "entity_id_prefixes_scope_entity_id_pk": {
+          "columns": [
+            "scope",
+            "entity_id"
+          ],
+          "name": "entity_id_prefixes_scope_entity_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "entity_tags": {
+      "name": "entity_tags",
+      "columns": {
+        "entity_id": {
+          "name": "entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tag_id": {
+          "name": "tag_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_entity_tags_tag": {
+          "name": "idx_entity_tags_tag",
+          "columns": [
+            "tag_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "entity_tags_entity_id_entities_id_fk": {
+          "name": "entity_tags_entity_id_entities_id_fk",
+          "tableFrom": "entity_tags",
+          "tableTo": "entities",
+          "columnsFrom": [
+            "entity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "entity_tags_tag_id_tags_id_fk": {
+          "name": "entity_tags_tag_id_tags_id_fk",
+          "tableFrom": "entity_tags",
+          "tableTo": "tags",
+          "columnsFrom": [
+            "tag_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "entity_tags_entity_id_tag_id_pk": {
+          "columns": [
+            "entity_id",
+            "tag_id"
+          ],
+          "name": "entity_tags_entity_id_tag_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "entity_versions": {
+      "name": "entity_versions",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "data": {
+          "name": "data",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "change_type": {
+          "name": "change_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "changed_fields": {
+          "name": "changed_fields",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "entity_versions_entity_id_version_unique": {
+          "name": "entity_versions_entity_id_version_unique",
+          "columns": [
+            "entity_id",
+            "version"
+          ],
+          "isUnique": true
+        },
+        "idx_entity_versions_entity": {
+          "name": "idx_entity_versions_entity",
+          "columns": [
+            "entity_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "links": {
+      "name": "links",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source_id": {
+          "name": "source_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "target_id": {
+          "name": "target_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_links_source": {
+          "name": "idx_links_source",
+          "columns": [
+            "source_id"
+          ],
+          "isUnique": false
+        },
+        "idx_links_target": {
+          "name": "idx_links_target",
+          "columns": [
+            "target_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "links_source_id_entities_id_fk": {
+          "name": "links_source_id_entities_id_fk",
+          "tableFrom": "links",
+          "tableTo": "entities",
+          "columnsFrom": [
+            "source_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "links_target_id_entities_id_fk": {
+          "name": "links_target_id_entities_id_fk",
+          "tableFrom": "links",
+          "tableTo": "entities",
+          "columnsFrom": [
+            "target_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "migration_journal": {
+      "name": "migration_journal",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "operation": {
+          "name": "operation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "from_name": {
+          "name": "from_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "to_name": {
+          "name": "to_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "term_id": {
+          "name": "term_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "affected_entity_ids": {
+          "name": "affected_entity_ids",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "affected_count": {
+          "name": "affected_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "applied_at": {
+          "name": "applied_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "applied_by": {
+          "name": "applied_by",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "dry_run": {
+          "name": "dry_run",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        }
+      },
+      "indexes": {
+        "idx_journal_term": {
+          "name": "idx_journal_term",
+          "columns": [
+            "term_id"
+          ],
+          "isUnique": false
+        },
+        "idx_journal_applied_at": {
+          "name": "idx_journal_applied_at",
+          "columns": [
+            "applied_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "migration_journal_term_id_terms_id_fk": {
+          "name": "migration_journal_term_id_terms_id_fk",
+          "tableFrom": "migration_journal",
+          "tableTo": "terms",
+          "columnsFrom": [
+            "term_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "migration_journal_operation_check": {
+          "name": "migration_journal_operation_check",
+          "value": "\"migration_journal\".\"operation\" in ('rename', 'merge', 'deprecate', 'create')"
+        },
+        "migration_journal_kind_check": {
+          "name": "migration_journal_kind_check",
+          "value": "\"migration_journal\".\"kind\" is null OR \"migration_journal\".\"kind\" in ('brand', 'project', 'feature', 'api', 'concept', 'package', 'other')"
+        }
+      }
+    },
+    "next_commands": {
+      "name": "next_commands",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "prefix": {
+          "name": "prefix",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "command_type": {
+          "name": "command_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_next_commands_entity": {
+          "name": "idx_next_commands_entity",
+          "columns": [
+            "entity_id"
+          ],
+          "isUnique": false
+        },
+        "idx_next_commands_command_type": {
+          "name": "idx_next_commands_command_type",
+          "columns": [
+            "command_type"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "next_commands_entity_id_entities_id_fk": {
+          "name": "next_commands_entity_id_entities_id_fk",
+          "tableFrom": "next_commands",
+          "tableTo": "entities",
+          "columnsFrom": [
+            "entity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "schema_meta": {
+      "name": "schema_meta",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "value": {
+          "name": "value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "tags": {
+      "name": "tags",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "aliases": {
+          "name": "aliases",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "term_id": {
+          "name": "term_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_tags_parent": {
+          "name": "idx_tags_parent",
+          "columns": [
+            "parent_id"
+          ],
+          "isUnique": false
+        },
+        "idx_tags_term": {
+          "name": "idx_tags_term",
+          "columns": [
+            "term_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "tags_parent_id_tags_id_fk": {
+          "name": "tags_parent_id_tags_id_fk",
+          "tableFrom": "tags",
+          "tableTo": "tags",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "term_names": {
+      "name": "term_names",
+      "columns": {
+        "term_id": {
+          "name": "term_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name_kind": {
+          "name": "name_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_term_names_kind_name": {
+          "name": "idx_term_names_kind_name",
+          "columns": [
+            "kind",
+            "name"
+          ],
+          "isUnique": true
+        },
+        "idx_term_names_one_canonical": {
+          "name": "idx_term_names_one_canonical",
+          "columns": [
+            "term_id"
+          ],
+          "isUnique": true,
+          "where": "\"term_names\".\"name_kind\" = 'canonical'"
+        },
+        "idx_term_names_name": {
+          "name": "idx_term_names_name",
+          "columns": [
+            "name"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "term_names_term_id_terms_id_fk": {
+          "name": "term_names_term_id_terms_id_fk",
+          "tableFrom": "term_names",
+          "tableTo": "terms",
+          "columnsFrom": [
+            "term_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "term_names_term_id_name_pk": {
+          "columns": [
+            "term_id",
+            "name"
+          ],
+          "name": "term_names_term_id_name_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "term_names_kind_check": {
+          "name": "term_names_kind_check",
+          "value": "\"term_names\".\"kind\" in ('brand', 'project', 'feature', 'api', 'concept', 'package', 'other')"
+        },
+        "term_names_name_normalized_check": {
+          "name": "term_names_name_normalized_check",
+          "value": "\"term_names\".\"name\" = lower(\"term_names\".\"name\") AND \"term_names\".\"name\" = trim(\"term_names\".\"name\") AND instr(\"term_names\".\"name\", ' ') = 0 AND instr(\"term_names\".\"name\", '_') = 0 AND instr(\"term_names\".\"name\", ',') = 0"
+        },
+        "term_names_name_kind_check": {
+          "name": "term_names_name_kind_check",
+          "value": "\"term_names\".\"name_kind\" in ('canonical', 'alias', 'deprecated')"
+        },
+        "term_names_display_name_check": {
+          "name": "term_names_display_name_check",
+          "value": "instr(\"term_names\".\"display_name\", ',') = 0"
+        }
+      }
+    },
+    "terms": {
+      "name": "terms",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "canonical_name": {
+          "name": "canonical_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'active'"
+        },
+        "merged_into_id": {
+          "name": "merged_into_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_terms_kind_canonical_name": {
+          "name": "idx_terms_kind_canonical_name",
+          "columns": [
+            "kind",
+            "canonical_name"
+          ],
+          "isUnique": true
+        },
+        "idx_terms_status": {
+          "name": "idx_terms_status",
+          "columns": [
+            "status"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "terms_merged_into_id_terms_id_fk": {
+          "name": "terms_merged_into_id_terms_id_fk",
+          "tableFrom": "terms",
+          "tableTo": "terms",
+          "columnsFrom": [
+            "merged_into_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "terms_kind_check": {
+          "name": "terms_kind_check",
+          "value": "\"terms\".\"kind\" in ('brand', 'project', 'feature', 'api', 'concept', 'package', 'other')"
+        },
+        "terms_status_check": {
+          "name": "terms_status_check",
+          "value": "\"terms\".\"status\" in ('active', 'deprecated', 'merged')"
+        },
+        "terms_canonical_name_check": {
+          "name": "terms_canonical_name_check",
+          "value": "instr(\"terms\".\"canonical_name\", ',') = 0"
+        }
+      }
+    }
+  },
+  "views": {},
+  "enums": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "indexes": {}
+  }
+}

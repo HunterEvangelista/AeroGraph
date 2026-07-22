@@ -9,8 +9,8 @@ import {
 } from "@kioku/core";
 import { asc, eq } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
-import { DatabaseClientTag } from "./client";
 import { entities, nextCommands } from "./schema";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
 // ============================================================================
 // Helpers
@@ -34,10 +34,10 @@ const decodeRow = (row: NextCommandRow): Effect.Effect<NextCommand, RepositoryEr
 // Repository Implementation
 // ============================================================================
 
-export const SqliteNextRepositoryLive = Layer.effect(
+export const SqliteNextRepositorySessionLive = Layer.effect(
   NextRepositoryTag,
   Effect.gen(function* () {
-    const { drizzle } = yield* DatabaseClientTag;
+    const { drizzle, transaction, write } = yield* DatabaseSessionTag;
 
     const verifyEntityExists = (entityId: string) =>
       Effect.gen(function* () {
@@ -66,16 +66,18 @@ export const SqliteNextRepositoryLive = Layer.effect(
 
         const row = yield* Effect.try({
           try: () =>
-            drizzle
-              .insert(nextCommands)
-              .values({
-                entityId: input.entityId,
-                prefix: input.prefix,
-                commandType: input.commandType,
-                createdAt: now(),
-              })
-              .returning()
-              .get(),
+            write(() =>
+              drizzle
+                .insert(nextCommands)
+                .values({
+                  entityId: input.entityId,
+                  prefix: input.prefix,
+                  commandType: input.commandType,
+                  createdAt: now(),
+                })
+                .returning()
+                .get()
+            ),
           catch: (error) =>
             new RepositoryError({
               message: `Failed to create next command: ${error instanceof Error ? error.message : String(error)}`,
@@ -114,23 +116,24 @@ export const SqliteNextRepositoryLive = Layer.effect(
 
     const clear = (entityId?: string) =>
       Effect.try({
-        try: () => {
-          const existing = entityId
-            ? drizzle
-                .select({ id: nextCommands.id })
-                .from(nextCommands)
-                .where(eq(nextCommands.entityId, entityId))
-                .all()
-            : drizzle.select({ id: nextCommands.id }).from(nextCommands).all();
+        try: () =>
+          write(() => {
+            const existing = entityId
+              ? drizzle
+                  .select({ id: nextCommands.id })
+                  .from(nextCommands)
+                  .where(eq(nextCommands.entityId, entityId))
+                  .all()
+              : drizzle.select({ id: nextCommands.id }).from(nextCommands).all();
 
-          if (entityId) {
-            drizzle.delete(nextCommands).where(eq(nextCommands.entityId, entityId)).run();
-          } else {
-            drizzle.delete(nextCommands).run();
-          }
+            if (entityId) {
+              drizzle.delete(nextCommands).where(eq(nextCommands.entityId, entityId)).run();
+            } else {
+              drizzle.delete(nextCommands).run();
+            }
 
-          return existing.length;
-        },
+            return existing.length;
+          }),
         catch: (error) =>
           new RepositoryError({
             message: `Failed to clear next commands: ${error instanceof Error ? error.message : String(error)}`,
@@ -151,7 +154,7 @@ export const SqliteNextRepositoryLive = Layer.effect(
 
         const rows = yield* Effect.try({
           try: () =>
-            drizzle.transaction((tx) => {
+            transaction((tx) => {
               tx.delete(nextCommands).run();
               const timestamp = now();
               return tx
@@ -184,4 +187,8 @@ export const SqliteNextRepositoryLive = Layer.effect(
       replaceAll,
     } satisfies NextRepository;
   })
+);
+
+export const SqliteNextRepositoryLive = SqliteNextRepositorySessionLive.pipe(
+  Layer.provide(RootDatabaseSessionLive)
 );

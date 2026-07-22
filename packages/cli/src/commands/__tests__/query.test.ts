@@ -1,5 +1,21 @@
+import { spawnSync } from "node:child_process";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type CliWorkspace, createCliWorkspace } from "../../__tests__/helpers/cli.js";
+
+const governTagFixture = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../__tests__/helpers/govern-tag-fixture.ts"
+);
+
+const governTags = (workspace: CliWorkspace, ...args: ReadonlyArray<string>) => {
+  const result = spawnSync("bun", ["run", governTagFixture, workspace.rootPath, ...args], {
+    encoding: "utf8",
+    shell: false,
+  });
+  expect(result.status, `${result.stderr}\n${result.stdout}`).toBe(0);
+};
 
 describe("query command", () => {
   let workspace: CliWorkspace;
@@ -20,6 +36,29 @@ describe("query command", () => {
     expect(result.stdout).toContain("doc-auth-overview  [doc] Auth Overview");
     expect(result.stdout).toContain("code-auth-middleware  [code_ref] Auth Middleware");
     expect(result.stdout).not.toContain("doc-auth-only  [doc] Auth Only Doc");
+  });
+
+  it("unions tags governed by one term while intersecting separate selectors", () => {
+    governTags(
+      workspace,
+      "Authentication",
+      "concept",
+      "term-concept-authentication",
+      "auth,middleware"
+    );
+
+    const governed = workspace.run("query", "--tags", "Authentication");
+    expect(governed.status, `${governed.stderr}\n${governed.stdout}`).toBe(0);
+    expect(governed.stdout).toContain("Auth Overview");
+    expect(governed.stdout).toContain("Auth Middleware");
+    expect(governed.stdout).toContain("Auth Only Doc");
+
+    const intersection = workspace.run("query", "--tags", "Authentication,middleware");
+    expect(intersection.status, `${intersection.stderr}\n${intersection.stdout}`).toBe(0);
+    expect(intersection.stdout).toContain("Tag intersection: #Authentication, #middleware (2)");
+    expect(intersection.stdout).toContain("Auth Overview");
+    expect(intersection.stdout).toContain("Auth Middleware");
+    expect(intersection.stdout).not.toContain("Auth Only Doc");
   });
 
   it("queries related entities with link direction labels", () => {

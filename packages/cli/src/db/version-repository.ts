@@ -14,9 +14,8 @@ import { and, desc, count as drizzleCount, eq, gte, lte } from "drizzle-orm";
  * SQLite Version Repository Implementation
  */
 import { Effect, Layer } from "effect";
-import { DatabaseClientTag } from "./client.js";
 import { entities, entityVersions } from "./schema.js";
-import { withSqliteWriteRetry } from "./sqlite-retry.js";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session.js";
 
 // ============================================================================
 // Helper Functions
@@ -50,10 +49,10 @@ const rowToVersion = (row: VersionRow): EntityVersion => ({
 // Repository Implementation
 // ============================================================================
 
-export const SqliteVersionRepositoryLive = Layer.effect(
+export const SqliteVersionRepositorySessionLive = Layer.effect(
   VersionRepositoryTag,
   Effect.gen(function* () {
-    const { drizzle } = yield* DatabaseClientTag;
+    const { drizzle, write } = yield* DatabaseSessionTag;
 
     const create = (
       entityId: string,
@@ -66,7 +65,7 @@ export const SqliteVersionRepositoryLive = Layer.effect(
         try: () => {
           const id = generateId();
           const timestamp = now();
-          withSqliteWriteRetry(() =>
+          write(() =>
             drizzle
               .insert(entityVersions)
               .values({
@@ -263,7 +262,7 @@ export const SqliteVersionRepositoryLive = Layer.effect(
             .where(eq(entityVersions.entityId, entityId))
             .all();
 
-          withSqliteWriteRetry(() =>
+          write(() =>
             drizzle.delete(entityVersions).where(eq(entityVersions.entityId, entityId)).run()
           );
           return existing.length;
@@ -286,4 +285,8 @@ export const SqliteVersionRepositoryLive = Layer.effect(
       deleteAllForEntity,
     } satisfies VersionRepository;
   })
+);
+
+export const SqliteVersionRepositoryLive = SqliteVersionRepositorySessionLive.pipe(
+  Layer.provide(RootDatabaseSessionLive)
 );
