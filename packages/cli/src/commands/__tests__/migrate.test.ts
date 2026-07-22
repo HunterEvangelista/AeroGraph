@@ -106,9 +106,22 @@ describe("migrate command", () => {
     expect(tag.stdout).toContain("Tag: #kioku");
     expect(tag.stdout).toContain("Name:    AeroGraph");
 
+    const postRenameCreate = workspace.run(
+      "doc",
+      "create",
+      "Post Rename Notes",
+      "--content",
+      "Created with the canonical term name.",
+      "--tags",
+      "AeroGraph"
+    );
+    expect(postRenameCreate.status, `${postRenameCreate.stderr}\n${postRenameCreate.stdout}`).toBe(
+      0
+    );
+
     const docsByOldTagId = workspace.run("doc", "list", "--tag", "kioku");
     expect(docsByOldTagId.status, `${docsByOldTagId.stderr}\n${docsByOldTagId.stdout}`).toBe(0);
-    expect(docsByOldTagId.stdout).toContain("Documents (1)");
+    expect(docsByOldTagId.stdout).toContain("Documents (2)");
     expect(docsByOldTagId.stdout).toContain("Rename Applied Notes");
 
     const oldNameQuery = workspace.run("query", "--tags", "kioku");
@@ -117,6 +130,7 @@ describe("migrate command", () => {
     expect(canonicalQuery.status, `${canonicalQuery.stderr}\n${canonicalQuery.stdout}`).toBe(0);
     expect(queryEntityIds(oldNameQuery.stdout)).toEqual(queryEntityIds(canonicalQuery.stdout));
     expect(oldNameQuery.stdout).toContain("Rename Applied Notes");
+    expect(oldNameQuery.stdout).toContain("Post Rename Notes");
 
     const oldNameContext = workspace.run("context", "--tags", "kioku");
     const canonicalContext = workspace.run("context", "--tags", "AeroGraph", "--canonical-terms");
@@ -155,7 +169,7 @@ describe("migrate command", () => {
     expect(journal).toMatchObject({
       id: journalId,
       termId: "term-brand-kioku",
-      fromName: "kioku",
+      fromName: "Kioku",
       toName: "AeroGraph",
     });
   });

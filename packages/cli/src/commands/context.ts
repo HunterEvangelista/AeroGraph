@@ -47,7 +47,7 @@ const validateDepth = (depth: number) => {
 
 const canonicalTagName = (tag: Tag, canonicalNames: Map<string, string>) =>
   Effect.gen(function* () {
-    if (!tag.termId) return tag.name;
+    if (!tag.termId) return tag.id;
     const cached = canonicalNames.get(tag.termId);
     if (cached) return cached;
 

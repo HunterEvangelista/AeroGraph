@@ -1,11 +1,12 @@
 # Provisional Tag Semantics
 
-Kioku tags are currently lightweight labels, not governed vocabulary entries. This document records the working semantics until Kioku has a managed tag library with descriptions, owners, aliases, and lifecycle rules.
+Kioku supports legacy exact-ID tags and tags associated with governed terms. Broader governance and lifecycle commands remain separate follow-up work.
 
 ## Current Behavior
 
-- Tags are exact string labels.
-- `kioku query --tags a,b` means entity results must have both tag `a` and tag `b`.
+- A selector matching a canonical, alias, or deprecated term name resolves to every tag governed by that stable term ID.
+- A selector that does not match a registered term retains exact tag-ID behavior.
+- One governed selector matches any tag in that term; `kioku query --tags a,b` intersects the two selector groups.
 - Tags do not imply hierarchy today.
 - A tag like `editor/indexer` is a single exact tag, not equivalent to `editor` plus `indexer`.
 - Tags should be lowercase kebab-case or simple lowercase nouns unless there is a strong reason otherwise.

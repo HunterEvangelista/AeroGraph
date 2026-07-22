@@ -13,29 +13,29 @@ import {
 } from "@kioku/core";
 import { type Cause, Effect, Exit, Layer } from "effect";
 import { type DatabaseClient, DatabaseClientTag } from "./client.js";
-import { SqliteEntityRepositoryLive } from "./entity-repository.js";
-import { SqliteLinkRepositoryLive } from "./link-repository.js";
-import { SqliteMigrationJournalRepositoryLive } from "./migration-journal-repository.js";
-import { SqliteNextRepositoryLive } from "./next-repository.js";
+import { SqliteEntityRepositorySessionLive } from "./entity-repository.js";
+import { SqliteLinkRepositorySessionLive } from "./link-repository.js";
+import { SqliteMigrationJournalRepositorySessionLive } from "./migration-journal-repository.js";
+import { SqliteNextRepositorySessionLive } from "./next-repository.js";
 import {
   type DatabaseSession,
   DatabaseSessionTag,
   makeTransactionDatabaseSession,
 } from "./session.js";
 import { withSqliteWriteRetry } from "./sqlite-retry.js";
-import { SqliteTagRepositoryLive } from "./tag-repository.js";
-import { SqliteTermRepositoryLive } from "./term-repository.js";
-import { SqliteVersionRepositoryLive } from "./version-repository.js";
+import { SqliteTagRepositorySessionLive } from "./tag-repository.js";
+import { SqliteTermRepositorySessionLive } from "./term-repository.js";
+import { SqliteVersionRepositorySessionLive } from "./version-repository.js";
 
 const transactionRepositoriesLive = (session: DatabaseSession) =>
   Layer.mergeAll(
-    SqliteEntityRepositoryLive,
-    SqliteLinkRepositoryLive,
-    SqliteMigrationJournalRepositoryLive,
-    SqliteNextRepositoryLive,
-    SqliteTagRepositoryLive,
-    SqliteTermRepositoryLive,
-    SqliteVersionRepositoryLive
+    SqliteEntityRepositorySessionLive,
+    SqliteLinkRepositorySessionLive,
+    SqliteMigrationJournalRepositorySessionLive,
+    SqliteNextRepositorySessionLive,
+    SqliteTagRepositorySessionLive,
+    SqliteTermRepositorySessionLive,
+    SqliteVersionRepositorySessionLive
   ).pipe(Layer.provide(Layer.succeed(DatabaseSessionTag, session)));
 
 const repositoryError = (action: string, error: unknown) =>

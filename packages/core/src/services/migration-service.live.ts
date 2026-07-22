@@ -4,19 +4,8 @@
 import { Effect, Layer } from "effect";
 import type { Entity } from "../domain/entity.js";
 import type { Tag } from "../domain/tag.js";
-import {
-  type CreateTermNameInput,
-  type JournalEntryId,
-  normalizeTermName,
-  type Term,
-  type TermName,
-} from "../domain/term.js";
-import {
-  type RepositoryError,
-  TermAlreadyExistsError,
-  TermMigrationError,
-  ValidationError,
-} from "../errors.js";
+import { type JournalEntryId, normalizeTermName, type Term } from "../domain/term.js";
+import { type RepositoryError, TermMigrationError, ValidationError } from "../errors.js";
 import { EntityRepositoryTag } from "../repository/entity-repository.js";
 import { MigrationJournalRepositoryTag } from "../repository/migration-journal-repository.js";
 import type { TagRepository } from "../repository/tag-repository.js";
@@ -59,10 +48,17 @@ const validateRenameInput = (input: RenameTermInput) =>
       });
     }
 
+    if (fromName.includes(",") || toName.includes(",")) {
+      return yield* new ValidationError({
+        field: fromName.includes(",") ? "fromName" : "toName",
+        message: "Term names cannot contain commas because commas separate CLI selectors.",
+      });
+    }
+
     const normalizedFromName = normalizeTermName(fromName);
     const normalizedToName = normalizeTermName(toName);
 
-    if (normalizedFromName === normalizedToName) {
+    if (fromName === toName) {
       return yield* new ValidationError({
         field: "toName",
         message: "Migration source and destination names must be different.",
@@ -114,36 +110,6 @@ const notesForPlan = (
   return notes;
 };
 
-const sameRegisteredName = (left: TermName, right: CreateTermNameInput): boolean =>
-  left.displayName === right.displayName && left.nameKind === right.nameKind;
-
-const ensureTermName = (repo: TermRepository, input: CreateTermNameInput) =>
-  Effect.gen(function* () {
-    const matches = yield* repo.findByName(input.name, input.kind);
-    const conflict = matches.find(({ term }) => term.id !== input.termId);
-
-    if (conflict) {
-      return yield* new TermAlreadyExistsError({
-        name: input.name,
-        message: `Term name '${input.name}' already belongs to '${conflict.term.canonicalName}'.`,
-      });
-    }
-
-    const existing = matches.find(({ term }) => term.id === input.termId)?.termName;
-    if (existing) {
-      if (sameRegisteredName(existing, input)) {
-        return existing;
-      }
-
-      return yield* repo.updateName(input.termId, input.name, {
-        displayName: input.displayName,
-        nameKind: input.nameKind,
-      });
-    }
-
-    return yield* repo.addName(input);
-  });
-
 const aliasesForRenamedTag = (tag: Tag, input: NormalizedRenameInput): ReadonlyArray<string> => {
   const aliases: string[] = [];
   const seen = new Set<string>();
@@ -176,33 +142,11 @@ const ensureRenameTerm = (repo: TermRepository, input: NormalizedRenameInput, te
   Effect.gen(function* () {
     yield* validateRenameTerm(term);
 
-    if (term.canonicalName === input.toName && term.status === "active") {
+    if (term.canonicalName === input.toName) {
       return term;
     }
 
-    return yield* repo.update(term.id, {
-      canonicalName: input.toName,
-      status: "active",
-    });
-  });
-
-const ensureRenameNames = (repo: TermRepository, input: NormalizedRenameInput, term: Term) =>
-  Effect.gen(function* () {
-    yield* ensureTermName(repo, {
-      termId: term.id,
-      kind: input.kind,
-      name: input.toName,
-      displayName: input.toName,
-      nameKind: "canonical",
-    });
-
-    yield* ensureTermName(repo, {
-      termId: term.id,
-      kind: input.kind,
-      name: input.fromName,
-      displayName: input.fromName,
-      nameKind: "deprecated",
-    });
+    return yield* repo.renameCanonical(term.id, input.toName);
   });
 
 const updateAffectedTags = (
@@ -262,18 +206,17 @@ const planRenameWith = (repositories: RenameRepositories, input: RenameTermInput
 
     yield* validateRenameTerm(source.term);
 
-    const destination = (yield* repositories.terms.findByName(
-      normalized.toName,
-      normalized.kind
-    ))[0];
-    if (destination && destination.term.id !== source.term.id) {
+    const destinationConflict = (yield* repositories.terms.findByName(normalized.toName)).find(
+      ({ term }) => term.id !== source.term.id
+    );
+    if (destinationConflict) {
       return yield* new ValidationError({
         field: "toName",
-        message: `Cannot rename '${normalized.fromName}' to '${normalized.toName}' because the destination belongs to a different term. Merge the terms instead.`,
+        message: `Cannot rename '${normalized.fromName}' to '${normalized.toName}' because the destination belongs to a different ${destinationConflict.term.kind} term. Merge the terms instead.`,
       });
     }
 
-    if (normalizeTermName(source.term.canonicalName) === normalized.normalizedToName) {
+    if (source.term.canonicalName === normalized.toName) {
       return yield* new ValidationError({
         field: "toName",
         message: `'${normalized.toName}' is already the canonical name for this term.`,
@@ -319,7 +262,7 @@ const planRenameWith = (repositories: RenameRepositories, input: RenameTermInput
     return {
       operation: "rename",
       kind: normalized.kind,
-      fromName: normalized.fromName,
+      fromName: source.term.canonicalName,
       toName: normalized.toName,
       normalizedFromName: normalized.normalizedFromName,
       normalizedToName: normalized.normalizedToName,
@@ -356,15 +299,15 @@ export const MigrationServiceLive = Layer.effect(
           const normalized = yield* validateRenameInput(input);
           const transactionRenameRepositories: RenameRepositories = transactionRepositories;
           const plan = yield* planRenameWith(transactionRenameRepositories, normalized);
+          const appliedInput = { ...normalized, fromName: plan.fromName };
           const term = yield* ensureRenameTerm(
             transactionRepositories.terms,
-            normalized,
+            appliedInput,
             plan.term
           );
-          yield* ensureRenameNames(transactionRepositories.terms, normalized, term);
           const updatedTags = yield* updateAffectedTags(
             transactionRepositories.tags,
-            normalized,
+            appliedInput,
             term,
             plan.affectedTags
           );
@@ -373,7 +316,7 @@ export const MigrationServiceLive = Layer.effect(
             id: normalized.journalEntryId ?? journalEntryIdFor(normalized),
             operation: "rename",
             kind: normalized.kind,
-            fromName: normalized.fromName,
+            fromName: plan.fromName,
             toName: normalized.toName,
             termId: term.id,
             affectedEntityIds: plan.affectedEntityIds,

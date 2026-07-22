@@ -31,6 +31,10 @@ export const normalizeTermName = (name: string): string =>
     .toLowerCase()
     .replace(/[\s_]+/g, "-");
 
+const TermNameText = Schema.String.check(Schema.isNonEmpty(), Schema.isPattern(/^[^,]+$/));
+
+const MutableTermNameKind = Schema.Literals(["alias", "deprecated"]);
+
 // ============================================================================
 // Term Kind
 // ============================================================================
@@ -67,7 +71,7 @@ export const TermIdSchema = Schema.String.pipe(Schema.brand("TermId"));
 
 export const Term = Schema.Struct({
   id: TermIdSchema,
-  canonicalName: Schema.String.check(Schema.isNonEmpty()),
+  canonicalName: TermNameText,
   kind: TermKind,
   description: Schema.optional(Schema.String),
   status: TermStatus,
@@ -86,8 +90,8 @@ export type TermId = (typeof Term.Type)["id"];
 export const TermName = Schema.Struct({
   termId: TermIdSchema,
   kind: TermKind,
-  name: Schema.String.check(Schema.isNonEmpty()),
-  displayName: Schema.String.check(Schema.isNonEmpty()),
+  name: TermNameText,
+  displayName: TermNameText,
   nameKind: TermNameKind,
   createdAt: Schema.DateFromString,
 });
@@ -124,10 +128,10 @@ export type JournalEntryId = (typeof MigrationJournalEntry.Type)["id"];
 
 export const CreateTermInput = Schema.Struct({
   id: Schema.String.check(Schema.isNonEmpty()),
-  canonicalName: Schema.String.check(Schema.isNonEmpty()),
+  canonicalName: TermNameText,
   kind: TermKind,
   description: Schema.optional(Schema.String),
-  aliases: Schema.optional(Schema.Array(Schema.String.check(Schema.isNonEmpty()))),
+  aliases: Schema.optional(Schema.Array(TermNameText)),
 });
 
 export type CreateTermInput = typeof CreateTermInput.Type;
@@ -137,7 +141,6 @@ export type CreateTermInput = typeof CreateTermInput.Type;
 // ============================================================================
 
 export const UpdateTermInput = Schema.Struct({
-  canonicalName: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   description: Schema.optional(Schema.String),
   status: Schema.optional(TermStatus),
   mergedIntoId: Schema.optional(TermIdSchema),
@@ -152,9 +155,9 @@ export type UpdateTermInput = typeof UpdateTermInput.Type;
 export const CreateTermNameInput = Schema.Struct({
   termId: TermIdSchema,
   kind: TermKind,
-  name: Schema.String.check(Schema.isNonEmpty()),
-  displayName: Schema.String.check(Schema.isNonEmpty()),
-  nameKind: TermNameKind,
+  name: TermNameText,
+  displayName: TermNameText,
+  nameKind: MutableTermNameKind,
 });
 
 export type CreateTermNameInput = typeof CreateTermNameInput.Type;
@@ -164,8 +167,8 @@ export type CreateTermNameInput = typeof CreateTermNameInput.Type;
 // ============================================================================
 
 export const UpdateTermNameInput = Schema.Struct({
-  displayName: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
-  nameKind: Schema.optional(TermNameKind),
+  displayName: Schema.optional(TermNameText),
+  nameKind: Schema.optional(MutableTermNameKind),
 });
 
 export type UpdateTermNameInput = typeof UpdateTermNameInput.Type;

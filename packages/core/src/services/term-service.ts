@@ -45,7 +45,10 @@ export interface TermService {
 
   readonly addName: (
     input: CreateTermNameInput
-  ) => Effect.Effect<TermName, TermNotFoundError | ValidationError | RepositoryError>;
+  ) => Effect.Effect<
+    TermName,
+    TermAlreadyExistsError | TermNotFoundError | ValidationError | RepositoryError
+  >;
 
   readonly ensureName: (
     input: CreateTermNameInput

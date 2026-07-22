@@ -5,6 +5,7 @@ import {
   RepositoryError,
   type ResolvedTermName,
   type Term,
+  TermAlreadyExistsError,
   type TermId,
   type TermKind,
   type TermName,
@@ -18,7 +19,7 @@ import {
 import { and, eq } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { termNames, terms } from "./schema.js";
-import { DatabaseSessionTag } from "./session.js";
+import { type DatabaseExecutor, DatabaseSessionTag, RootDatabaseSessionLive } from "./session.js";
 
 const now = (): string => new Date().toISOString();
 
@@ -26,6 +27,107 @@ type TermRow = typeof terms.$inferSelect;
 type TermNameRow = typeof termNames.$inferSelect;
 
 const termNameKindOrder = { canonical: 0, alias: 1, deprecated: 2 } as const;
+
+const validateTermName = (value: string, field: string) => {
+  const normalized = normalizeTermName(value);
+  if (!normalized) {
+    return Effect.fail(new ValidationError({ field, message: "Term names must not be empty." }));
+  }
+  if (value.includes(",")) {
+    return Effect.fail(
+      new ValidationError({
+        field,
+        message: "Term names cannot contain commas because commas separate CLI selectors.",
+      })
+    );
+  }
+  return Effect.succeed(normalized);
+};
+
+const isUniqueConstraintError = (error: unknown): boolean => {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { readonly code?: unknown }).code)
+      : "";
+  const message = error instanceof Error ? error.message : String(error);
+  return `${code} ${message}`.toLowerCase().includes("unique constraint");
+};
+
+const writeError = (action: string, name: string, error: unknown) =>
+  isUniqueConstraintError(error)
+    ? new TermAlreadyExistsError({
+        name,
+        message: `Term name '${name}' already exists within this term kind.`,
+      })
+    : new RepositoryError({
+        message: `Failed to ${action}: ${error instanceof Error ? error.message : String(error)}`,
+        cause: error,
+      });
+
+const validateNameUpdate = (existing: TermNameRow, updates: UpdateTermNameInput) => {
+  const requestedNameKind = updates.nameKind as string | undefined;
+  const changesCanonicalState =
+    (existing.nameKind === "canonical" &&
+      (updates.displayName !== undefined || updates.nameKind !== undefined)) ||
+    (existing.nameKind !== "canonical" && requestedNameKind === "canonical");
+  if (changesCanonicalState) {
+    return Effect.fail(
+      new ValidationError({
+        field: "nameKind",
+        message: "Canonical names must be changed through renameCanonical.",
+      })
+    );
+  }
+  return updates.displayName === undefined
+    ? Effect.void
+    : validateTermName(updates.displayName, "displayName").pipe(Effect.asVoid);
+};
+
+const writeCanonicalName = (
+  executor: DatabaseExecutor,
+  id: TermId,
+  canonicalName: string,
+  normalizedName: string,
+  kind: TermKind,
+  timestamp: string,
+  currentCanonical: TermNameRow,
+  destination: TermNameRow | undefined
+) => {
+  if (currentCanonical.name === normalizedName) {
+    executor
+      .update(termNames)
+      .set({ displayName: canonicalName })
+      .where(and(eq(termNames.termId, id), eq(termNames.name, currentCanonical.name)))
+      .run();
+    return;
+  }
+
+  executor
+    .update(termNames)
+    .set({ nameKind: "deprecated" })
+    .where(and(eq(termNames.termId, id), eq(termNames.name, currentCanonical.name)))
+    .run();
+  if (destination) {
+    executor
+      .update(termNames)
+      .set({ displayName: canonicalName, nameKind: "canonical" })
+      .where(and(eq(termNames.termId, id), eq(termNames.name, normalizedName)))
+      .run();
+    return;
+  }
+
+  executor
+    .insert(termNames)
+    .values({
+      termId: id,
+      kind,
+      name: normalizedName,
+      displayName: canonicalName,
+      nameKind: "canonical",
+      createdAt: timestamp,
+    })
+    .run();
+};
 
 const rowToTerm = (row: TermRow): Term => ({
   id: row.id as TermId,
@@ -73,7 +175,7 @@ const toUniqueNames = (canonicalName: string, aliases: ReadonlyArray<string> | u
   return names;
 };
 
-export const SqliteTermRepositoryLive = Layer.effect(
+export const SqliteTermRepositorySessionLive = Layer.effect(
   TermRepositoryTag,
   Effect.gen(function* () {
     const { drizzle, transaction, write } = yield* DatabaseSessionTag;
@@ -97,49 +199,52 @@ export const SqliteTermRepositoryLive = Layer.effect(
       });
 
     const create = (input: CreateTermInput) =>
-      Effect.try({
-        try: () => {
-          const timestamp = now();
-          transaction((tx) => {
-            tx.insert(terms)
-              .values({
-                id: input.id,
-                canonicalName: input.canonicalName,
-                kind: input.kind,
-                description: input.description ?? null,
-                status: "active",
-                mergedIntoId: null,
-                createdAt: timestamp,
-                updatedAt: timestamp,
-              })
-              .run();
+      Effect.gen(function* () {
+        yield* validateTermName(input.canonicalName, "canonicalName");
+        for (const alias of input.aliases ?? []) {
+          yield* validateTermName(alias, "aliases");
+        }
 
-            const names = toUniqueNames(input.canonicalName, input.aliases);
-            if (names.length > 0) {
-              tx.insert(termNames)
-                .values(
-                  names.map((name) => ({
-                    termId: input.id,
-                    kind: input.kind,
-                    name: name.name,
-                    displayName: name.displayName,
-                    nameKind: name.nameKind,
-                    createdAt: timestamp,
-                  }))
-                )
+        return yield* Effect.try({
+          try: () => {
+            const timestamp = now();
+            transaction((tx) => {
+              tx.insert(terms)
+                .values({
+                  id: input.id,
+                  canonicalName: input.canonicalName,
+                  kind: input.kind,
+                  description: input.description ?? null,
+                  status: "active",
+                  mergedIntoId: null,
+                  createdAt: timestamp,
+                  updatedAt: timestamp,
+                })
                 .run();
-            }
-          });
 
-          const row = drizzle.select().from(terms).where(eq(terms.id, input.id)).get();
-          if (!row) throw new Error(`Inserted term not found: ${input.id}`);
-          return rowToTerm(row);
-        },
-        catch: (error) =>
-          new RepositoryError({
-            message: `Failed to create term: ${error instanceof Error ? error.message : String(error)}`,
-            cause: error,
-          }),
+              const names = toUniqueNames(input.canonicalName, input.aliases);
+              if (names.length > 0) {
+                tx.insert(termNames)
+                  .values(
+                    names.map((name) => ({
+                      termId: input.id,
+                      kind: input.kind,
+                      name: name.name,
+                      displayName: name.displayName,
+                      nameKind: name.nameKind,
+                      createdAt: timestamp,
+                    }))
+                  )
+                  .run();
+              }
+            });
+
+            const row = drizzle.select().from(terms).where(eq(terms.id, input.id)).get();
+            if (!row) throw new Error(`Inserted term not found: ${input.id}`);
+            return rowToTerm(row);
+          },
+          catch: (error) => writeError("create term", input.canonicalName, error),
+        });
       });
 
     const getByCanonicalName = (kind: TermKind, canonicalName: string) =>
@@ -249,11 +354,18 @@ export const SqliteTermRepositoryLive = Layer.effect(
             message: `Term name kind '${input.kind}' does not match term kind '${term.kind}'`,
           });
         }
+        if ((input.nameKind as string) === "canonical") {
+          return yield* new ValidationError({
+            field: "nameKind",
+            message: "Canonical names must be changed through renameCanonical.",
+          });
+        }
+        const normalizedName = yield* validateTermName(input.name, "name");
+        yield* validateTermName(input.displayName, "displayName");
 
         return yield* Effect.try({
           try: () => {
             const timestamp = now();
-            const normalizedName = normalizeTermName(input.name);
             write(() =>
               drizzle
                 .insert(termNames)
@@ -276,11 +388,7 @@ export const SqliteTermRepositoryLive = Layer.effect(
             if (!row) throw new Error(`Inserted term name not found: ${normalizedName}`);
             return rowToTermName(row);
           },
-          catch: (error) =>
-            new RepositoryError({
-              message: `Failed to add term name: ${error instanceof Error ? error.message : String(error)}`,
-              cause: error,
-            }),
+          catch: (error) => writeError("add term name", input.displayName, error),
         });
       });
 
@@ -333,6 +441,7 @@ export const SqliteTermRepositoryLive = Layer.effect(
         if (!existing) {
           return yield* new TermNotFoundError({ name: normalizedName });
         }
+        yield* validateNameUpdate(existing, updates);
 
         yield* Effect.try({
           try: () =>
@@ -377,6 +486,17 @@ export const SqliteTermRepositoryLive = Layer.effect(
     const update = (id: TermId, updates: UpdateTermInput) =>
       Effect.gen(function* () {
         const existing = yield* getById(id);
+        const requestedCanonicalName = (updates as { readonly canonicalName?: string })
+          .canonicalName;
+        if (
+          requestedCanonicalName !== undefined &&
+          requestedCanonicalName !== existing.canonicalName
+        ) {
+          return yield* new ValidationError({
+            field: "canonicalName",
+            message: "Canonical names must be changed through renameCanonical.",
+          });
+        }
 
         yield* Effect.try({
           try: () =>
@@ -384,7 +504,7 @@ export const SqliteTermRepositoryLive = Layer.effect(
               drizzle
                 .update(terms)
                 .set({
-                  canonicalName: updates.canonicalName ?? existing.canonicalName,
+                  canonicalName: existing.canonicalName,
                   description: updates.description ?? existing.description ?? null,
                   status: updates.status ?? existing.status,
                   mergedIntoId: updates.mergedIntoId ?? existing.mergedIntoId ?? null,
@@ -403,6 +523,54 @@ export const SqliteTermRepositoryLive = Layer.effect(
         return yield* getById(id);
       });
 
+    const renameCanonical = (id: TermId, canonicalName: string) =>
+      Effect.gen(function* () {
+        const existing = yield* getById(id);
+        const normalizedName = yield* validateTermName(canonicalName, "canonicalName");
+        const conflict = (yield* findByName(canonicalName, existing.kind)).find(
+          ({ term }) => term.id !== id
+        );
+        if (conflict) {
+          return yield* new TermAlreadyExistsError({
+            name: canonicalName,
+            message: `Term name '${canonicalName}' already belongs to '${conflict.term.canonicalName}'.`,
+          });
+        }
+
+        yield* Effect.try({
+          try: () => {
+            const timestamp = now();
+            transaction((tx) => {
+              const names = tx.select().from(termNames).where(eq(termNames.termId, id)).all();
+              const currentCanonical = names.find(({ nameKind }) => nameKind === "canonical");
+              if (!currentCanonical) {
+                throw new Error(`Canonical term name not found for ${id}`);
+              }
+
+              const destination = names.find(({ name }) => name === normalizedName);
+              writeCanonicalName(
+                tx,
+                id,
+                canonicalName,
+                normalizedName,
+                existing.kind,
+                timestamp,
+                currentCanonical,
+                destination
+              );
+
+              tx.update(terms)
+                .set({ canonicalName, updatedAt: timestamp })
+                .where(eq(terms.id, id))
+                .run();
+            });
+          },
+          catch: (error) => writeError("rename canonical term", canonicalName, error),
+        });
+
+        return yield* getById(id);
+      });
+
     return {
       create,
       getById,
@@ -413,6 +581,11 @@ export const SqliteTermRepositoryLive = Layer.effect(
       listNames,
       updateName,
       update,
+      renameCanonical,
     } satisfies TermRepository;
   })
+);
+
+export const SqliteTermRepositoryLive = SqliteTermRepositorySessionLive.pipe(
+  Layer.provide(RootDatabaseSessionLive)
 );

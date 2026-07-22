@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
   type AnySQLiteColumn,
+  check,
   index,
   integer,
   primaryKey,
@@ -28,7 +30,9 @@ export const sqlStringList = (values: readonly string[]): string =>
   values.map((value) => `'${value}'`).join(", ");
 
 export const TERM_NAME_NORMALIZED_CHECK =
-  "name = lower(name) AND name = trim(name) AND instr(name, ' ') = 0 AND instr(name, '_') = 0";
+  "name = lower(name) AND name = trim(name) AND instr(name, ' ') = 0 AND instr(name, '_') = 0 AND instr(name, ',') = 0";
+export const TERM_CANONICAL_NAME_CHECK = "instr(canonical_name, ',') = 0";
+export const TERM_DISPLAY_NAME_CHECK = "instr(display_name, ',') = 0";
 
 const TERM_KIND_CHECK_VALUES = sqlStringList(TERM_KIND_VALUES);
 const TERM_STATUS_CHECK_VALUES = sqlStringList(TERM_STATUS_VALUES);
@@ -73,6 +77,9 @@ export const terms = sqliteTable(
   (table) => [
     uniqueIndex("idx_terms_kind_canonical_name").on(table.kind, table.canonicalName),
     index("idx_terms_status").on(table.status),
+    check("terms_kind_check", sql`${table.kind} in (${sql.raw(TERM_KIND_CHECK_VALUES)})`),
+    check("terms_status_check", sql`${table.status} in (${sql.raw(TERM_STATUS_CHECK_VALUES)})`),
+    check("terms_canonical_name_check", sql`instr(${table.canonicalName}, ',') = 0`),
   ]
 );
 
@@ -91,7 +98,20 @@ export const termNames = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.termId, table.name] }),
     uniqueIndex("idx_term_names_kind_name").on(table.kind, table.name),
+    uniqueIndex("idx_term_names_one_canonical")
+      .on(table.termId)
+      .where(sql`${table.nameKind} = 'canonical'`),
     index("idx_term_names_name").on(table.name),
+    check("term_names_kind_check", sql`${table.kind} in (${sql.raw(TERM_KIND_CHECK_VALUES)})`),
+    check(
+      "term_names_name_normalized_check",
+      sql`${table.name} = lower(${table.name}) AND ${table.name} = trim(${table.name}) AND instr(${table.name}, ' ') = 0 AND instr(${table.name}, '_') = 0 AND instr(${table.name}, ',') = 0`
+    ),
+    check(
+      "term_names_name_kind_check",
+      sql`${table.nameKind} in (${sql.raw(TERM_NAME_KIND_CHECK_VALUES)})`
+    ),
+    check("term_names_display_name_check", sql`instr(${table.displayName}, ',') = 0`),
   ]
 );
 
@@ -116,6 +136,14 @@ export const migrationJournal = sqliteTable(
   (table) => [
     index("idx_journal_term").on(table.termId),
     index("idx_journal_applied_at").on(table.appliedAt),
+    check(
+      "migration_journal_operation_check",
+      sql`${table.operation} in (${sql.raw(MIGRATION_OPERATION_CHECK_VALUES)})`
+    ),
+    check(
+      "migration_journal_kind_check",
+      sql`${table.kind} is null OR ${table.kind} in (${sql.raw(TERM_KIND_CHECK_VALUES)})`
+    ),
   ]
 );
 
@@ -259,7 +287,7 @@ CREATE TABLE IF NOT EXISTS entities (
 -- Terms registry (governed canonical identity for tags)
 CREATE TABLE IF NOT EXISTS terms (
   id TEXT PRIMARY KEY,
-  canonical_name TEXT NOT NULL,
+  canonical_name TEXT NOT NULL CHECK(${TERM_CANONICAL_NAME_CHECK}),
   kind TEXT NOT NULL CHECK(kind IN (${TERM_KIND_CHECK_VALUES})),
   description TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN (${TERM_STATUS_CHECK_VALUES})),
@@ -273,7 +301,7 @@ CREATE TABLE IF NOT EXISTS term_names (
   term_id TEXT NOT NULL REFERENCES terms(id) ON DELETE CASCADE,
   kind TEXT NOT NULL CHECK(kind IN (${TERM_KIND_CHECK_VALUES})),
   name TEXT NOT NULL CHECK(${TERM_NAME_NORMALIZED_CHECK}),
-  display_name TEXT NOT NULL,
+  display_name TEXT NOT NULL CHECK(${TERM_DISPLAY_NAME_CHECK}),
   name_kind TEXT NOT NULL CHECK(name_kind IN (${TERM_NAME_KIND_CHECK_VALUES})),
   created_at TEXT NOT NULL,
   PRIMARY KEY (term_id, name)
@@ -371,6 +399,7 @@ CREATE INDEX IF NOT EXISTS idx_tags_term ON tags(term_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_terms_kind_canonical_name ON terms(kind, canonical_name);
 CREATE INDEX IF NOT EXISTS idx_terms_status ON terms(status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_term_names_kind_name ON term_names(kind, name);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_term_names_one_canonical ON term_names(term_id) WHERE name_kind = 'canonical';
 CREATE INDEX IF NOT EXISTS idx_term_names_name ON term_names(name);
 CREATE INDEX IF NOT EXISTS idx_journal_term ON migration_journal(term_id);
 CREATE INDEX IF NOT EXISTS idx_journal_applied_at ON migration_journal(applied_at);

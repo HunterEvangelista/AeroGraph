@@ -6,6 +6,8 @@ import { type Tag, type TagId, TagIdSchema } from "../domain/tag.js";
 import { TagNotFoundError, ValidationError } from "../errors.js";
 import type { TagRepository } from "../repository/tag-repository.js";
 import { TagRepositoryTag } from "../repository/tag-repository.js";
+import type { ResolvedTermName } from "../repository/term-repository.js";
+import { TermRepositoryTag } from "../repository/term-repository.js";
 import { type TagService, TagServiceTag } from "./tag-service.js";
 
 const parseTagPath = (tagPath: string): Effect.Effect<ReadonlyArray<string>, ValidationError> => {
@@ -50,13 +52,62 @@ const ensureTag = (
     return yield* existing.failure;
   });
 
+const findLiteralTag = (repo: TagRepository, tagPath: string) =>
+  Effect.gen(function* () {
+    const literal = yield* Effect.result(repo.getById(TagIdSchema.make(tagPath)));
+    if (Result.isSuccess(literal)) return literal.success;
+    if (literal.failure instanceof TagNotFoundError) return undefined;
+    return yield* literal.failure;
+  });
+
+const selectGovernedTag = (
+  repo: TagRepository,
+  tagPath: string,
+  matches: ReadonlyArray<ResolvedTermName>
+) =>
+  Effect.gen(function* () {
+    if (matches.length > 1) {
+      return yield* new ValidationError({
+        field: "tagPath",
+        message: `Term name '${tagPath}' is ambiguous across kinds; use a literal tag ID.`,
+      });
+    }
+
+    const term = matches[0]?.term;
+    const governedTags = (yield* repo.getAll()).filter((tag) => tag.termId === term?.id);
+    if (governedTags.length !== 1) {
+      return yield* new ValidationError({
+        field: "tagPath",
+        message:
+          governedTags.length === 0
+            ? `Governed term '${tagPath}' has no attachment tag.`
+            : `Governed term '${tagPath}' has multiple attachment tags; use a literal tag ID.`,
+      });
+    }
+
+    return governedTags[0];
+  });
+
 export const TagServiceLive = Layer.effect(
   TagServiceTag,
   Effect.gen(function* () {
     const repo = yield* TagRepositoryTag;
+    const termRepo = yield* TermRepositoryTag;
+
+    const resolveGovernedTag = (tagPath: string) =>
+      Effect.gen(function* () {
+        const literal = yield* findLiteralTag(repo, tagPath);
+        if (literal) return literal;
+        const matches = yield* termRepo.findByName(tagPath);
+        if (matches.length === 0) return undefined;
+        return yield* selectGovernedTag(repo, tagPath, matches);
+      });
 
     const ensureHierarchy = (tagPath: string) =>
       Effect.gen(function* () {
+        const governedTag = yield* resolveGovernedTag(tagPath);
+        if (governedTag) return governedTag;
+
         const parts = yield* parseTagPath(tagPath);
         let parentId: TagId | undefined;
         let currentTag: Tag | undefined;

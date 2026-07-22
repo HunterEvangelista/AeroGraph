@@ -65,11 +65,14 @@ export interface TermRepository {
   readonly list: (kind?: TermKind) => Effect.Effect<ReadonlyArray<Term>, RepositoryError>;
 
   /**
-   * Add a canonical, alias, or deprecated name for a term.
+   * Add an alias or deprecated name for a term.
    */
   readonly addName: (
     input: CreateTermNameInput
-  ) => Effect.Effect<TermName, TermNotFoundError | ValidationError | RepositoryError>;
+  ) => Effect.Effect<
+    TermName,
+    TermAlreadyExistsError | TermNotFoundError | ValidationError | RepositoryError
+  >;
 
   /**
    * List all registered names for a term.
@@ -79,7 +82,7 @@ export interface TermRepository {
   ) => Effect.Effect<ReadonlyArray<TermName>, TermNotFoundError | RepositoryError>;
 
   /**
-   * Update a registered term name's display text or kind.
+   * Update a non-canonical registered term name's display text or kind.
    */
   readonly updateName: (
     termId: TermId,
@@ -88,12 +91,23 @@ export interface TermRepository {
   ) => Effect.Effect<TermName, TermNotFoundError | ValidationError | RepositoryError>;
 
   /**
-   * Update mutable term fields.
+   * Update mutable non-canonical term fields.
    */
   readonly update: (
     id: TermId,
     updates: UpdateTermInput
   ) => Effect.Effect<Term, TermNotFoundError | ValidationError | RepositoryError>;
+
+  /**
+   * Atomically replace the canonical display name and registered canonical row.
+   */
+  readonly renameCanonical: (
+    id: TermId,
+    canonicalName: string
+  ) => Effect.Effect<
+    Term,
+    TermAlreadyExistsError | TermNotFoundError | ValidationError | RepositoryError
+  >;
 }
 
 // ============================================================================

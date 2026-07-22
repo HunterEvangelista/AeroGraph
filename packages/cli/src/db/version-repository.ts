@@ -15,7 +15,7 @@ import { and, desc, count as drizzleCount, eq, gte, lte } from "drizzle-orm";
  */
 import { Effect, Layer } from "effect";
 import { entities, entityVersions } from "./schema.js";
-import { DatabaseSessionTag } from "./session.js";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session.js";
 
 // ============================================================================
 // Helper Functions
@@ -49,7 +49,7 @@ const rowToVersion = (row: VersionRow): EntityVersion => ({
 // Repository Implementation
 // ============================================================================
 
-export const SqliteVersionRepositoryLive = Layer.effect(
+export const SqliteVersionRepositorySessionLive = Layer.effect(
   VersionRepositoryTag,
   Effect.gen(function* () {
     const { drizzle, write } = yield* DatabaseSessionTag;
@@ -285,4 +285,8 @@ export const SqliteVersionRepositoryLive = Layer.effect(
       deleteAllForEntity,
     } satisfies VersionRepository;
   })
+);
+
+export const SqliteVersionRepositoryLive = SqliteVersionRepositorySessionLive.pipe(
+  Layer.provide(RootDatabaseSessionLive)
 );

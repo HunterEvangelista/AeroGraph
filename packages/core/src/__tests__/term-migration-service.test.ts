@@ -276,7 +276,6 @@ const createMockTermRepository = (store: TermStore): TermRepository => {
         const existing = yield* getById(id);
         const updated: Term = {
           ...existing,
-          canonicalName: updates.canonicalName ?? existing.canonicalName,
           status: updates.status ?? existing.status,
           ...(updates.description !== undefined ? { description: updates.description } : {}),
           ...(updates.mergedIntoId !== undefined
@@ -286,6 +285,41 @@ const createMockTermRepository = (store: TermStore): TermRepository => {
               : {}),
           updatedAt: FIXED_DATE,
         };
+        store.terms.set(id, updated);
+        return updated;
+      }),
+    renameCanonical: (id, canonicalName) =>
+      Effect.gen(function* () {
+        const existing = yield* getById(id);
+        const normalizedName = normalizeTermName(canonicalName);
+        const currentCanonicalIndex = store.names.findIndex(
+          (name) => name.termId === id && name.nameKind === "canonical"
+        );
+        const currentCanonical = store.names[currentCanonicalIndex];
+        if (!currentCanonical) {
+          return yield* new TermNotFoundError({ name: existing.canonicalName });
+        }
+
+        if (currentCanonical.name === normalizedName) {
+          store.names[currentCanonicalIndex] = { ...currentCanonical, displayName: canonicalName };
+        } else {
+          store.names[currentCanonicalIndex] = { ...currentCanonical, nameKind: "deprecated" };
+          const destinationIndex = store.names.findIndex(
+            (name) => name.termId === id && name.name === normalizedName
+          );
+          const destination = store.names[destinationIndex];
+          if (destination) {
+            store.names[destinationIndex] = {
+              ...destination,
+              displayName: canonicalName,
+              nameKind: "canonical",
+            };
+          } else {
+            store.names.push(createTestTermName(id, existing.kind, canonicalName, "canonical"));
+          }
+        }
+
+        const updated = { ...existing, canonicalName, updatedAt: FIXED_DATE };
         store.terms.set(id, updated);
         return updated;
       }),
@@ -640,7 +674,34 @@ describe("MigrationService", () => {
     );
 
     expect(error).toBeInstanceOf(ValidationError);
-    expect(error.message).toContain("destination belongs to a different term");
+    expect(error.message).toContain("destination belongs to a different brand term");
+  });
+
+  it("rejects a destination name owned by a different term kind", async () => {
+    const termStore = createTermStore();
+    const sourceTerm = createTestTerm("term-brand-kioku", "Kioku", "brand");
+    const destinationTerm = createTestTerm("term-package-aerograph", "AeroGraph", "package");
+    termStore.terms.set(sourceTerm.id, sourceTerm);
+    termStore.terms.set(destinationTerm.id, destinationTerm);
+    termStore.names.push(createTestTermName(sourceTerm.id, "brand", "Kioku", "canonical"));
+    termStore.names.push(
+      createTestTermName(destinationTerm.id, "package", "AeroGraph", "canonical")
+    );
+
+    const program = Effect.gen(function* () {
+      const service = yield* MigrationServiceTag;
+      return yield* service.planRename({
+        kind: "brand",
+        fromName: "Kioku",
+        toName: "AeroGraph",
+      });
+    });
+    const error = await Effect.runPromise(
+      Effect.flip(Effect.provide(program, createTestLayer({ termStore })))
+    );
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.message).toContain("destination belongs to a different package term");
   });
 
   it("rejects an ungoverned destination tag that would split the concept cluster", async () => {
@@ -765,5 +826,100 @@ describe("MigrationService", () => {
     ]);
     expect(tags.get("legacy-client")?.termId).toBe("term-package-client");
     expect(taggedEntities.get("legacy-client")).toEqual(new Set(["doc-1"]));
+  });
+
+  it("preserves deprecated status and the actual former canonical spelling", async () => {
+    const termStore = createTermStore();
+    const sourceTerm = createTestTerm("term-brand-kioku", "Kioku", "brand", {
+      status: "deprecated",
+    });
+    termStore.terms.set(sourceTerm.id, sourceTerm);
+    termStore.names.push(createTestTermName(sourceTerm.id, "brand", "Kioku", "canonical"));
+    const tags = new Map<string, Tag>([
+      ["kioku", createTestTag("kioku", "Kioku", { termId: sourceTerm.id })],
+    ]);
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.gen(function* () {
+          const service = yield* MigrationServiceTag;
+          return yield* service.applyRename({
+            kind: "brand",
+            fromName: "kioku",
+            toName: "AeroGraph",
+            journalEntryId: "journal-preserve-source" as JournalEntryId,
+          });
+        }),
+        createTestLayer({ termStore, tags })
+      )
+    );
+
+    expect(result.term.status).toBe("deprecated");
+    expect(result.journalEntry.fromName).toBe("Kioku");
+    expect(termStore.names.find(({ name }) => name === "kioku")).toMatchObject({
+      displayName: "Kioku",
+      nameKind: "deprecated",
+    });
+  });
+
+  it("applies display-only canonical corrections without adding a second normalized name", async () => {
+    const termStore = createTermStore();
+    const sourceTerm = createTestTerm("term-brand-kioku", "Kioku", "brand");
+    termStore.terms.set(sourceTerm.id, sourceTerm);
+    termStore.names.push(createTestTermName(sourceTerm.id, "brand", "Kioku", "canonical"));
+    const tags = new Map<string, Tag>([
+      ["kioku", createTestTag("kioku", "Kioku", { termId: sourceTerm.id })],
+    ]);
+
+    const result = await Effect.runPromise(
+      Effect.provide(
+        Effect.gen(function* () {
+          const service = yield* MigrationServiceTag;
+          return yield* service.applyRename({
+            kind: "brand",
+            fromName: "Kioku",
+            toName: "KIOKU",
+            journalEntryId: "journal-display-only" as JournalEntryId,
+          });
+        }),
+        createTestLayer({ termStore, tags })
+      )
+    );
+
+    expect(result.term.canonicalName).toBe("KIOKU");
+    expect(result.journalEntry).toMatchObject({ fromName: "Kioku", toName: "KIOKU" });
+    expect(termStore.names).toHaveLength(1);
+    expect(termStore.names[0]).toMatchObject({
+      name: "kioku",
+      displayName: "KIOKU",
+      nameKind: "canonical",
+    });
+    expect(tags.get("kioku")?.name).toBe("KIOKU");
+  });
+
+  it("rejects comma-bearing term names that cannot round-trip through CLI selectors", async () => {
+    const termStore = createTermStore();
+    const sourceTerm = createTestTerm("term-brand-kioku", "Kioku", "brand");
+    termStore.terms.set(sourceTerm.id, sourceTerm);
+    termStore.names.push(createTestTermName(sourceTerm.id, "brand", "Kioku", "canonical"));
+
+    const error = await Effect.runPromise(
+      Effect.flip(
+        Effect.provide(
+          Effect.gen(function* () {
+            const service = yield* MigrationServiceTag;
+            return yield* service.planRename({
+              kind: "brand",
+              fromName: "Kioku",
+              toName: "Foo, Inc.",
+            });
+          }),
+          createTestLayer({ termStore })
+        )
+      )
+    );
+
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(error.message).toContain("cannot contain commas");
   });
 });

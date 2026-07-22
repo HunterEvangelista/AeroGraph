@@ -16,7 +16,7 @@ import { and, count as drizzleCount, eq, like, or } from "drizzle-orm";
  */
 import { Effect, Layer } from "effect";
 import { entities, entityTags, tags } from "./schema.js";
-import { DatabaseSessionTag } from "./session.js";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session.js";
 
 // ============================================================================
 // Helper Functions
@@ -48,7 +48,7 @@ const rowToTag = (row: TagRow): Tag => ({
 // Repository Implementation
 // ============================================================================
 
-export const SqliteTagRepositoryLive = Layer.effect(
+export const SqliteTagRepositorySessionLive = Layer.effect(
   TagRepositoryTag,
   Effect.gen(function* () {
     const { drizzle, write } = yield* DatabaseSessionTag;
@@ -376,4 +376,8 @@ export const SqliteTagRepositoryLive = Layer.effect(
       count,
     } satisfies TagRepository;
   })
+);
+
+export const SqliteTagRepositoryLive = SqliteTagRepositorySessionLive.pipe(
+  Layer.provide(RootDatabaseSessionLive)
 );

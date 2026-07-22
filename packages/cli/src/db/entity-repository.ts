@@ -21,7 +21,7 @@ import { desc, count as drizzleCount, eq, inArray, sql } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { rebuildEntityIdPrefixes } from "./entity-prefix-index";
 import { entities, entityTags } from "./schema";
-import { DatabaseSessionTag } from "./session";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
 // ============================================================================
 // Helper Functions
@@ -154,7 +154,7 @@ const mergeEntityMetadata = (existing: Entity, updates: Partial<Entity>): string
 // Repository Implementation
 // ============================================================================
 
-export const SqliteEntityRepositoryLive = Layer.effect(
+export const SqliteEntityRepositorySessionLive = Layer.effect(
   EntityRepositoryTag,
   Effect.gen(function* () {
     const { db, drizzle, transaction, write } = yield* DatabaseSessionTag;
@@ -510,4 +510,8 @@ export const SqliteEntityRepositoryLive = Layer.effect(
       search,
     } satisfies EntityRepository;
   })
+);
+
+export const SqliteEntityRepositoryLive = SqliteEntityRepositorySessionLive.pipe(
+  Layer.provide(RootDatabaseSessionLive)
 );

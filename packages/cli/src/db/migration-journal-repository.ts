@@ -11,7 +11,7 @@ import {
 import { desc, eq } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { migrationJournal } from "./schema.js";
-import { DatabaseSessionTag } from "./session.js";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session.js";
 
 const now = (): string => new Date().toISOString();
 
@@ -32,7 +32,7 @@ const rowToJournalEntry = (row: MigrationJournalRow): MigrationJournalEntry => (
   dryRun: row.dryRun,
 });
 
-export const SqliteMigrationJournalRepositoryLive = Layer.effect(
+export const SqliteMigrationJournalRepositorySessionLive = Layer.effect(
   MigrationJournalRepositoryTag,
   Effect.gen(function* () {
     const { drizzle, write } = yield* DatabaseSessionTag;
@@ -139,3 +139,6 @@ export const SqliteMigrationJournalRepositoryLive = Layer.effect(
     } satisfies MigrationJournalRepository;
   })
 );
+
+export const SqliteMigrationJournalRepositoryLive =
+  SqliteMigrationJournalRepositorySessionLive.pipe(Layer.provide(RootDatabaseSessionLive));

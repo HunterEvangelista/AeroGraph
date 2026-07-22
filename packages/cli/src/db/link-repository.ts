@@ -13,7 +13,7 @@ import {
 import { and, desc, count as drizzleCount, eq, or } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { entities, links } from "./schema";
-import { DatabaseSessionTag } from "./session";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
 // ============================================================================
 // Helper Functions
@@ -43,7 +43,7 @@ const rowToLink = (row: LinkRow): Link => ({
 // Repository Implementation
 // ============================================================================
 
-export const SqliteLinkRepositoryLive = Layer.effect(
+export const SqliteLinkRepositorySessionLive = Layer.effect(
   LinkRepositoryTag,
   Effect.gen(function* () {
     const { drizzle, transaction, write } = yield* DatabaseSessionTag;
@@ -394,4 +394,8 @@ export const SqliteLinkRepositoryLive = Layer.effect(
       count,
     } satisfies LinkRepository;
   })
+);
+
+export const SqliteLinkRepositoryLive = SqliteLinkRepositorySessionLive.pipe(
+  Layer.provide(RootDatabaseSessionLive)
 );

@@ -9,7 +9,6 @@ import { SqliteEntityRepositoryLive } from "./entity-repository.js";
 import { SqliteLinkRepositoryLive } from "./link-repository.js";
 import { SqliteMigrationJournalRepositoryLive } from "./migration-journal-repository.js";
 import { SqliteNextRepositoryLive } from "./next-repository.js";
-import { RootDatabaseSessionLive } from "./session.js";
 import { SqliteTagRepositoryLive } from "./tag-repository.js";
 import { SqliteTermRepositoryLive } from "./term-repository.js";
 import { TransactionEngineLive } from "./transaction-engine.js";
@@ -23,33 +22,27 @@ const SqliteRepositoryImplementationsLive = Layer.mergeAll(
   SqliteNextRepositoryLive,
   SqliteTermRepositoryLive,
   SqliteMigrationJournalRepositoryLive,
-  EntityPrefixIndexLive
+  EntityPrefixIndexLive,
+  TransactionEngineLive
 );
 
-const SqliteInfrastructureLive = (dbPath: string) => {
-  const database = DatabaseClientLive(dbPath);
-  return Layer.mergeAll(RootDatabaseSessionLive, TransactionEngineLive).pipe(
-    Layer.provideMerge(database)
-  );
-};
-
-const sqliteRepositoriesWith = (infrastructure: ReturnType<typeof SqliteInfrastructureLive>) =>
-  SqliteRepositoryImplementationsLive.pipe(Layer.provideMerge(infrastructure));
+const sqliteRepositoriesWith = (database: ReturnType<typeof DatabaseClientLive>) =>
+  SqliteRepositoryImplementationsLive.pipe(Layer.provide(database));
 
 export const SqliteRepositoriesLive = (dbPath: string) => {
-  const infrastructure = SqliteInfrastructureLive(dbPath);
-  return sqliteRepositoriesWith(infrastructure);
+  const database = DatabaseClientLive(dbPath);
+  return sqliteRepositoriesWith(database);
 };
 
 export const CliCoreLive = (dbPath: string) => {
-  const infrastructure = SqliteInfrastructureLive(dbPath);
-  const repositories = sqliteRepositoriesWith(infrastructure);
+  const database = DatabaseClientLive(dbPath);
+  const repositories = sqliteRepositoriesWith(database);
   return CoreServicesLive.pipe(Layer.provide(repositories));
 };
 
 export const CliServicesLive = (dbPath: string) => {
-  const infrastructure = SqliteInfrastructureLive(dbPath);
-  const repositories = sqliteRepositoriesWith(infrastructure);
+  const database = DatabaseClientLive(dbPath);
+  const repositories = sqliteRepositoriesWith(database);
   const core = CoreServicesLive.pipe(Layer.provide(repositories));
   return Layer.merge(core, repositories);
 };

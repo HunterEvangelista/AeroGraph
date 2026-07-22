@@ -9,6 +9,10 @@ const governTagFixture = join(
   dirname(fileURLToPath(import.meta.url)),
   "../../__tests__/helpers/govern-tag-fixture.ts"
 );
+const updateTagFixture = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../__tests__/helpers/update-tag-fixture.ts"
+);
 
 const governTags = (workspace: CliWorkspace, ...args: ReadonlyArray<string>) => {
   const result = spawnSync("bun", ["run", governTagFixture, workspace.rootPath, ...args], {
@@ -105,5 +109,20 @@ describe("context command", () => {
     expect(result.stdout).toContain("### Governed Decision");
     expect(result.stdout).toContain("- Tags: #auth, #Architecture Choice");
     expect(result.stdout).not.toContain("- Tags: #auth, #decision");
+  });
+
+  it("keeps ungoverned tag IDs round-trippable in canonical output", () => {
+    const update = spawnSync(
+      "bun",
+      ["run", updateTagFixture, workspace.rootPath, "auth", "Authentication Label"],
+      { encoding: "utf8", shell: false }
+    );
+    expect(update.status, `${update.stderr}\n${update.stdout}`).toBe(0);
+
+    const result = workspace.run("context", "--tags", "auth", "--canonical-terms");
+
+    expect(result.status, `${result.stderr}\n${result.stdout}`).toBe(0);
+    expect(result.stdout).toContain("- Tags: #auth, #middleware");
+    expect(result.stdout).not.toContain("#Authentication Label");
   });
 });

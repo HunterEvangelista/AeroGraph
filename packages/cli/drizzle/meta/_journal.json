@@ -22,6 +22,13 @@
       "when": 1782165620000,
       "tag": "0002_term_registry",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784742397415,
+      "tag": "0003_term_registry_constraints",
+      "breakpoints": true
     }
   ]
 }

@@ -2,19 +2,19 @@ import assert from "node:assert/strict";
 import {
   type JournalEntryId,
   MigrationJournalRepositoryTag,
+  TermAlreadyExistsError,
   type TermId,
   TermRepositoryTag,
+  ValidationError,
 } from "@kioku/core";
 import { Effect, Layer } from "effect";
 import { DatabaseClientLive } from "../../client.js";
 import { SqliteMigrationJournalRepositoryLive } from "../../migration-journal-repository.js";
-import { RootDatabaseSessionLive } from "../../session.js";
 import { SqliteTermRepositoryLive } from "../../term-repository.js";
 
 const createRepositoryLayer = () => {
-  const session = RootDatabaseSessionLive.pipe(Layer.provideMerge(DatabaseClientLive(":memory:")));
   return Layer.mergeAll(SqliteTermRepositoryLive, SqliteMigrationJournalRepositoryLive).pipe(
-    Layer.provide(session)
+    Layer.provide(DatabaseClientLive(":memory:"))
   );
 };
 
@@ -84,10 +84,9 @@ const runTermUpdateScenario = Effect.gen(function* () {
     nameKind: "deprecated",
   });
 
-  const updated = yield* repo.update(term.id, {
-    canonicalName: "Governed Memory Graph",
-    status: "deprecated",
-  });
+  const renamed = yield* repo.renameCanonical(term.id, "Governed Memory Graph");
+  const displayCorrected = yield* repo.renameCanonical(term.id, "GOVERNED_MEMORY_GRAPH");
+  const updated = yield* repo.update(term.id, { status: "deprecated" });
   const renamedName = yield* repo.updateName(term.id, "Project Memory", {
     nameKind: "alias",
     displayName: "Project Memory Legacy",
@@ -97,8 +96,38 @@ const runTermUpdateScenario = Effect.gen(function* () {
   assert.equal(deprecatedName.displayName, "Project Memory");
   assert.equal(renamedName.nameKind, "alias");
   assert.equal(renamedName.displayName, "Project Memory Legacy");
-  assert.equal(updated.canonicalName, "Governed Memory Graph");
+  assert.equal(renamed.canonicalName, "Governed Memory Graph");
+  assert.equal(displayCorrected.canonicalName, "GOVERNED_MEMORY_GRAPH");
   assert.equal(updated.status, "deprecated");
+  const names = yield* repo.listNames(term.id);
+  assert.equal(names.filter(({ nameKind }) => nameKind === "canonical").length, 1);
+  const canonical = names.find(({ nameKind }) => nameKind === "canonical");
+  assert.equal(canonical?.name, "governed-memory-graph");
+  assert.equal(canonical?.displayName, "GOVERNED_MEMORY_GRAPH");
+
+  const canonicalAddError = yield* Effect.flip(
+    repo.addName({
+      termId: term.id,
+      kind: "feature",
+      name: "Second Canonical",
+      displayName: "Second Canonical",
+      nameKind: "canonical",
+    } as never)
+  );
+  assert.ok(canonicalAddError instanceof ValidationError);
+  const canonicalUpdateError = yield* Effect.flip(
+    repo.update(term.id, { canonicalName: "Direct Change" } as never)
+  );
+  assert.ok(canonicalUpdateError instanceof ValidationError);
+});
+
+const runDuplicateScenario = Effect.gen(function* () {
+  const repo = yield* TermRepositoryTag;
+  yield* repo.create({ id: "term-brand-kioku", canonicalName: "Kioku", kind: "brand" });
+  const error = yield* Effect.flip(
+    repo.create({ id: "term-brand-kioku-duplicate", canonicalName: "KIOKU", kind: "brand" })
+  );
+  assert.ok(error instanceof TermAlreadyExistsError);
 });
 
 const runJournalScenario = Effect.gen(function* () {
@@ -144,4 +173,5 @@ const runJournalScenario = Effect.gen(function* () {
 await Effect.runPromise(Effect.provide(runTermCreateScenario, createRepositoryLayer()));
 await Effect.runPromise(Effect.provide(runTermResolutionScenario, createRepositoryLayer()));
 await Effect.runPromise(Effect.provide(runTermUpdateScenario, createRepositoryLayer()));
+await Effect.runPromise(Effect.provide(runDuplicateScenario, createRepositoryLayer()));
 await Effect.runPromise(Effect.provide(runJournalScenario, createRepositoryLayer()));

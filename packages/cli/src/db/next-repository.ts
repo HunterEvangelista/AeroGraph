@@ -10,7 +10,7 @@ import {
 import { asc, eq } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 import { entities, nextCommands } from "./schema";
-import { DatabaseSessionTag } from "./session";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
 // ============================================================================
 // Helpers
@@ -34,7 +34,7 @@ const decodeRow = (row: NextCommandRow): Effect.Effect<NextCommand, RepositoryEr
 // Repository Implementation
 // ============================================================================
 
-export const SqliteNextRepositoryLive = Layer.effect(
+export const SqliteNextRepositorySessionLive = Layer.effect(
   NextRepositoryTag,
   Effect.gen(function* () {
     const { drizzle, transaction, write } = yield* DatabaseSessionTag;
@@ -187,4 +187,8 @@ export const SqliteNextRepositoryLive = Layer.effect(
       replaceAll,
     } satisfies NextRepository;
   })
+);
+
+export const SqliteNextRepositoryLive = SqliteNextRepositorySessionLive.pipe(
+  Layer.provide(RootDatabaseSessionLive)
 );
