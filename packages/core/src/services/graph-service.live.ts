@@ -112,26 +112,25 @@ export const GraphServiceLive = Layer.effect(
         );
       });
 
-    const getStats = () =>
-      Effect.gen(function* () {
-        const [totalEntities, totalTags, totalLinks] = yield* Effect.all([
-          entityRepo.count(),
-          tagRepo.count(),
-          linkRepo.count(),
-        ]);
+    const getStats = Effect.gen(function* () {
+      const [totalEntities, totalTags, totalLinks] = yield* Effect.all([
+        entityRepo.count(),
+        tagRepo.count,
+        linkRepo.count,
+      ]);
 
-        const entitiesByType: Record<string, number> = {};
-        for (const type of [
-          EntityTypeEnum.Doc,
-          EntityTypeEnum.CodeRef,
-          EntityTypeEnum.Story,
-          EntityTypeEnum.Diagram,
-        ] as const) {
-          entitiesByType[type] = yield* entityRepo.count(type);
-        }
+      const entitiesByType: Record<string, number> = {};
+      for (const type of [
+        EntityTypeEnum.Doc,
+        EntityTypeEnum.CodeRef,
+        EntityTypeEnum.Story,
+        EntityTypeEnum.Diagram,
+      ] as const) {
+        entitiesByType[type] = yield* entityRepo.count(type);
+      }
 
-        return { totalEntities, totalTags, totalLinks, entitiesByType } satisfies GraphStats;
-      });
+      return { totalEntities, totalTags, totalLinks, entitiesByType } satisfies GraphStats;
+    });
 
     const findPath = (sourceId: string, targetId: string, maxDepth = 5) =>
       Effect.gen(function* () {

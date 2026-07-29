@@ -31,7 +31,7 @@ export const Link = Schema.Struct({
 });
 
 export type Link = typeof Link.Type;
-export type LinkId = (typeof Link.Type)["id"];
+export type LinkId = Link["id"];
 
 // ============================================================================
 // Link Creation Input

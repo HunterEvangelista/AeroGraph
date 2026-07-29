@@ -22,7 +22,7 @@ export const resolveTagSelectors = (
   Effect.gen(function* () {
     const tagRepository = yield* TagRepositoryTag;
     const termService = yield* TermServiceTag;
-    const tags = yield* tagRepository.getAll();
+    const tags = yield* tagRepository.getAll;
     const resolvedSelectors: ResolvedTagSelector[] = [];
     const seen = new Set<string>();
 

@@ -157,7 +157,7 @@ const createMockTagRepository = (config: MockTagRepositoryConfig = {}): TagRepos
         return tag;
       }),
 
-    getAll: () => Effect.succeed(Array.from(tags.values())),
+    getAll: Effect.sync(() => Array.from(tags.values())),
     getChildren: () => Effect.succeed([]),
     getAncestors: () => Effect.succeed([]),
     update: (id) =>
@@ -173,7 +173,7 @@ const createMockTagRepository = (config: MockTagRepositoryConfig = {}): TagRepos
     removeFromEntity: () => Effect.void,
     getTagsForEntity: () => Effect.succeed([]),
     search: () => Effect.succeed([]),
-    count: () => Effect.succeed(tags.size),
+    count: Effect.sync(() => tags.size),
   };
 };
 
@@ -362,7 +362,7 @@ const createMockLinkRepository = (config: MockLinkRepositoryConfig = {}): LinkRe
     delete: () => Effect.void,
     deleteAllForEntity: () => Effect.succeed(0),
     deleteBetween: () => Effect.void,
-    count: () => Effect.succeed(links.size),
+    count: Effect.sync(() => links.size),
   };
 };
 
@@ -1056,7 +1056,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getStats();
+        return yield* graphService.getStats;
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));

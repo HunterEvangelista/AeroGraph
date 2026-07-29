@@ -95,24 +95,23 @@ export const SqliteTagRepositorySessionLive = Layer.effect(
         });
 
         if (!row) {
-          return yield* Effect.fail(new TagNotFoundError({ tagId: id }));
+          return yield* new TagNotFoundError({ tagId: id });
         }
 
         return rowToTag(row);
       });
 
-    const getAll = () =>
-      Effect.try({
-        try: () => {
-          const rows = drizzle.select().from(tags).orderBy(tags.id).all();
-          return rows.map(rowToTag);
-        },
-        catch: (error) =>
-          new RepositoryError({
-            message: `Failed to get tags: ${error instanceof Error ? error.message : String(error)}`,
-            cause: error,
-          }),
-      });
+    const getAll = Effect.try({
+      try: () => {
+        const rows = drizzle.select().from(tags).orderBy(tags.id).all();
+        return rows.map(rowToTag);
+      },
+      catch: (error) =>
+        new RepositoryError({
+          message: `Failed to get tags: ${error instanceof Error ? error.message : String(error)}`,
+          cause: error,
+        }),
+    });
 
     const getChildren = (parentId: TagId) =>
       Effect.gen(function* () {
@@ -225,7 +224,7 @@ export const SqliteTagRepositorySessionLive = Layer.effect(
         });
 
         if (!entityExists) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId }));
+          return yield* new EntityNotFoundError({ entityId });
         }
 
         yield* Effect.try({
@@ -260,7 +259,7 @@ export const SqliteTagRepositorySessionLive = Layer.effect(
         });
 
         if (!entityExists) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId }));
+          return yield* new EntityNotFoundError({ entityId });
         }
 
         yield* Effect.try({
@@ -296,7 +295,7 @@ export const SqliteTagRepositorySessionLive = Layer.effect(
         });
 
         if (!entityExists) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId }));
+          return yield* new EntityNotFoundError({ entityId });
         }
 
         return yield* Effect.try({
@@ -348,18 +347,17 @@ export const SqliteTagRepositorySessionLive = Layer.effect(
           }),
       });
 
-    const count = () =>
-      Effect.try({
-        try: () => {
-          const result = drizzle.select({ count: drizzleCount() }).from(tags).get();
-          return result?.count ?? 0;
-        },
-        catch: (error) =>
-          new RepositoryError({
-            message: `Failed to count tags: ${error instanceof Error ? error.message : String(error)}`,
-            cause: error,
-          }),
-      });
+    const count = Effect.try({
+      try: () => {
+        const result = drizzle.select({ count: drizzleCount() }).from(tags).get();
+        return result?.count ?? 0;
+      },
+      catch: (error) =>
+        new RepositoryError({
+          message: `Failed to count tags: ${error instanceof Error ? error.message : String(error)}`,
+          cause: error,
+        }),
+    });
 
     return {
       create,

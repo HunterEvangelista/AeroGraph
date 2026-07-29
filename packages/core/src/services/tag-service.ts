@@ -20,7 +20,7 @@ export interface TagService {
 
   readonly getById: (id: TagId) => Effect.Effect<Tag, TagNotFoundError | RepositoryError>;
 
-  readonly getAll: () => Effect.Effect<ReadonlyArray<Tag>, RepositoryError>;
+  readonly getAll: Effect.Effect<ReadonlyArray<Tag>, RepositoryError>;
 
   readonly getChildren: (
     parentId: TagId
@@ -53,7 +53,7 @@ export interface TagService {
 
   readonly search: (query: string) => Effect.Effect<ReadonlyArray<Tag>, RepositoryError>;
 
-  readonly count: () => Effect.Effect<number, RepositoryError>;
+  readonly count: Effect.Effect<number, RepositoryError>;
 
   /**
    * Parse a hierarchical tag string (e.g., "checkout/rate-limiting")

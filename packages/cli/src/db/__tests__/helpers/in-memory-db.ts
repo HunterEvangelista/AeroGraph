@@ -15,6 +15,6 @@ export const createInMemoryDatabase = async (): Promise<InMemoryDatabase> => {
 
   return {
     db: client.db,
-    close: () => Effect.runPromise(client.close()),
+    close: () => Effect.runPromise(client.close),
   };
 };

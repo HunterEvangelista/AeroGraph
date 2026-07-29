@@ -342,7 +342,7 @@ const createMockTagRepository = (tags: Map<string, Tag>): TagRepository => ({
       }
       return tag;
     }),
-  getAll: () => Effect.succeed(Array.from(tags.values())),
+  getAll: Effect.sync(() => Array.from(tags.values())),
   getChildren: () => Effect.succeed([]),
   getAncestors: () => Effect.succeed([]),
   update: (id, updates) =>
@@ -366,7 +366,7 @@ const createMockTagRepository = (tags: Map<string, Tag>): TagRepository => ({
   removeFromEntity: () => Effect.void,
   getTagsForEntity: () => Effect.succeed([]),
   search: () => Effect.succeed([]),
-  count: () => Effect.succeed(tags.size),
+  count: Effect.sync(() => tags.size),
 });
 
 const createMockEntityRepository = (

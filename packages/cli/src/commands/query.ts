@@ -70,24 +70,20 @@ const validateQuerySelection = (selection: QuerySelection) =>
     ].filter((value) => value !== undefined).length;
 
     if (selectedModes !== 1) {
-      return yield* Effect.fail(
-        new InvalidQueryError({
-          message:
-            "Choose exactly one query mode: --tags, --related-to, --traverse, --path, or a quoted natural-language prompt.",
-        })
-      );
+      return yield* new InvalidQueryError({
+        message:
+          "Choose exactly one query mode: --tags, --related-to, --traverse, --path, or a quoted natural-language prompt.",
+      });
     }
 
     if (selection.depthValue !== undefined && !selection.traverseValue) {
-      return yield* Effect.fail(
-        new InvalidQueryError({ message: "--depth is only valid with --traverse." })
-      );
+      return yield* new InvalidQueryError({ message: "--depth is only valid with --traverse." });
     }
 
     if (selection.traverseValue && selection.depthValue === undefined) {
-      return yield* Effect.fail(
-        new InvalidQueryError({ message: "--traverse requires an explicit --depth value." })
-      );
+      return yield* new InvalidQueryError({
+        message: "--traverse requires an explicit --depth value.",
+      });
     }
 
     yield* validateDepth(selection.depthValue);
@@ -135,9 +131,7 @@ const runStructuredQuery = (selection: QuerySelection) =>
 
     if (selection.pathValue) {
       if (selection.pathValue.length !== 2) {
-        return yield* Effect.fail(
-          new InvalidQueryError({ message: "--path requires <fromId> and <toId>." })
-        );
+        return yield* new InvalidQueryError({ message: "--path requires <fromId> and <toId>." });
       }
       const [fromId, toId] = selection.pathValue as readonly [string, string];
       const resolvedFromId = yield* resolveEntityId(fromId);
@@ -204,11 +198,7 @@ export const queryCommand = Command.make(
       const workspace = yield* configService.load();
       const ServiceLayers = CliServicesLive(workspace.dbPath);
 
-      yield* Effect.scoped(
-        Effect.gen(function* () {
-          yield* runStructuredQuery(selection);
-        }).pipe(Effect.provide(ServiceLayers))
-      );
+      yield* Effect.scoped(runStructuredQuery(selection).pipe(Effect.provide(ServiceLayers)));
     }).pipe(
       Effect.catchTags({
         InvalidQueryError: (e) =>
