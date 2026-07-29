@@ -1,4 +1,5 @@
 {
+  "$schema": "./node_modules/@effect/tsgo/schema.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",

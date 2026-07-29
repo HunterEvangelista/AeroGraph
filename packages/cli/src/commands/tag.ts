@@ -106,7 +106,7 @@ const tagListCommand = Command.make(
             return yield* tagService.search(searchValue);
           }
 
-          return yield* tagService.getAll();
+          return yield* tagService.getAll;
         })
       );
 
@@ -278,9 +278,9 @@ const tagShowCommand = Command.make(
 
           const tag = yield* tagService.getById(id as TagId);
           const ancestors = yield* tagService.getAncestors(tag.id);
-          const children = yield* Effect.catch(tagService.getChildren(tag.id), () =>
-            Effect.succeed([] as ReadonlyArray<typeof tag>)
-          );
+          const children = yield* tagService
+            .getChildren(tag.id)
+            .pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<typeof tag>));
 
           return { tag, ancestors, children };
         })

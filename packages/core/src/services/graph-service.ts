@@ -75,7 +75,7 @@ export interface GraphService {
   /**
    * Get graph statistics
    */
-  readonly getStats: () => Effect.Effect<GraphStats, RepositoryError>;
+  readonly getStats: Effect.Effect<GraphStats, RepositoryError>;
 
   /**
    * Find shortest path between two entities (via links)

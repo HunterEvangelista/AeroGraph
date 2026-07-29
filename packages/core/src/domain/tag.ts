@@ -22,7 +22,7 @@ export const Tag = Schema.Struct({
 });
 
 export type Tag = typeof Tag.Type;
-export type TagId = (typeof Tag.Type)["id"];
+export type TagId = Tag["id"];
 
 // ============================================================================
 // Tag Creation Input

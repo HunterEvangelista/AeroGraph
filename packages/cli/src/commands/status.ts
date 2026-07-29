@@ -28,7 +28,7 @@ export const statusCommand = Command.make("status", {}, () =>
     const stats = yield* Effect.scoped(
       Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getStats();
+        return yield* graphService.getStats;
       }).pipe(Effect.provide(ServiceLayer))
     );
 

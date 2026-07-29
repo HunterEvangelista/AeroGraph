@@ -29,7 +29,7 @@ export const EntityVersion = Schema.Struct({
 });
 
 export type EntityVersion = typeof EntityVersion.Type;
-export type VersionId = (typeof EntityVersion.Type)["id"];
+export type VersionId = EntityVersion["id"];
 
 // ============================================================================
 // Typed Entity Version (for runtime use)

@@ -21,14 +21,15 @@ type NextCommandRow = typeof nextCommands.$inferSelect;
 const now = (): string => new Date().toISOString();
 
 const decodeRow = (row: NextCommandRow): Effect.Effect<NextCommand, RepositoryError> =>
-  Effect.try({
-    try: () => Schema.decodeUnknownSync(NextCommandSchema)(row),
-    catch: (error) =>
-      new RepositoryError({
-        message: `Failed to decode next command row: ${error instanceof Error ? error.message : String(error)}`,
-        cause: error,
-      }),
-  });
+  Schema.decodeUnknownEffect(NextCommandSchema)(row).pipe(
+    Effect.mapError(
+      (error) =>
+        new RepositoryError({
+          message: `Failed to decode next command row: ${error instanceof Error ? error.message : String(error)}`,
+          cause: error,
+        })
+    )
+  );
 
 // ============================================================================
 // Repository Implementation

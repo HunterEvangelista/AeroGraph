@@ -74,7 +74,7 @@ const selectGovernedTag = (
     }
 
     const term = matches[0]?.term;
-    const governedTags = (yield* repo.getAll()).filter((tag) => tag.termId === term?.id);
+    const governedTags = (yield* repo.getAll).filter((tag) => tag.termId === term?.id);
     if (governedTags.length !== 1) {
       return yield* new ValidationError({
         field: "tagPath",
@@ -131,7 +131,7 @@ export const TagServiceLive = Layer.effect(
     return {
       create: (input) => repo.create(input),
       getById: (id) => repo.getById(id),
-      getAll: () => repo.getAll(),
+      getAll: repo.getAll,
       getChildren: (parentId) => repo.getChildren(parentId),
       getAncestors: (id) => repo.getAncestors(id),
       update: (id, updates) => repo.update(id, updates),
@@ -140,7 +140,7 @@ export const TagServiceLive = Layer.effect(
       removeFromEntity: (tagId, entityId) => repo.removeFromEntity(tagId, entityId),
       getTagsForEntity: (entityId) => repo.getTagsForEntity(entityId),
       search: (query) => repo.search(query),
-      count: () => repo.count(),
+      count: repo.count,
       ensureHierarchy,
     } satisfies TagService;
   })

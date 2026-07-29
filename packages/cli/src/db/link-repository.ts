@@ -366,18 +366,17 @@ export const SqliteLinkRepositorySessionLive = Layer.effect(
         });
       });
 
-    const count = () =>
-      Effect.try({
-        try: () => {
-          const result = drizzle.select({ count: drizzleCount() }).from(links).get();
-          return result?.count ?? 0;
-        },
-        catch: (error) =>
-          new RepositoryError({
-            message: `Failed to count links: ${error instanceof Error ? error.message : String(error)}`,
-            cause: error,
-          }),
-      });
+    const count = Effect.try({
+      try: () => {
+        const result = drizzle.select({ count: drizzleCount() }).from(links).get();
+        return result?.count ?? 0;
+      },
+      catch: (error) =>
+        new RepositoryError({
+          message: `Failed to count links: ${error instanceof Error ? error.message : String(error)}`,
+          cause: error,
+        }),
+    });
 
     return {
       create,

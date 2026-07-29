@@ -29,7 +29,7 @@ export interface TagRepository {
   /**
    * Get all tags
    */
-  readonly getAll: () => Effect.Effect<ReadonlyArray<Tag>, RepositoryError>;
+  readonly getAll: Effect.Effect<ReadonlyArray<Tag>, RepositoryError>;
 
   /**
    * Get child tags of a parent tag
@@ -89,7 +89,7 @@ export interface TagRepository {
   /**
    * Count tags
    */
-  readonly count: () => Effect.Effect<number, RepositoryError>;
+  readonly count: Effect.Effect<number, RepositoryError>;
 }
 
 // ============================================================================

@@ -287,7 +287,7 @@ const docEditCommand = Command.make(
       const contentValue = Option.getOrUndefined(content);
 
       if (!titleValue && !contentValue) {
-        return yield* Effect.fail(new NoUpdatesError());
+        return yield* new NoUpdatesError();
       }
 
       const updated = yield* withCliServices(

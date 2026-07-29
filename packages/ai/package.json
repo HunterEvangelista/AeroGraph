@@ -27,11 +27,11 @@
   "dependencies": {
     "@kioku/core": "workspace:*",
     "ai": "^4.0.27",
-    "effect": "4.0.0-beta.74"
+    "effect": "^4.0.0-beta.102"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
-    "typescript": "^7.0.1-rc",
+    "typescript": "^7.0.2",
     "vitest": "^2.1.8"
   }
 }

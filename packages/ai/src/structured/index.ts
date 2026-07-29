@@ -26,8 +26,8 @@ export const SuggestedCodeRef = Schema.Struct({
   filePath: Schema.String,
   description: Schema.String,
   tags: Schema.Array(Schema.String),
-  startLine: Schema.optional(Schema.Number),
-  endLine: Schema.optional(Schema.Number),
+  startLine: Schema.optional(Schema.Finite),
+  endLine: Schema.optional(Schema.Finite),
 });
 
 export const OnboardingResult = Schema.Struct({
@@ -47,7 +47,7 @@ export const QueryResult = Schema.Struct({
   relevantEntityIds: Schema.Array(Schema.String),
   summary: Schema.String,
   suggestedTags: Schema.Array(Schema.String),
-  confidence: Schema.Number,
+  confidence: Schema.Finite,
 });
 
 export type QueryResult = typeof QueryResult.Type;

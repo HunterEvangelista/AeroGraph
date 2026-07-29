@@ -123,14 +123,14 @@ try {
     ).value,
     "4"
   );
-  await Effect.runPromise(client.close());
+  await Effect.runPromise(client.close);
 
   const reopened = await Effect.runPromise(makeDatabaseClient(validPath));
   assert.equal(
     (reopened.db.query("SELECT name FROM term_names").get() as { name: string }).name,
     "kioku-name"
   );
-  await Effect.runPromise(reopened.close());
+  await Effect.runPromise(reopened.close);
 
   const collisionPath = join(root, "collision.db");
   createV3Database(collisionPath, [

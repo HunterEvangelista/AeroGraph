@@ -30,7 +30,7 @@ import {
 export interface DatabaseClient {
   readonly db: Database;
   readonly drizzle: BunSQLiteDatabase<typeof schema>;
-  readonly close: () => Effect.Effect<void, DatabaseError>;
+  readonly close: Effect.Effect<void, DatabaseError>;
 }
 
 // ============================================================================
@@ -304,20 +304,19 @@ export const makeDatabaseClient = (
     return {
       db,
       drizzle: drizzleDb,
-      close: () =>
-        Effect.try({
-          try: () => db.close(),
-          catch: (error) =>
-            new DatabaseError({
-              message: `Failed to close database: ${error instanceof Error ? error.message : String(error)}`,
-              cause: error,
-            }),
-        }),
+      close: Effect.try({
+        try: () => db.close(),
+        catch: (error) =>
+          new DatabaseError({
+            message: `Failed to close database: ${error instanceof Error ? error.message : String(error)}`,
+            cause: error,
+          }),
+      }),
     } satisfies DatabaseClient;
   });
 
 export const DatabaseClientLive = (dbPath: string) =>
   Layer.effect(
     DatabaseClientTag,
-    Effect.acquireRelease(makeDatabaseClient(dbPath), (client) => client.close().pipe(Effect.orDie))
+    Effect.acquireRelease(makeDatabaseClient(dbPath), (client) => client.close.pipe(Effect.orDie))
   );

@@ -161,9 +161,7 @@ export const linkCommand = Command.make(
         const linkRepository = yield* LinkRepositoryTag;
         const typeValue = Option.getOrUndefined(type);
         if (!typeValue) {
-          return yield* Effect.fail(
-            new InvalidLinkCommandError({ message: "--type is required." })
-          );
+          return yield* new InvalidLinkCommandError({ message: "--type is required." });
         }
         const source = yield* resolveEntityId(sourceId);
         const target = yield* resolveEntityId(targetId);

@@ -81,7 +81,7 @@ export const Term = Schema.Struct({
 });
 
 export type Term = typeof Term.Type;
-export type TermId = (typeof Term.Type)["id"];
+export type TermId = Term["id"];
 
 // ============================================================================
 // Term Name Schema
@@ -120,7 +120,7 @@ export const MigrationJournalEntry = Schema.Struct({
 });
 
 export type MigrationJournalEntry = typeof MigrationJournalEntry.Type;
-export type JournalEntryId = (typeof MigrationJournalEntry.Type)["id"];
+export type JournalEntryId = MigrationJournalEntry["id"];
 
 // ============================================================================
 // Term Creation Input

@@ -230,7 +230,7 @@ const planRenameWith = (repositories: RenameRepositories, input: RenameTermInput
       });
     }
 
-    const tags = yield* repositories.tags.getAll();
+    const tags = yield* repositories.tags.getAll;
     yield* validateDestinationTags(tags, source.term, normalized);
 
     const matchingTags = tags.filter((tag) => tagMatchesName(tag, normalized.normalizedFromName));

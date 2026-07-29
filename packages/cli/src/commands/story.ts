@@ -92,7 +92,7 @@ const parseOptionalStatus = (status: Option.Option<string>) =>
 
     const parsed = parseStoryStatus(value);
     if (parsed instanceof InvalidStoryStatusError) {
-      return yield* Effect.fail(parsed);
+      return yield* parsed;
     }
 
     return parsed;
@@ -436,7 +436,7 @@ const storyDeleteCommand = Command.make(
           );
 
           if (existing._tag !== EntityTypeEnum.Story) {
-            return yield* Effect.fail(new NotAStoryError({ id: resolvedId }));
+            return yield* new NotAStoryError({ id: resolvedId });
           }
 
           if (!force) {

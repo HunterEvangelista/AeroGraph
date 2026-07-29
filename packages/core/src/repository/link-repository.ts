@@ -86,7 +86,7 @@ export interface LinkRepository {
   /**
    * Count links
    */
-  readonly count: () => Effect.Effect<number, RepositoryError>;
+  readonly count: Effect.Effect<number, RepositoryError>;
 }
 
 // ============================================================================
