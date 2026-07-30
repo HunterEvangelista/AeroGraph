@@ -1,8 +1,9 @@
 import {
   type CreateLinkInput,
+  type EntityId,
   EntityNotFoundError,
   getInverseLinkType,
-  type Link,
+  Link,
   type LinkId,
   LinkNotFoundError,
   type LinkRepository,
@@ -11,7 +12,7 @@ import {
   RepositoryError,
 } from "@kioku/core";
 import { and, desc, count as drizzleCount, eq, or } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { entities, links } from "./schema";
 import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
@@ -31,13 +32,16 @@ interface LinkRow {
   createdAt: string;
 }
 
-const rowToLink = (row: LinkRow): Link => ({
-  id: row.id as LinkId,
-  sourceId: row.sourceId,
-  targetId: row.targetId,
-  type: row.type,
-  createdAt: new Date(row.createdAt),
-});
+const decodeRow = (row: LinkRow): Effect.Effect<Link, RepositoryError> =>
+  Schema.decodeUnknownEffect(Link)(row).pipe(
+    Effect.mapError(
+      (error) =>
+        new RepositoryError({
+          message: `Failed to decode link row: ${error instanceof Error ? error.message : String(error)}`,
+          cause: error,
+        })
+    )
+  );
 
 // ============================================================================
 // Repository Implementation
@@ -48,7 +52,7 @@ export const SqliteLinkRepositorySessionLive = Layer.effect(
   Effect.gen(function* () {
     const { drizzle, transaction, write } = yield* DatabaseSessionTag;
 
-    const verifyEntityExists = (entityId: string) =>
+    const verifyEntityExists = (entityId: EntityId) =>
       Effect.gen(function* () {
         const exists = yield* Effect.try({
           try: () =>
@@ -74,7 +78,7 @@ export const SqliteLinkRepositorySessionLive = Layer.effect(
         yield* verifyEntityExists(input.sourceId);
         yield* verifyEntityExists(input.targetId);
 
-        return yield* Effect.try({
+        const row = yield* Effect.try({
           try: () => {
             const id = generateId();
             const timestamp = now();
@@ -92,7 +96,7 @@ export const SqliteLinkRepositorySessionLive = Layer.effect(
             );
             const row = drizzle.select().from(links).where(eq(links.id, id)).get();
             if (!row) throw new Error(`Inserted link not found: ${id}`);
-            return rowToLink(row);
+            return row;
           },
           catch: (error) =>
             new RepositoryError({
@@ -100,6 +104,8 @@ export const SqliteLinkRepositorySessionLive = Layer.effect(
               cause: error,
             }),
         });
+
+        return yield* decodeRow(row);
       });
 
     const createBidirectional = (input: CreateLinkInput) =>
@@ -107,7 +113,7 @@ export const SqliteLinkRepositorySessionLive = Layer.effect(
         yield* verifyEntityExists(input.sourceId);
         yield* verifyEntityExists(input.targetId);
 
-        return yield* Effect.try({
+        const rows = yield* Effect.try({
           try: () => {
             const createPair = transaction((tx) => {
               const timestamp = now();
@@ -143,7 +149,7 @@ export const SqliteLinkRepositorySessionLive = Layer.effect(
             });
 
             const [forwardRow, inverseRow] = createPair;
-            return [rowToLink(forwardRow), rowToLink(inverseRow)] as const;
+            return [forwardRow, inverseRow] as const;
           },
           catch: (error) =>
             new RepositoryError({
@@ -151,6 +157,10 @@ export const SqliteLinkRepositorySessionLive = Layer.effect(
               cause: error,
             }),
         });
+
+        const forwardLink = yield* decodeRow(rows[0]);
+        const inverseLink = yield* decodeRow(rows[1]);
+        return [forwardLink, inverseLink] as const;
       });
 
     const getById = (id: LinkId) =>
@@ -168,96 +178,111 @@ export const SqliteLinkRepositorySessionLive = Layer.effect(
           return yield* new LinkNotFoundError({ linkId: id });
         }
 
-        return rowToLink(row);
+        return yield* decodeRow(row);
       });
 
-    const getFromSource = (sourceId: string) =>
-      Effect.try({
-        try: () => {
-          const rows = drizzle
-            .select()
-            .from(links)
-            .where(eq(links.sourceId, sourceId))
-            .orderBy(desc(links.createdAt))
-            .all();
-          return rows.map(rowToLink);
-        },
-        catch: (error) =>
-          new RepositoryError({
-            message: `Failed to get links from source: ${error instanceof Error ? error.message : String(error)}`,
-            cause: error,
-          }),
+    const getFromSource = (sourceId: EntityId) =>
+      Effect.gen(function* () {
+        const rows = yield* Effect.try({
+          try: () => {
+            return drizzle
+              .select()
+              .from(links)
+              .where(eq(links.sourceId, sourceId))
+              .orderBy(desc(links.createdAt))
+              .all();
+          },
+          catch: (error) =>
+            new RepositoryError({
+              message: `Failed to get links from source: ${error instanceof Error ? error.message : String(error)}`,
+              cause: error,
+            }),
+        });
+
+        return yield* Effect.forEach(rows, decodeRow);
       });
 
-    const getToTarget = (targetId: string) =>
-      Effect.try({
-        try: () => {
-          const rows = drizzle
-            .select()
-            .from(links)
-            .where(eq(links.targetId, targetId))
-            .orderBy(desc(links.createdAt))
-            .all();
-          return rows.map(rowToLink);
-        },
-        catch: (error) =>
-          new RepositoryError({
-            message: `Failed to get links to target: ${error instanceof Error ? error.message : String(error)}`,
-            cause: error,
-          }),
+    const getToTarget = (targetId: EntityId) =>
+      Effect.gen(function* () {
+        const rows = yield* Effect.try({
+          try: () => {
+            return drizzle
+              .select()
+              .from(links)
+              .where(eq(links.targetId, targetId))
+              .orderBy(desc(links.createdAt))
+              .all();
+          },
+          catch: (error) =>
+            new RepositoryError({
+              message: `Failed to get links to target: ${error instanceof Error ? error.message : String(error)}`,
+              cause: error,
+            }),
+        });
+
+        return yield* Effect.forEach(rows, decodeRow);
       });
 
-    const getAllForEntity = (entityId: string) =>
-      Effect.try({
-        try: () => {
-          const rows = drizzle
-            .select()
-            .from(links)
-            .where(or(eq(links.sourceId, entityId), eq(links.targetId, entityId)))
-            .orderBy(desc(links.createdAt))
-            .all();
-          return rows.map(rowToLink);
-        },
-        catch: (error) =>
-          new RepositoryError({
-            message: `Failed to get links for entity: ${error instanceof Error ? error.message : String(error)}`,
-            cause: error,
-          }),
+    const getAllForEntity = (entityId: EntityId) =>
+      Effect.gen(function* () {
+        const rows = yield* Effect.try({
+          try: () => {
+            return drizzle
+              .select()
+              .from(links)
+              .where(or(eq(links.sourceId, entityId), eq(links.targetId, entityId)))
+              .orderBy(desc(links.createdAt))
+              .all();
+          },
+          catch: (error) =>
+            new RepositoryError({
+              message: `Failed to get links for entity: ${error instanceof Error ? error.message : String(error)}`,
+              cause: error,
+            }),
+        });
+
+        return yield* Effect.forEach(rows, decodeRow);
       });
 
     const getByType = (type: LinkType) =>
-      Effect.try({
-        try: () => {
-          const rows = drizzle
-            .select()
-            .from(links)
-            .where(eq(links.type, type))
-            .orderBy(desc(links.createdAt))
-            .all();
-          return rows.map(rowToLink);
-        },
-        catch: (error) =>
-          new RepositoryError({
-            message: `Failed to get links by type: ${error instanceof Error ? error.message : String(error)}`,
-            cause: error,
-          }),
+      Effect.gen(function* () {
+        const rows = yield* Effect.try({
+          try: () => {
+            return drizzle
+              .select()
+              .from(links)
+              .where(eq(links.type, type))
+              .orderBy(desc(links.createdAt))
+              .all();
+          },
+          catch: (error) =>
+            new RepositoryError({
+              message: `Failed to get links by type: ${error instanceof Error ? error.message : String(error)}`,
+              cause: error,
+            }),
+        });
+
+        return yield* Effect.forEach(rows, decodeRow);
       });
 
-    const getLinkBetween = (sourceId: string, targetId: string) =>
-      Effect.try({
-        try: () => {
-          const row = drizzle
-            .select()
-            .from(links)
-            .where(and(eq(links.sourceId, sourceId), eq(links.targetId, targetId)))
-            .get();
-          return row ? rowToLink(row) : null;
-        },
-        catch: (error) =>
-          new RepositoryError({
-            message: `Failed to get link between entities: ${error instanceof Error ? error.message : String(error)}`,
-            cause: error,
-          }),
+    const getLinkBetween = (sourceId: EntityId, targetId: EntityId) =>
+      Effect.gen(function* () {
+        const row = yield* Effect.try({
+          try: () => {
+            return drizzle
+              .select()
+              .from(links)
+              .where(and(eq(links.sourceId, sourceId), eq(links.targetId, targetId)))
+              .get();
+          },
+          catch: (error) =>
+            new RepositoryError({
+              message: `Failed to get link between entities: ${error instanceof Error ? error.message : String(error)}`,
+              cause: error,
+            }),
+        });
+
+        return row ? yield* decodeRow(row) : null;
       });
 
     const deleteById = (id: LinkId) =>
@@ -274,7 +299,7 @@ export const SqliteLinkRepositorySessionLive = Layer.effect(
         });
       });
 
-    const deleteAllForEntity = (entityId: string) =>
+    const deleteAllForEntity = (entityId: EntityId) =>
       Effect.try({
         try: () => {
           const existing = drizzle
@@ -298,7 +323,7 @@ export const SqliteLinkRepositorySessionLive = Layer.effect(
           }),
       });
 
-    const deleteBetween = (sourceId: string, targetId: string, type?: LinkType) =>
+    const deleteBetween = (sourceId: EntityId, targetId: EntityId, type?: LinkType) =>
       Effect.gen(function* () {
         const link = yield* Effect.try({
           try: () => {

@@ -1,4 +1,4 @@
-import { GraphServiceTag } from "@kioku/core";
+import { EntityType, GraphServiceTag } from "@kioku/core";
 import { Console, Effect } from "effect";
 /**
  * Status Command
@@ -35,10 +35,10 @@ export const statusCommand = Command.make("status", {}, () =>
     yield* Console.log("Graph Statistics");
     yield* Console.log("-".repeat(40));
     yield* Console.log(`Entities: ${stats.totalEntities}`);
-    yield* Console.log(`  - Docs:      ${stats.entitiesByType["doc"] ?? 0}`);
-    yield* Console.log(`  - Code Refs: ${stats.entitiesByType["code_ref"] ?? 0}`);
-    yield* Console.log(`  - Stories:   ${stats.entitiesByType["story"] ?? 0}`);
-    yield* Console.log(`  - Diagrams:  ${stats.entitiesByType["diagram"] ?? 0}`);
+    yield* Console.log(`  - Docs:      ${stats.entitiesByType[EntityType.Doc] ?? 0}`);
+    yield* Console.log(`  - Code Refs: ${stats.entitiesByType[EntityType.CodeRef] ?? 0}`);
+    yield* Console.log(`  - Stories:   ${stats.entitiesByType[EntityType.Story] ?? 0}`);
+    yield* Console.log(`  - Diagrams:  ${stats.entitiesByType[EntityType.Diagram] ?? 0}`);
     yield* Console.log(`Tags:     ${stats.totalTags}`);
     yield* Console.log(`Links:    ${stats.totalLinks}`);
     yield* Console.log("");

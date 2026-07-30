@@ -1,16 +1,8 @@
-import { Cause, Effect, Exit, Layer } from "effect";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import type {
-  CodeRef,
-  Diagram,
-  Doc,
-  Entity,
-  EntityId,
-  EntityType,
-  Story,
-} from "../domain/entity.js";
-import { DiagramTypeEnum, EntityTypeEnum, StoryStatusEnum } from "../domain/entity.js";
+import type { CodeRef, Diagram, Doc, Entity, EntityId, Story } from "../domain/entity.js";
+import { BrandedId, DiagramTypeEnum, EntityType, StoryStatusEnum } from "../domain/entity.js";
 import type { Link, LinkId, LinkType } from "../domain/link.js";
 import type { Tag, TagId } from "../domain/tag.js";
 import type { Term, TermId, TermName } from "../domain/term.js";
@@ -41,8 +33,10 @@ import { FIXED_TIMESTAMP_ISO } from "./helpers/index.js";
 
 const FIXED_DATE = new Date(FIXED_TIMESTAMP_ISO);
 
+const testEntityId = (id: string): EntityId => Schema.decodeUnknownSync(BrandedId)(id);
+
 const createTestDoc = (id: string): Doc => ({
-  _tag: EntityTypeEnum.Doc,
+  _tag: EntityType.Doc,
   id: id as EntityId,
   title: `Entity ${id}`,
   content: `Content for ${id}`,
@@ -53,7 +47,7 @@ const createTestDoc = (id: string): Doc => ({
 });
 
 const createTestCodeRef = (id: string): CodeRef => ({
-  _tag: EntityTypeEnum.CodeRef,
+  _tag: EntityType.CodeRef,
   id: id as EntityId,
   title: `Entity ${id}`,
   content: `Content for ${id}`,
@@ -66,7 +60,7 @@ const createTestCodeRef = (id: string): CodeRef => ({
 });
 
 const createTestStory = (id: string): Story => ({
-  _tag: EntityTypeEnum.Story,
+  _tag: EntityType.Story,
   id: id as EntityId,
   title: `Entity ${id}`,
   content: `Content for ${id}`,
@@ -78,7 +72,7 @@ const createTestStory = (id: string): Story => ({
 });
 
 const createTestDiagram = (id: string): Diagram => ({
-  _tag: EntityTypeEnum.Diagram,
+  _tag: EntityType.Diagram,
   id: id as EntityId,
   title: `Entity ${id}`,
   content: `Content for ${id}`,
@@ -90,15 +84,15 @@ const createTestDiagram = (id: string): Diagram => ({
   version: 1,
 });
 
-const createTestEntity = (id: string, type: EntityType = EntityTypeEnum.Doc): Entity => {
+const createTestEntity = (id: string, type: EntityType = EntityType.Doc): Entity => {
   switch (type) {
-    case EntityTypeEnum.Doc:
+    case EntityType.Doc:
       return createTestDoc(id);
-    case EntityTypeEnum.CodeRef:
+    case EntityType.CodeRef:
       return createTestCodeRef(id);
-    case EntityTypeEnum.Story:
+    case EntityType.Story:
       return createTestStory(id);
-    case EntityTypeEnum.Diagram:
+    case EntityType.Diagram:
       return createTestDiagram(id);
   }
 };
@@ -112,8 +106,8 @@ const createTestTag = (id: string, name: string, parentId?: string): Tag => ({
 
 const createTestLink = (id: string, sourceId: string, targetId: string, type: LinkType): Link => ({
   id: id as LinkId,
-  sourceId,
-  targetId,
+  sourceId: testEntityId(sourceId),
+  targetId: testEntityId(targetId),
   type,
   createdAt: FIXED_DATE,
 });
@@ -205,7 +199,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
   return {
     createDoc: (input) =>
       Effect.succeed({
-        _tag: EntityTypeEnum.Doc,
+        _tag: EntityType.Doc,
         id: `doc-${Date.now()}` as EntityId,
         title: input.title,
         content: input.content,
@@ -216,7 +210,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
       }),
     createCodeRef: (input) =>
       Effect.succeed({
-        _tag: EntityTypeEnum.CodeRef,
+        _tag: EntityType.CodeRef,
         id: `code-${Date.now()}` as EntityId,
         title: input.title,
         content: input.content,
@@ -232,7 +226,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
       }),
     createStory: (input) =>
       Effect.succeed({
-        _tag: EntityTypeEnum.Story,
+        _tag: EntityType.Story,
         id: `story-${Date.now()}` as EntityId,
         title: input.title,
         content: input.content,
@@ -246,7 +240,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
       }),
     createDiagram: (input) =>
       Effect.succeed({
-        _tag: EntityTypeEnum.Diagram,
+        _tag: EntityType.Diagram,
         id: `diagram-${Date.now()}` as EntityId,
         title: input.title,
         content: input.content,
@@ -670,7 +664,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getEntityWithLinks("e1");
+        return yield* graphService.getEntityWithLinks(testEntityId("e1"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -691,7 +685,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getEntityWithLinks("nonexistent");
+        return yield* graphService.getEntityWithLinks(testEntityId("nonexistent"));
       });
 
       const exit = await Effect.runPromiseExit(Effect.provide(program, layer));
@@ -721,7 +715,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getRelatedEntities("center");
+        return yield* graphService.getRelatedEntities(testEntityId("center"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -750,7 +744,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getRelatedEntities("center", ["references"]);
+        return yield* graphService.getRelatedEntities(testEntityId("center"), ["references"]);
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -771,7 +765,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getRelatedEntities("isolated");
+        return yield* graphService.getRelatedEntities(testEntityId("isolated"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -801,7 +795,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.traverse("e1", 2); // Only go 2 hops
+        return yield* graphService.traverse(testEntityId("e1"), 2); // Only go 2 hops
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -831,7 +825,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.traverse("e1", 10); // High depth to test cycle handling
+        return yield* graphService.traverse(testEntityId("e1"), 10); // High depth to test cycle handling
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -851,7 +845,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.traverse("isolated", 5);
+        return yield* graphService.traverse(testEntityId("isolated"), 5);
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -958,7 +952,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.findPath("source", "target");
+        return yield* graphService.findPath(testEntityId("source"), testEntityId("target"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -997,7 +991,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.findPath("source", "target");
+        return yield* graphService.findPath(testEntityId("source"), testEntityId("target"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -1024,7 +1018,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.findPath("island1", "island2");
+        return yield* graphService.findPath(testEntityId("island1"), testEntityId("island2"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -1036,10 +1030,10 @@ describe("GraphService", () => {
   describe("getStats()", () => {
     it("returns correct totals and entity-type breakdown", async () => {
       const entities = new Map<string, Entity>();
-      entities.set("doc1", createTestEntity("doc1", EntityTypeEnum.Doc));
-      entities.set("doc2", createTestEntity("doc2", EntityTypeEnum.Doc));
-      entities.set("code1", createTestEntity("code1", EntityTypeEnum.CodeRef));
-      entities.set("story1", createTestEntity("story1", EntityTypeEnum.Story));
+      entities.set("doc1", createTestEntity("doc1", EntityType.Doc));
+      entities.set("doc2", createTestEntity("doc2", EntityType.Doc));
+      entities.set("code1", createTestEntity("code1", EntityType.CodeRef));
+      entities.set("story1", createTestEntity("story1", EntityType.Story));
 
       const tags = new Map<string, Tag>();
       tags.set("tag1", createTestTag("tag1", "tag1"));
@@ -1064,10 +1058,10 @@ describe("GraphService", () => {
       expect(result.totalEntities).toBe(4);
       expect(result.totalTags).toBe(2);
       expect(result.totalLinks).toBe(1);
-      expect(result.entitiesByType[EntityTypeEnum.Doc]).toBe(2);
-      expect(result.entitiesByType[EntityTypeEnum.CodeRef]).toBe(1);
-      expect(result.entitiesByType[EntityTypeEnum.Story]).toBe(1);
-      expect(result.entitiesByType[EntityTypeEnum.Diagram]).toBe(0);
+      expect(result.entitiesByType[EntityType.Doc]).toBe(2);
+      expect(result.entitiesByType[EntityType.CodeRef]).toBe(1);
+      expect(result.entitiesByType[EntityType.Story]).toBe(1);
+      expect(result.entitiesByType[EntityType.Diagram]).toBe(0);
     });
   });
 });

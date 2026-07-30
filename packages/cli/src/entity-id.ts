@@ -1,9 +1,9 @@
-import { EntityNotFoundError, EntityServiceTag } from "@kioku/core";
-import { Data, Effect, Result } from "effect";
+import { BrandedId, type EntityId, EntityNotFoundError, EntityServiceTag } from "@kioku/core";
+import { Data, Effect, Option, Result, Schema } from "effect";
 import { EntityPrefixIndexTag } from "./db/entity-prefix-index.js";
 
 export interface EntityIdMatch {
-  readonly id: string;
+  readonly id: EntityId;
   readonly title: string;
   readonly type: "doc" | "code_ref" | "story" | "diagram";
 }
@@ -18,11 +18,14 @@ export const formatEntityIdMatches = (matches: ReadonlyArray<EntityIdMatch>): st
 
 export const resolveEntityId = (value: string) =>
   Effect.gen(function* () {
+    const entityId = Option.getOrUndefined(Schema.decodeUnknownOption(BrandedId)(value));
+    if (!entityId) {
+      return yield* new EntityNotFoundError({ entityId: value });
+    }
+
     const entityService = yield* EntityServiceTag;
     const prefixIndex = yield* EntityPrefixIndexTag;
-    const exact = yield* Effect.result(
-      entityService.getById(value as Parameters<typeof entityService.getById>[0])
-    );
+    const exact = yield* Effect.result(entityService.getById(entityId));
 
     if (Result.isSuccess(exact)) {
       return exact.success.id;
@@ -38,9 +41,10 @@ export const resolveEntityId = (value: string) =>
     }
 
     const matches = yield* prefixIndex.findMatchesByPrefix(value);
+    const [match] = matches;
 
-    if (matches.length === 1) {
-      return matches[0]?.id ?? value;
+    if (match) {
+      return match.id;
     }
 
     if (matches.length > 1) {

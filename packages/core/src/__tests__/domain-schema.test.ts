@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { EntityTypeEnum } from "../domain/entity.js";
+import { EntityType } from "../domain/entity.js";
 import {
   CodeRefSchema,
   CreateTagInput,
@@ -40,7 +40,7 @@ describe("domain schema unit tests", () => {
     it("decodes a valid doc entity", () => {
       const result = decodeSync(DocSchema, {
         id: "entity-0001",
-        _tag: EntityTypeEnum.Doc,
+        _tag: EntityType.Doc,
         title: "Architecture Overview",
         content: "System design notes",
         tags: ["architecture", "docs"],
@@ -50,7 +50,7 @@ describe("domain schema unit tests", () => {
       });
 
       expect(result.id).toBe("entity-0001");
-      expect(result._tag).toBe(EntityTypeEnum.Doc);
+      expect(result._tag).toBe(EntityType.Doc);
       expect(result.title).toBe("Architecture Overview");
       expect(result.createdAt).toBeInstanceOf(Date);
       expect(result.updatedAt).toBeInstanceOf(Date);
@@ -59,7 +59,7 @@ describe("domain schema unit tests", () => {
     it("decodes a valid code_ref entity", () => {
       const result = decodeSync(CodeRefSchema, {
         id: "entity-0002",
-        _tag: EntityTypeEnum.CodeRef,
+        _tag: EntityType.CodeRef,
         title: "Graph service traversal",
         content: "Traversal implementation reference",
         tags: ["service"],
@@ -74,7 +74,7 @@ describe("domain schema unit tests", () => {
       });
 
       expect(result.id).toBe("entity-0002");
-      expect(result._tag).toBe(EntityTypeEnum.CodeRef);
+      expect(result._tag).toBe(EntityType.CodeRef);
       expect(result.filePath).toBe("src/services/graph-service.ts");
       expect(result.startLine).toBe(10);
       expect(result.endLine).toBe(42);
@@ -86,7 +86,7 @@ describe("domain schema unit tests", () => {
       const result = decodeSync(StorySchema, {
         id: "entity-0003",
         title: "Implement graph traversal",
-        _tag: EntityTypeEnum.Story,
+        _tag: EntityType.Story,
         content: "Add BFS traversal support",
         tags: ["story"],
         createdAt: FIXED_DATE_ISO,
@@ -98,7 +98,7 @@ describe("domain schema unit tests", () => {
       });
 
       expect(result.id).toBe("entity-0003");
-      expect(result._tag).toBe(EntityTypeEnum.Story);
+      expect(result._tag).toBe(EntityType.Story);
       expect(result.status).toBe("in_progress");
       expect(result.priority).toBe("high");
       expect(result.parentId).toBe("story-epic-1");
@@ -109,7 +109,7 @@ describe("domain schema unit tests", () => {
     it("decodes a valid diagram entity", () => {
       const result = decodeSync(DiagramSchema, {
         id: "entity-0004",
-        _tag: EntityTypeEnum.Diagram,
+        _tag: EntityType.Diagram,
         title: "Entity relationship diagram",
         content: "ERD for graph storage",
         tags: ["diagram"],
@@ -122,7 +122,7 @@ describe("domain schema unit tests", () => {
       });
 
       expect(result.id).toBe("entity-0004");
-      expect(result._tag).toBe(EntityTypeEnum.Diagram);
+      expect(result._tag).toBe(EntityType.Diagram);
       expect(result.diagramType).toBe("erd");
       expect(result.generatedFrom).toEqual(["entity-0001", "entity-0002"]);
       expect(result.createdAt).toBeInstanceOf(Date);
@@ -133,7 +133,7 @@ describe("domain schema unit tests", () => {
       const variants = [
         {
           id: "entity-doc",
-          _tag: EntityTypeEnum.Doc,
+          _tag: EntityType.Doc,
           title: "Doc",
           content: "Content",
           tags: [],

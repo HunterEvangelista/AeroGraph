@@ -1,4 +1,4 @@
-import { EntityServiceTag, EntityTypeEnum, LinkRepositoryTag, TagServiceTag } from "@kioku/core";
+import { EntityServiceTag, EntityType, LinkRepositoryTag, TagServiceTag } from "@kioku/core";
 import { Console, Data, Effect, Option } from "effect";
 /**
  * Doc Commands
@@ -123,7 +123,7 @@ const docShowCommand = Command.make(
             resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
-          if (entity._tag !== EntityTypeEnum.Doc) {
+          if (entity._tag !== EntityType.Doc) {
             return yield* new NotADocError({ id: resolvedId });
           }
 
@@ -219,19 +219,19 @@ const docListCommand = Command.make(
 
           if (searchValue) {
             const results = yield* entityService.search(searchValue);
-            const docs = results.filter((e) => e._tag === EntityTypeEnum.Doc);
+            const docs = results.filter((e) => e._tag === EntityType.Doc);
             const displayIds = yield* loadFormattedEntityIds(docs.map((doc) => doc.id));
             return { docs, displayIds };
           }
 
           if (tagValue) {
             const results = yield* entityService.getByTag(tagValue);
-            const docs = results.filter((e) => e._tag === EntityTypeEnum.Doc);
+            const docs = results.filter((e) => e._tag === EntityType.Doc);
             const displayIds = yield* loadFormattedEntityIds(docs.map((doc) => doc.id));
             return { docs, displayIds };
           }
 
-          const docs = yield* entityService.getAll(EntityTypeEnum.Doc);
+          const docs = yield* entityService.getAll(EntityType.Doc);
           const displayIds = yield* loadFormattedEntityIds(docs.map((doc) => doc.id));
           return { docs, displayIds };
         })
@@ -300,7 +300,7 @@ const docEditCommand = Command.make(
             resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
-          if (existing._tag !== EntityTypeEnum.Doc) {
+          if (existing._tag !== EntityType.Doc) {
             return yield* new NotADocError({ id: resolvedId });
           }
 
@@ -360,7 +360,7 @@ const docDeleteCommand = Command.make(
             resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
-          if (existing._tag !== EntityTypeEnum.Doc) {
+          if (existing._tag !== EntityType.Doc) {
             return yield* new NotADocError({ id: resolvedId });
           }
 

@@ -1,4 +1,5 @@
 import { Context, type Effect } from "effect";
+import type { EntityId } from "../domain/entity.js";
 import type { CreateLinkInput, Link, LinkId, LinkType } from "../domain/link.js";
 import type {
   EntityNotFoundError,
@@ -37,18 +38,20 @@ export interface LinkRepository {
   /**
    * Get all links from a source entity
    */
-  readonly getFromSource: (sourceId: string) => Effect.Effect<ReadonlyArray<Link>, RepositoryError>;
+  readonly getFromSource: (
+    sourceId: EntityId
+  ) => Effect.Effect<ReadonlyArray<Link>, RepositoryError>;
 
   /**
    * Get all links to a target entity
    */
-  readonly getToTarget: (targetId: string) => Effect.Effect<ReadonlyArray<Link>, RepositoryError>;
+  readonly getToTarget: (targetId: EntityId) => Effect.Effect<ReadonlyArray<Link>, RepositoryError>;
 
   /**
    * Get all links for an entity (both directions)
    */
   readonly getAllForEntity: (
-    entityId: string
+    entityId: EntityId
   ) => Effect.Effect<ReadonlyArray<Link>, RepositoryError>;
 
   /**
@@ -60,8 +63,8 @@ export interface LinkRepository {
    * Get link between two specific entities
    */
   readonly getLinkBetween: (
-    sourceId: string,
-    targetId: string
+    sourceId: EntityId,
+    targetId: EntityId
   ) => Effect.Effect<Link | null, RepositoryError>;
 
   /**
@@ -72,14 +75,14 @@ export interface LinkRepository {
   /**
    * Delete all links for an entity
    */
-  readonly deleteAllForEntity: (entityId: string) => Effect.Effect<number, RepositoryError>;
+  readonly deleteAllForEntity: (entityId: EntityId) => Effect.Effect<number, RepositoryError>;
 
   /**
    * Delete link between two entities
    */
   readonly deleteBetween: (
-    sourceId: string,
-    targetId: string,
+    sourceId: EntityId,
+    targetId: EntityId,
     type?: LinkType
   ) => Effect.Effect<void, LinkNotFoundError | RepositoryError>;
 

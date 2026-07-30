@@ -1,4 +1,4 @@
-import { type Entity, EntityTypeEnum, type Link } from "@kioku/core";
+import { type Entity, EntityType, type Link } from "@kioku/core";
 
 export interface ContextEntity {
   readonly entity: Entity;
@@ -20,7 +20,7 @@ const sectionOrder = [
 ] as const;
 
 const codeLocation = (entity: Entity): string | undefined => {
-  if (entity._tag !== EntityTypeEnum.CodeRef) return undefined;
+  if (entity._tag !== EntityType.CodeRef) return undefined;
   const start = entity.startLine ? `:${entity.startLine}` : "";
   const end = entity.endLine ? `-${entity.endLine}` : "";
   return `${entity.filePath}${start}${end}`;
@@ -88,19 +88,19 @@ export const formatContextMarkdown = ({ title, entities, links }: ContextMarkdow
   appendSection(
     lines,
     "Code References",
-    without(entities, used).filter((item) => item.entity._tag === EntityTypeEnum.CodeRef),
+    without(entities, used).filter((item) => item.entity._tag === EntityType.CodeRef),
     used
   );
   appendSection(
     lines,
     "Related Docs",
-    without(entities, used).filter((item) => item.entity._tag === EntityTypeEnum.Doc),
+    without(entities, used).filter((item) => item.entity._tag === EntityType.Doc),
     used
   );
   appendSection(
     lines,
     "Stories",
-    without(entities, used).filter((item) => item.entity._tag === EntityTypeEnum.Story),
+    without(entities, used).filter((item) => item.entity._tag === EntityType.Story),
     used
   );
   appendSection(lines, "Other Context", without(entities, used), used);

@@ -11,8 +11,7 @@ import {
   EntityNotFoundError,
   type EntityRepository,
   EntityRepositoryTag,
-  type EntityType,
-  EntityTypeEnum,
+  EntityType,
   RepositoryError,
   type Story,
   StoryStatusEnum,
@@ -78,11 +77,11 @@ const rowToEntity = (row: EntityRow): Entity => {
 
   switch (row.type) {
     case "doc":
-      return { ...base, _tag: EntityTypeEnum.Doc } as Doc;
+      return { ...base, _tag: EntityType.Doc } as Doc;
     case "code_ref":
       return {
         ...base,
-        _tag: EntityTypeEnum.CodeRef,
+        _tag: EntityType.CodeRef,
         repoPath: metadata.repoPath ?? "",
         filePath: metadata.filePath ?? "",
         startLine: metadata.startLine,
@@ -93,7 +92,7 @@ const rowToEntity = (row: EntityRow): Entity => {
     case "story":
       return {
         ...base,
-        _tag: EntityTypeEnum.Story,
+        _tag: EntityType.Story,
         status: metadata.status ?? StoryStatusEnum.Backlog,
         priority: metadata.priority,
         parentId: metadata.parentId,
@@ -101,7 +100,7 @@ const rowToEntity = (row: EntityRow): Entity => {
     case "diagram":
       return {
         ...base,
-        _tag: EntityTypeEnum.Diagram,
+        _tag: EntityType.Diagram,
         diagramType: metadata.diagramType ?? "other",
         source: metadata.source ?? "",
         generatedFrom: metadata.generatedFrom,
@@ -139,13 +138,13 @@ const mergeDiagramMetadata = (existing: Diagram, updates: Partial<Diagram>): str
 
 const mergeEntityMetadata = (existing: Entity, updates: Partial<Entity>): string | null => {
   switch (existing._tag) {
-    case EntityTypeEnum.Doc:
+    case EntityType.Doc:
       return mergeDocMetadata(existing, updates as Partial<Doc>);
-    case EntityTypeEnum.CodeRef:
+    case EntityType.CodeRef:
       return mergeCodeRefMetadata(existing, updates as Partial<CodeRef>);
-    case EntityTypeEnum.Story:
+    case EntityType.Story:
       return mergeStoryMetadata(existing, updates as Partial<Story>);
-    case EntityTypeEnum.Diagram:
+    case EntityType.Diagram:
       return mergeDiagramMetadata(existing, updates as Partial<Diagram>);
   }
 };
@@ -177,7 +176,7 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
               .insert(entities)
               .values({
                 id,
-                type: EntityTypeEnum.Doc,
+                type: EntityType.Doc,
                 title: input.title,
                 content: input.content,
                 metadata: null,
@@ -216,7 +215,7 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
               .insert(entities)
               .values({
                 id,
-                type: EntityTypeEnum.CodeRef,
+                type: EntityType.CodeRef,
                 title: input.title,
                 content: input.content,
                 metadata,
@@ -252,7 +251,7 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
               .insert(entities)
               .values({
                 id,
-                type: EntityTypeEnum.Story,
+                type: EntityType.Story,
                 title: input.title,
                 content: input.content,
                 metadata,
@@ -288,7 +287,7 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
               .insert(entities)
               .values({
                 id,
-                type: EntityTypeEnum.Diagram,
+                type: EntityType.Diagram,
                 title: input.title,
                 content: input.content,
                 metadata,

@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
 import { describe, expect, it } from "vitest";
-import type { Entity, EntityId, EntityType } from "../domain/entity.js";
-import { EntityTypeEnum } from "../domain/entity.js";
+import type { Entity, EntityId } from "../domain/entity.js";
+import { EntityType } from "../domain/entity.js";
 import type { Tag, TagId, UpdateTagInput } from "../domain/tag.js";
 import type {
   CreateTermInput,
@@ -59,7 +59,7 @@ interface MigrationStore {
 }
 
 const createTestEntity = (id: string, tags: ReadonlyArray<string> = []): Entity => ({
-  _tag: EntityTypeEnum.Doc,
+  _tag: EntityType.Doc,
   id: id as EntityId,
   title: `Entity ${id}`,
   content: `Content for ${id}`,

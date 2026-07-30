@@ -3,6 +3,7 @@
  * Relationships between entities
  */
 import { Schema } from "effect";
+import { BrandedId } from "./entity";
 
 // ============================================================================
 // Link Types
@@ -24,8 +25,8 @@ export type LinkType = typeof LinkType.Type;
 
 export const Link = Schema.Struct({
   id: Schema.String.pipe(Schema.brand("LinkId")),
-  sourceId: Schema.String,
-  targetId: Schema.String,
+  sourceId: BrandedId,
+  targetId: BrandedId,
   type: LinkType,
   createdAt: Schema.DateFromString,
 });
@@ -38,8 +39,8 @@ export type LinkId = Link["id"];
 // ============================================================================
 
 export const CreateLinkInput = Schema.Struct({
-  sourceId: Schema.String.check(Schema.isNonEmpty()),
-  targetId: Schema.String.check(Schema.isNonEmpty()),
+  sourceId: BrandedId,
+  targetId: BrandedId,
   type: LinkType,
 });
 

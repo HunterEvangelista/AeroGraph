@@ -1,5 +1,6 @@
+/** biome-ignore-all lint/complexity/noExcessiveCognitiveComplexity: deferred */
 import { Effect, Layer, Result } from "effect";
-import { type Entity, EntityTypeEnum } from "../domain/entity.js";
+import { type Entity, type EntityId, type EntityType, EntityTypes } from "../domain/entity.js";
 import type { LinkType } from "../domain/link.js";
 import { EntityNotFoundError } from "../errors.js";
 import { EntityRepositoryTag } from "../repository/entity-repository.js";
@@ -20,9 +21,9 @@ export const GraphServiceLive = Layer.effect(
     const linkRepo = yield* LinkRepositoryTag;
     const tagRepo = yield* TagRepositoryTag;
 
-    const getEntityWithLinks = (entityId: string) =>
+    const getEntityWithLinks = (entityId: EntityId) =>
       Effect.gen(function* () {
-        const entity = yield* entityRepo.getById(entityId as Entity["id"]);
+        const entity = yield* entityRepo.getById(entityId);
         const allLinks = yield* linkRepo.getAllForEntity(entityId);
 
         const incomingLinks = allLinks.filter((l) => l.targetId === entityId);
@@ -31,7 +32,7 @@ export const GraphServiceLive = Layer.effect(
         return { entity, incomingLinks, outgoingLinks } satisfies EntityWithLinks;
       });
 
-    const getRelatedEntities = (entityId: string, linkTypes?: ReadonlyArray<LinkType>) =>
+    const getRelatedEntities = (entityId: EntityId, linkTypes?: ReadonlyArray<LinkType>) =>
       Effect.gen(function* () {
         const links = yield* linkRepo.getAllForEntity(entityId);
 
@@ -59,15 +60,15 @@ export const GraphServiceLive = Layer.effect(
         return entities;
       });
 
-    const traverse = (entityId: string, maxDepth: number, linkTypes?: ReadonlyArray<LinkType>) =>
+    const traverse = (entityId: EntityId, maxDepth: number, linkTypes?: ReadonlyArray<LinkType>) =>
       Effect.gen(function* () {
-        const visited = new Set<string>([entityId]);
+        const visited = new Set([entityId]);
         const entities: Entity[] = [];
         let currentLevel = [entityId];
         let depth = 0;
 
         while (currentLevel.length > 0 && depth < maxDepth) {
-          const nextLevel: string[] = [];
+          const nextLevel: EntityId[] = [];
 
           for (const id of currentLevel) {
             const related = yield* getRelatedEntities(id, linkTypes);
@@ -119,34 +120,29 @@ export const GraphServiceLive = Layer.effect(
         linkRepo.count,
       ]);
 
-      const entitiesByType: Record<string, number> = {};
-      for (const type of [
-        EntityTypeEnum.Doc,
-        EntityTypeEnum.CodeRef,
-        EntityTypeEnum.Story,
-        EntityTypeEnum.Diagram,
-      ] as const) {
+      const entitiesByType: Partial<Record<EntityType, number>> = {};
+      for (const type of EntityTypes) {
         entitiesByType[type] = yield* entityRepo.count(type);
       }
 
       return { totalEntities, totalTags, totalLinks, entitiesByType } satisfies GraphStats;
     });
 
-    const findPath = (sourceId: string, targetId: string, maxDepth = 5) =>
+    const findPath = (sourceId: EntityId, targetId: EntityId, maxDepth = 5) =>
       Effect.gen(function* () {
         const visited = new Set<string>([sourceId]);
-        const parentMap = new Map<string, string>();
+        const parentMap = new Map<EntityId, EntityId>();
         let queue = [sourceId];
 
         for (let depth = 0; depth <= maxDepth && queue.length > 0; depth++) {
-          const nextQueue: string[] = [];
+          const nextQueue: EntityId[] = [];
 
           for (const currentId of queue) {
             if (currentId === targetId) {
               const path: Entity[] = [];
-              let id: string | undefined = targetId;
+              let id: EntityId | undefined = targetId;
               while (id) {
-                const entity = yield* entityRepo.getById(id as Entity["id"]);
+                const entity = yield* entityRepo.getById(id);
                 path.unshift(entity);
                 id = parentMap.get(id);
               }
