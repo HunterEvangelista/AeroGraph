@@ -41,17 +41,17 @@ export const resolveEntityId = (value: string) =>
     }
 
     const matches = yield* prefixIndex.findMatchesByPrefix(value);
-    const [match] = matches;
-
-    if (match) {
-      return match.id;
-    }
 
     if (matches.length > 1) {
       return yield* new AmbiguousEntityIdError({
         value,
         matches,
       });
+    }
+
+    const [match] = matches;
+    if (match) {
+      return match.id;
     }
 
     return yield* new EntityNotFoundError({ entityId: value });
