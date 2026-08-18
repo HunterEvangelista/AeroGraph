@@ -1,11 +1,14 @@
 # Provisional Tag Semantics
 
-Kioku supports legacy exact-ID tags and tags associated with governed terms. Broader governance and lifecycle commands remain separate follow-up work.
+Kioku supports legacy exact-ID tags and tags associated with governed terms. Governed terminology can be inspected, aliased, deprecated, merged, and audited through the `kioku term` commands.
 
 ## Current Behavior
 
 - A selector matching a canonical, alias, or deprecated term name resolves to every tag governed by that stable term ID.
+- A merged term's historical names redirect to the active destination term and its governed tags.
+- A deprecated term continues resolving its own governed tags; an optional replacement is advisory rather than a redirect.
 - A selector that does not match a registered term retains exact tag-ID behavior.
+- Exact stable IDs take precedence. Name lookup is kind-scoped, and unqualified cross-kind ambiguity must be resolved explicitly.
 - One governed selector matches any tag in that term; `kioku query --tags a,b` intersects the two selector groups.
 - Tags do not imply hierarchy today.
 - A tag like `editor/indexer` is a single exact tag, not equivalent to `editor` plus `indexer`.
