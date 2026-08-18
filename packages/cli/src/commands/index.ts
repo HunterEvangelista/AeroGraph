@@ -14,3 +14,4 @@ export { queryCommand } from "./query.js";
 export { statusCommand } from "./status.js";
 export { storyCommand } from "./story.js";
 export { tagCommand } from "./tag.js";
+export { termCommand } from "./term.js";
