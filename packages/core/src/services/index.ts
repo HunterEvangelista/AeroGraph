@@ -37,6 +37,10 @@ export { TagServiceTag } from "./tag-service";
 export { TagServiceLive } from "./tag-service.live";
 export type {
   AddTermAliasInput,
+  CreateGovernedTermInput,
+  GovernTagInput,
+  TagGovernanceFilter,
+  TagGovernanceInspection,
   TermAudit,
   TermGovernanceService,
 } from "./term-governance-service";

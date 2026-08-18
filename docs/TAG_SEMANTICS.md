@@ -2,6 +2,19 @@
 
 Kioku supports legacy exact-ID tags and tags associated with governed terms. Governed terminology can be inspected, aliased, deprecated, merged, and audited through the `kioku term` commands.
 
+## Setup and Safety
+
+Terms can be created without an ID (the registry generates one), or with an explicit stable ID. Aliases are repeatable CLI flags:
+
+```bash
+kioku term create Kioku --kind brand --alias "Kioku Project" --alias "Project Memory" --json
+kioku tag govern kioku --term Kioku --kind brand
+kioku tag list --governed
+kioku tag list --ungoverned --json
+```
+
+Governance changes only term ownership; tag IDs, entity-tag attachments, entities, and relationships are preserved. Reassignment is compare-and-set: `--replace` names the expected current owner and is required for changing an already governed tag. Exact term IDs take precedence over names, and `--kind` only disambiguates names. `term create` and the `tag govern`, `tag show`, and `tag list` operations support `--json` with an `ok` and `command` envelope; failures use the corresponding error envelope.
+
 ## Current Behavior
 
 - A selector matching a canonical, alias, or deprecated term name resolves to every tag governed by that stable term ID.

@@ -1,5 +1,16 @@
-import { TagIdSchema, TagServiceTag } from "@kioku/core";
-import { Console, Effect, Option } from "effect";
+import {
+  type GovernTagInput,
+  type KiokuError,
+  type TagGovernanceInspection,
+  TagIdSchema,
+  TagServiceTag,
+  TERM_KINDS,
+  TermGovernanceServiceTag,
+  TermIdSchema,
+  TermKind as TermKindSchema,
+  ValidationError,
+} from "@kioku/core";
+import { Console, Effect, Option, Schema } from "effect";
 /**
  * Tag Commands
  * Operations for managing tags and entity tagging
@@ -80,6 +91,68 @@ const tagCreateCommand = Command.make(
 // Tag List Command
 // ============================================================================
 
+const jsonFlag = Flag.boolean("json").pipe(
+  Flag.withDescription("Emit JSON"),
+  Flag.withDefault(false)
+);
+const governanceFilter = (
+  governed: boolean,
+  ungoverned: boolean
+): Effect.Effect<"governed" | "ungoverned" | undefined, ValidationError> =>
+  governed === ungoverned
+    ? governed
+      ? Effect.fail(
+          new ValidationError({
+            field: "governance",
+            message: "Use only one of --governed or --ungoverned.",
+          })
+        )
+      : Effect.void.pipe(Effect.as(undefined))
+    : Effect.succeed(governed ? "governed" : "ungoverned");
+const inspectionTag = (value: TagGovernanceInspection) => value.tag;
+const inspectionTerm = (value: TagGovernanceInspection) => value.term;
+
+interface TagJsonError {
+  readonly tag: string;
+  readonly message: string;
+  readonly field?: string;
+  readonly name?: string;
+}
+
+const errorMessage = (error: KiokuError): string => {
+  if (error.message) return error.message;
+  if (error._tag === "TagNotFoundError") return `Tag not found: #${error.tagId}`;
+  if (error._tag === "TermNotFoundError") return `Term not found: ${error.name}`;
+  if (error._tag === "EntityNotFoundError") return `Entity not found: ${error.entityId}`;
+  return error._tag;
+};
+
+const errorData = (error: KiokuError): TagJsonError => {
+  const data: TagJsonError = { tag: error._tag, message: errorMessage(error) };
+  if ("field" in error && error.field !== undefined) return { ...data, field: error.field };
+  if ("name" in error && error.name !== undefined) return { ...data, name: error.name };
+  return data;
+};
+
+const outputError = <A, E extends KiokuError, R>(
+  effect: Effect.Effect<A, E, R>,
+  command: string,
+  asJson: boolean
+) =>
+  asJson
+    ? effect.pipe(
+        Effect.catch((error) =>
+          Console.log(JSON.stringify({ ok: false, command, error: errorData(error) })).pipe(
+            Effect.andThen(
+              Effect.sync(() => {
+                process.exitCode = 1;
+              })
+            )
+          )
+        )
+      )
+    : effect.pipe(Effect.tapError((error) => Console.error(`Error: ${errorData(error).message}`)));
+
 const tagListCommand = Command.make(
   "list",
   {
@@ -92,24 +165,34 @@ const tagListCommand = Command.make(
       Flag.withDescription("Show as hierarchy tree"),
       Flag.withDefault(false)
     ),
+    governed: Flag.boolean("governed").pipe(Flag.withDefault(false)),
+    ungoverned: Flag.boolean("ungoverned").pipe(Flag.withDefault(false)),
+    json: jsonFlag,
   },
-  ({ search, tree }) =>
+  ({ search, tree, governed, ungoverned, json: asJson }) =>
     // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Existing tree rendering logic is localized to the list command.
     Effect.gen(function* () {
       const searchValue = Option.getOrUndefined(search);
-
+      const filter = yield* governanceFilter(governed, ungoverned);
       const tags = yield* withCliServices(
         Effect.gen(function* () {
-          const tagService = yield* TagServiceTag;
-
-          if (searchValue) {
-            return yield* tagService.search(searchValue);
-          }
-
-          return yield* tagService.getAll;
+          const governance = yield* TermGovernanceServiceTag;
+          const inspections = yield* governance.listTags(filter);
+          if (!searchValue) return inspections;
+          const query = searchValue.toLocaleLowerCase();
+          return inspections.filter((inspection) => {
+            const tag = inspectionTag(inspection);
+            return [tag.id, tag.name, ...(tag.aliases ?? [])].some((value) =>
+              value.toLocaleLowerCase().includes(query)
+            );
+          });
         })
       );
 
+      if (asJson) {
+        yield* Console.log(JSON.stringify({ ok: true, command: "tag list", tags }));
+        return;
+      }
       yield* Console.log("");
       yield* Console.log(`Tags (${tags.length})`);
       yield* Console.log("=".repeat(40));
@@ -119,59 +202,44 @@ const tagListCommand = Command.make(
         yield* Console.log("No tags found.");
         yield* Console.log("");
         yield* Console.log("Create one with: kioku tag create <name>");
-      } else if (tree) {
-        // Build tree structure
-        const rootTags = tags.filter((t) => !t.parentId);
-        const childMap = new Map<string, Array<(typeof tags)[0]>>();
-
-        for (const tag of tags) {
-          if (tag.parentId) {
-            const children = childMap.get(tag.parentId) || [];
-            children.push(tag);
-            childMap.set(tag.parentId, children);
-          }
-        }
-
-        const printTag = function* (
-          tag: (typeof tags)[0],
-          indent: number
-        ): Generator<Effect.Effect<void, never, never>, void, void> {
-          const prefix = "  ".repeat(indent);
-          const desc = tag.description ? ` - ${tag.description}` : "";
-          yield Console.log(`${prefix}#${tag.id}${desc}`);
-
-          const children = childMap.get(tag.id) || [];
-          for (const child of children) {
-            yield* printTag(child, indent + 1);
-          }
-        };
-
-        for (const rootTag of rootTags) {
-          yield* Effect.gen(function* () {
-            for (const effect of printTag(rootTag, 0)) {
-              yield* effect;
-            }
-          });
-        }
       } else {
-        for (const tag of tags) {
+        const render = (inspection: TagGovernanceInspection, depth: number) => {
+          const tag = inspectionTag(inspection);
           const desc = tag.description ? ` - ${tag.description}` : "";
-          const parent = tag.parentId ? ` (parent: #${tag.parentId})` : "";
-          yield* Console.log(`#${tag.id}${desc}${parent}`);
+          const governedTerm = inspectionTerm(inspection);
+          const governanceText = governedTerm
+            ? ` [governed: ${governedTerm.canonicalName} (${governedTerm.term.kind})]`
+            : " [ungoverned]";
+          return `${"  ".repeat(depth)}#${tag.id}${desc}${governanceText}`;
+        };
+        if (!tree) {
+          for (const inspection of tags) yield* Console.log(render(inspection, 0));
+        } else {
+          const byParent = new Map<string | undefined, TagGovernanceInspection[]>();
+          for (const inspection of tags) {
+            const parent = inspectionTag(inspection).parentId;
+            const siblings = byParent.get(parent) ?? [];
+            siblings.push(inspection);
+            byParent.set(parent, siblings);
+          }
+          const selectedIds = new Set<string>(
+            tags.map((inspection) => inspectionTag(inspection).id)
+          );
+          const visit = (inspection: TagGovernanceInspection, depth: number): Effect.Effect<void> =>
+            Effect.gen(function* () {
+              const tag = inspectionTag(inspection);
+              yield* Console.log(render(inspection, depth));
+              for (const child of byParent.get(tag.id) ?? []) yield* visit(child, depth + 1);
+            });
+          for (const inspection of tags) {
+            const parentId = inspectionTag(inspection).parentId;
+            if (!parentId || !selectedIds.has(parentId)) yield* visit(inspection, 0);
+          }
         }
       }
 
       yield* Console.log("");
-    }).pipe(
-      Effect.catchTags({
-        WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
-        ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
-        RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
-      })
-    )
+    }).pipe((effect) => outputError(effect, "tag list", asJson))
 );
 
 // ============================================================================
@@ -262,6 +330,79 @@ const tagRemoveCommand = Command.make(
 );
 
 // ============================================================================
+// Tag Governance Commands
+// ============================================================================
+
+const tagGovernCommand = Command.make(
+  "govern",
+  {
+    tagId: Argument.string("tag-id"),
+    term: Flag.string("term"),
+    kind: Flag.string("kind").pipe(Flag.optional),
+    replace: Flag.string("replace").pipe(Flag.optional),
+    json: jsonFlag,
+  },
+  (args) =>
+    Effect.gen(function* () {
+      const kindValue = Option.getOrUndefined(args.kind);
+      if (kindValue !== undefined && !Schema.is(TermKindSchema)(kindValue)) {
+        return yield* new ValidationError({
+          field: "kind",
+          message: `Invalid term kind '${kindValue}'. Expected one of: ${TERM_KINDS.join(", ")}`,
+        });
+      }
+      const result = yield* withCliServices(
+        Effect.gen(function* () {
+          const governance = yield* TermGovernanceServiceTag;
+          // Stable IDs always win; kind qualifies names only.
+          const termInspection =
+            kindValue === undefined
+              ? yield* governance.show(args.term)
+              : yield* governance
+                  .show({ id: TermIdSchema.make(args.term) })
+                  .pipe(
+                    Effect.catchTag("TermNotFoundError", () =>
+                      governance.show({ name: args.term, kind: kindValue })
+                    )
+                  );
+          const replacement = Option.getOrUndefined(args.replace);
+          const expected =
+            replacement === undefined
+              ? undefined
+              : yield* (
+                  kindValue === undefined
+                    ? governance.show(replacement)
+                    : governance
+                        .show({ id: TermIdSchema.make(replacement) })
+                        .pipe(
+                          Effect.catchTag("TermNotFoundError", () =>
+                            governance.show({ name: replacement, kind: kindValue })
+                          )
+                        )
+                ).pipe(Effect.map((inspection) => ({ id: inspection.term.id })));
+          const input: GovernTagInput = {
+            tagId: TagIdSchema.make(args.tagId),
+            term: { id: termInspection.term.id },
+          };
+          return yield* governance.governTag(expected ? { ...input, replace: expected } : input);
+        })
+      );
+      if (args.json)
+        yield* Console.log(JSON.stringify({ ok: true, command: "tag govern", tag: result }));
+      else {
+        const term = inspectionTerm(result);
+        yield* Console.log(`Tag ID: #${result.tag.id}`);
+        yield* Console.log(`Tag name: ${result.tag.name}`);
+        yield* Console.log("Status: governed");
+        if (term)
+          yield* Console.log(
+            `Term: ${term.term.id} | ${term.canonicalName} | kind: ${term.term.kind} | status: ${term.term.status}`
+          );
+      }
+    }).pipe((effect) => outputError(effect, "tag govern", args.json))
+);
+
+// ============================================================================
 // Tag Show Command
 // ============================================================================
 
@@ -269,23 +410,31 @@ const tagShowCommand = Command.make(
   "show",
   {
     id: Argument.string("tag-id"),
+    json: jsonFlag,
   },
-  ({ id }) =>
+  ({ id, json: asJson }) =>
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: show renders optional hierarchy and governance metadata.
     Effect.gen(function* () {
-      const { tag, ancestors, children } = yield* withCliServices(
+      const { tag, ancestors, children, inspection } = yield* withCliServices(
         Effect.gen(function* () {
           const tagService = yield* TagServiceTag;
+          const governance = yield* TermGovernanceServiceTag;
 
           const tag = yield* tagService.getById(TagIdSchema.make(id));
+          const inspection = yield* governance.inspectTag(TagIdSchema.make(id));
           const ancestors = yield* tagService.getAncestors(tag.id);
           const children = yield* tagService
             .getChildren(tag.id)
             .pipe(Effect.orElseSucceed(() => []));
 
-          return { tag, ancestors, children };
+          return { tag, ancestors, children, inspection };
         })
       );
 
+      if (asJson) {
+        yield* Console.log(JSON.stringify({ ok: true, command: "tag show", tag: inspection }));
+        return;
+      }
       yield* Console.log("");
       yield* Console.log(`Tag: #${tag.id}`);
       yield* Console.log("=".repeat(40));
@@ -295,6 +444,13 @@ const tagShowCommand = Command.make(
         yield* Console.log(`Desc:    ${tag.description}`);
       }
       yield* Console.log(`Created: ${tag.createdAt.toISOString()}`);
+      const governedTerm = inspectionTerm(inspection);
+      yield* Console.log(`Governance: ${governedTerm ? "governed" : "ungoverned"}`);
+      if (governedTerm) {
+        yield* Console.log(
+          `Term: ${governedTerm.term.id} (${governedTerm.canonicalName}; ${governedTerm.term.kind}; ${governedTerm.term.status})`
+        );
+      }
 
       if (ancestors.length > 0) {
         yield* Console.log("");
@@ -313,18 +469,7 @@ const tagShowCommand = Command.make(
       }
 
       yield* Console.log("");
-    }).pipe(
-      Effect.catchTags({
-        WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
-        ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
-        RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
-        TagNotFoundError: (e) =>
-          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.andThen(Effect.fail(e))),
-      })
-    )
+    }).pipe((effect) => outputError(effect, "tag show", asJson))
 );
 
 // ============================================================================
@@ -384,6 +529,7 @@ export const tagCommand = Command.make("tag").pipe(
   Command.withSubcommands([
     tagCreateCommand,
     tagListCommand,
+    tagGovernCommand,
     tagApplyCommand,
     tagRemoveCommand,
     tagShowCommand,
