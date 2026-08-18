@@ -5,15 +5,16 @@ import { PositiveInteger } from "./scalars";
 // Entity Types
 // ============================================================================
 
-export enum EntityTypeEnum {
-  Doc = "doc",
-  CodeRef = "code_ref",
-  Story = "story",
-  Diagram = "diagram",
-}
+export const EntityType = {
+  Doc: "doc",
+  CodeRef: "code_ref",
+  Story: "story",
+  Diagram: "diagram",
+} as const;
 
-export const EntityTypeSchema = Schema.Enum(EntityTypeEnum);
-export type EntityType = typeof EntityTypeSchema.Type;
+export type EntityType = (typeof EntityType)[keyof typeof EntityType];
+export const EntityTypes: ReadonlyArray<EntityType> = Object.freeze(Object.values(EntityType));
+export const EntityTypeSchema = Schema.Literals(EntityTypes);
 
 // ============================================================================
 // Story Status & Priority
@@ -59,7 +60,7 @@ export type DiagramType = typeof DiagramTypeSchema.Type;
 // Base Entity Schema (untagged)
 // ============================================================================
 
-export const BrandedId = Schema.String.pipe(Schema.brand("EntityId"));
+export const BrandedId = Schema.String.check(Schema.isNonEmpty()).pipe(Schema.brand("EntityId"));
 
 const BaseEntityFields = {
   id: BrandedId,
@@ -80,12 +81,12 @@ export type EntityId = (typeof BaseEntitySchema.Type)["id"];
 // Untagged Entity Variants
 // ============================================================================
 
-export const DocSchema = Schema.TaggedStruct(EntityTypeEnum.Doc, {
+export const DocSchema = Schema.TaggedStruct(EntityType.Doc, {
   ...BaseEntityFields,
 });
 export type Doc = typeof DocSchema.Type;
 
-export const CodeRefSchema = Schema.TaggedStruct(EntityTypeEnum.CodeRef, {
+export const CodeRefSchema = Schema.TaggedStruct(EntityType.CodeRef, {
   ...BaseEntityFields,
   repoPath: Schema.String,
   filePath: Schema.String.check(Schema.isNonEmpty()),
@@ -96,7 +97,7 @@ export const CodeRefSchema = Schema.TaggedStruct(EntityTypeEnum.CodeRef, {
 });
 export type CodeRef = typeof CodeRefSchema.Type;
 
-export const StorySchema = Schema.TaggedStruct(EntityTypeEnum.Story, {
+export const StorySchema = Schema.TaggedStruct(EntityType.Story, {
   ...BaseEntityFields,
   status: StoryStatusSchema,
   priority: Schema.optional(PrioritySchema),
@@ -104,7 +105,7 @@ export const StorySchema = Schema.TaggedStruct(EntityTypeEnum.Story, {
 });
 export type Story = typeof StorySchema.Type;
 
-export const DiagramSchema = Schema.TaggedStruct(EntityTypeEnum.Diagram, {
+export const DiagramSchema = Schema.TaggedStruct(EntityType.Diagram, {
   ...BaseEntityFields,
   diagramType: DiagramTypeSchema,
   source: Schema.String,

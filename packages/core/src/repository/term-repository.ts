@@ -42,6 +42,19 @@ export interface TermRepository {
    */
   readonly getById: (id: TermId) => Effect.Effect<Term, TermNotFoundError | RepositoryError>;
 
+  /** Get multiple terms in one repository operation. Results are deterministic. */
+  readonly getByIds: (
+    ids: ReadonlyArray<TermId>
+  ) => Effect.Effect<ReadonlyArray<Term>, RepositoryError>;
+
+  /** Get all registered names for multiple terms in one repository operation. */
+  readonly listNamesByTermIds: (
+    ids: ReadonlyArray<TermId>
+  ) => Effect.Effect<ReadonlyArray<TermName>, RepositoryError>;
+
+  /** List terms that directly merge into the destination, in deterministic order. */
+  readonly listMergedInto: (termId: TermId) => Effect.Effect<ReadonlyArray<Term>, RepositoryError>;
+
   /**
    * Get a term by exact canonical name within a kind.
    */
@@ -91,7 +104,8 @@ export interface TermRepository {
   ) => Effect.Effect<TermName, TermNotFoundError | ValidationError | RepositoryError>;
 
   /**
-   * Update mutable non-canonical term fields.
+   * Update mutable term fields. Nullable lifecycle fields distinguish omitted
+   * (preserve) from null (clear).
    */
   readonly update: (
     id: TermId,

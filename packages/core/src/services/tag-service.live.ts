@@ -6,9 +6,9 @@ import { type Tag, type TagId, TagIdSchema } from "../domain/tag";
 import { TagNotFoundError, ValidationError } from "../errors";
 import type { TagRepository } from "../repository/tag-repository";
 import { TagRepositoryTag } from "../repository/tag-repository";
-import type { ResolvedTermName } from "../repository/term-repository";
 import { TermRepositoryTag } from "../repository/term-repository";
 import { type TagService, TagServiceTag } from "./tag-service";
+import { resolveTermName } from "./term-resolution";
 
 const parseTagPath = (tagPath: string): Effect.Effect<ReadonlyArray<string>, ValidationError> => {
   const parts = tagPath
@@ -60,21 +60,9 @@ const findLiteralTag = (repo: TagRepository, tagPath: string) =>
     return yield* literal.failure;
   });
 
-const selectGovernedTag = (
-  repo: TagRepository,
-  tagPath: string,
-  matches: ReadonlyArray<ResolvedTermName>
-) =>
+const selectGovernedTag = (repo: TagRepository, tagPath: string, termId: string) =>
   Effect.gen(function* () {
-    if (matches.length > 1) {
-      return yield* new ValidationError({
-        field: "tagPath",
-        message: `Term name '${tagPath}' is ambiguous across kinds; use a literal tag ID.`,
-      });
-    }
-
-    const term = matches[0]?.term;
-    const governedTags = (yield* repo.getAll).filter((tag) => tag.termId === term?.id);
+    const governedTags = (yield* repo.getAll).filter((tag) => tag.termId === termId);
     if (governedTags.length !== 1) {
       return yield* new ValidationError({
         field: "tagPath",
@@ -98,9 +86,29 @@ export const TagServiceLive = Layer.effect(
       Effect.gen(function* () {
         const literal = yield* findLiteralTag(repo, tagPath);
         if (literal) return literal;
-        const matches = yield* termRepo.findByName(tagPath);
-        if (matches.length === 0) return undefined;
-        return yield* selectGovernedTag(repo, tagPath, matches);
+        const resolution = yield* resolveTermName(termRepo, tagPath).pipe(
+          Effect.catchTags({
+            TermNotFoundError: () => Effect.void,
+            AmbiguousTermNameError: (error) =>
+              Effect.fail(
+                new ValidationError({
+                  field: "tagPath",
+                  message: `${error.message ?? `Term name '${tagPath}' is ambiguous`}; use a literal tag ID or specify a kind. Candidates: ${error.candidates.join(", ")}.`,
+                  cause: error,
+                })
+              ),
+            TermMigrationError: (error) =>
+              Effect.fail(
+                new ValidationError({
+                  field: "tagPath",
+                  message: `Cannot attach tag for governed term '${tagPath}': ${error.message}`,
+                  cause: error,
+                })
+              ),
+          })
+        );
+        if (!resolution) return undefined;
+        return yield* selectGovernedTag(repo, tagPath, resolution.term.id);
       });
 
     const ensureHierarchy = (tagPath: string) =>

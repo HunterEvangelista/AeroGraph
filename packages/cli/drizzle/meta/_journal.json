@@ -29,6 +29,13 @@
       "when": 1784742397415,
       "tag": "0003_term_registry_constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1787020153794,
+      "tag": "0004_perpetual_dazzler",
+      "breakpoints": true
     }
   ]
 }

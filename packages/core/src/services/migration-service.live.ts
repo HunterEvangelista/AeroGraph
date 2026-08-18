@@ -15,19 +15,44 @@ import { TermRepositoryTag } from "../repository/term-repository";
 import type { TransactionRepositories } from "../repository/transaction-engine";
 import { TransactionEngineTag } from "../repository/transaction-engine";
 import {
+  type DeprecateMigrationPlan,
+  type DeprecateMigrationResult,
+  type DeprecateTermInput,
+  type MergeMigrationPlan,
+  type MergeMigrationResult,
+  type MergeTermInput,
   type MigrationService,
   MigrationServiceTag,
   type RenameMigrationPlan,
   type RenameTermInput,
 } from "./migration-service";
+import {
+  validateDeprecationSource,
+  validateMergeTerms,
+  validateReplacementChain,
+  validateTermLifecycle,
+} from "./term-lifecycle";
+import { selectedTermForSelector } from "./term-resolution";
 
 interface NormalizedRenameInput extends RenameTermInput {
   readonly normalizedFromName: string;
   readonly normalizedToName: string;
 }
 
+const randomJournalSuffix = (): string => {
+  const webCrypto = (
+    globalThis as {
+      readonly crypto?: { readonly randomUUID?: () => string };
+    }
+  ).crypto;
+  if (!webCrypto?.randomUUID) {
+    throw new Error("Web Crypto randomUUID is required to generate journal entry IDs.");
+  }
+  return webCrypto.randomUUID();
+};
+
 const journalEntryIdFor = (input: NormalizedRenameInput): JournalEntryId =>
-  `journal-rename-${input.kind}-${input.normalizedFromName}-${input.normalizedToName}-${Date.now()}` as JournalEntryId;
+  `journal-rename-${input.kind}-${input.normalizedFromName}-${input.normalizedToName}-${randomJournalSuffix()}` as JournalEntryId;
 
 const validateRenameInput = (input: RenameTermInput) =>
   Effect.gen(function* () {
@@ -204,6 +229,7 @@ const planRenameWith = (repositories: RenameRepositories, input: RenameTermInput
       });
     }
 
+    yield* validateTermLifecycle(repositories.terms, source.term, "rename");
     yield* validateRenameTerm(source.term);
 
     const destinationConflict = (yield* repositories.terms.findByName(normalized.toName)).find(
@@ -275,7 +301,45 @@ const planRenameWith = (repositories: RenameRepositories, input: RenameTermInput
     } satisfies RenameMigrationPlan;
   });
 
-export const MigrationServiceLive = Layer.effect(
+const affectedFor = (repositories: RenameRepositories, term: Term) =>
+  Effect.gen(function* () {
+    const tags = (yield* repositories.tags.getAll).filter((tag) => tag.termId === term.id);
+    const entities = yield* collectAffectedEntities(repositories.entities.getByTag, tags);
+    return {
+      affectedTags: tags,
+      affectedEntities: entities,
+      affectedEntityIds: entities.map(({ id }) => id),
+    };
+  });
+
+const journalIdFor = (
+  operation: "deprecate" | "merge",
+  source: Term,
+  target?: Term
+): JournalEntryId =>
+  `journal-${operation}-${source.id}-${target?.id ?? "none"}-${randomJournalSuffix()}` as JournalEntryId;
+
+const deprecationPlan = (
+  source: Term,
+  replacement: Term | undefined,
+  affected: ReturnType<typeof affectedFor> extends Effect.Effect<infer A, infer _E, infer _R>
+    ? A
+    : never
+): DeprecateMigrationPlan => ({
+  operation: "deprecate",
+  term: source,
+  ...(replacement ? { replacement } : {}),
+  ...affected,
+  affectedCount: affected.affectedEntityIds.length,
+  notes: [
+    `Will deprecate ${source.kind} term '${source.canonicalName}'.`,
+    ...(replacement
+      ? [`Recommend active replacement '${replacement.canonicalName}'.`]
+      : ["No replacement is recommended."]),
+  ],
+});
+
+const MigrationServiceImplementation = Layer.effect(
   MigrationServiceTag,
   Effect.gen(function* () {
     const termRepo = yield* TermRepositoryTag;
@@ -292,6 +356,177 @@ export const MigrationServiceLive = Layer.effect(
     };
 
     const planRename = (input: RenameTermInput) => planRenameWith(repositories, input);
+
+    const lifecycleTerms = (repo: TermRepository, input: DeprecateTermInput) =>
+      Effect.gen(function* () {
+        const source = yield* selectedTermForSelector(repo, input.term);
+        const replacement = input.replacement
+          ? yield* selectedTermForSelector(repo, input.replacement)
+          : undefined;
+        return { source, replacement };
+      });
+
+    const planDeprecate = (input: DeprecateTermInput) =>
+      Effect.gen(function* () {
+        const { source, replacement } = yield* lifecycleTerms(termRepo, input);
+        yield* validateDeprecationSource(source);
+        yield* validateTermLifecycle(termRepo, source, "deprecate");
+        const mergedTerms = yield* termRepo.listMergedInto(source.id);
+        if (mergedTerms.length > 0) {
+          return yield* new ValidationError({
+            field: "term",
+            message: `Cannot deprecate '${source.canonicalName}' while merged terms point to it; merge the destination into another active term so merge chains end active.`,
+          });
+        }
+        if (replacement) yield* validateReplacementChain(termRepo, source, replacement.id);
+        if (
+          source.status === "deprecated" &&
+          (source.replacementTermId ?? undefined) === (replacement?.id ?? undefined)
+        ) {
+          return yield* new ValidationError({
+            field: "replacement",
+            message: `Term '${source.canonicalName}' is already deprecated with the requested replacement; choose a different replacement or clear it.`,
+          });
+        }
+        const affected = yield* affectedFor(repositories, source);
+        return deprecationPlan(source, replacement, affected);
+      });
+
+    const applyDeprecate = (input: DeprecateTermInput) =>
+      transactionEngine.run((transactionRepositories) =>
+        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: transactional validation and journaling are intentionally kept together.
+        Effect.gen(function* () {
+          // Every selector read in this callback is transaction-scoped.
+          const { source, replacement } = yield* lifecycleTerms(
+            transactionRepositories.terms,
+            input
+          );
+          yield* validateDeprecationSource(source);
+          yield* validateTermLifecycle(transactionRepositories.terms, source, "deprecate");
+          const mergedTerms = yield* transactionRepositories.terms.listMergedInto(source.id);
+          if (mergedTerms.length > 0) {
+            return yield* new ValidationError({
+              field: "term",
+              message: `Cannot deprecate '${source.canonicalName}' while merged terms point to it; merge the destination into another active term so merge chains end active.`,
+            });
+          }
+          if (replacement) {
+            yield* validateReplacementChain(transactionRepositories.terms, source, replacement.id);
+          }
+          if (
+            source.status === "deprecated" &&
+            (source.replacementTermId ?? undefined) === (replacement?.id ?? undefined)
+          ) {
+            return yield* new ValidationError({
+              field: "replacement",
+              message: `Term '${source.canonicalName}' is already deprecated with the requested replacement; choose a different replacement or clear it.`,
+            });
+          }
+          const txRepositories: RenameRepositories = transactionRepositories;
+          const affected = yield* affectedFor(txRepositories, source);
+          const term = yield* transactionRepositories.terms.update(source.id, {
+            status: "deprecated",
+            replacementTermId: replacement?.id ?? null,
+          });
+          const journalEntry = yield* transactionRepositories.migrationJournal.record({
+            id: input.journalEntryId ?? journalIdFor("deprecate", source, replacement),
+            operation: "deprecate",
+            kind: source.kind,
+            fromName: source.canonicalName,
+            ...(replacement
+              ? { toName: replacement.canonicalName, relatedTermId: replacement.id }
+              : {}),
+            termId: source.id,
+            affectedEntityIds: affected.affectedEntityIds,
+            ...(input.reason ? { reason: input.reason } : {}),
+            ...(input.appliedBy ? { appliedBy: input.appliedBy } : {}),
+            dryRun: false,
+          });
+          const plan = deprecationPlan(source, replacement, affected);
+          return { plan, term, journalEntry } satisfies DeprecateMigrationResult;
+        })
+      );
+
+    const mergeTerms = (repo: TermRepository, input: MergeTermInput) =>
+      Effect.gen(function* () {
+        const source = yield* selectedTermForSelector(repo, input.source);
+        const destination = yield* selectedTermForSelector(repo, input.destination);
+        return { source, destination };
+      });
+
+    const planMerge = (input: MergeTermInput) =>
+      Effect.gen(function* () {
+        const { source, destination } = yield* mergeTerms(termRepo, input);
+        yield* validateMergeTerms(source, destination);
+        yield* validateTermLifecycle(termRepo, source, "merge");
+        yield* validateTermLifecycle(termRepo, destination, "merge");
+        const affected = yield* affectedFor(repositories, source);
+        return {
+          operation: "merge",
+          source,
+          destination,
+          ...affected,
+          affectedCount: affected.affectedEntityIds.length,
+          notes: [
+            `Will merge '${source.canonicalName}' into active term '${destination.canonicalName}'.`,
+          ],
+        } satisfies MergeMigrationPlan;
+      });
+
+    const applyMerge = (input: MergeTermInput) =>
+      transactionEngine.run((transactionRepositories) =>
+        Effect.gen(function* () {
+          // Do not resolve through the outer repository or service: this is a
+          // transaction-scoped re-read that closes the TOCTOU window.
+          const { source, destination } = yield* mergeTerms(transactionRepositories.terms, input);
+          yield* validateMergeTerms(source, destination);
+          yield* validateTermLifecycle(transactionRepositories.terms, source, "merge");
+          yield* validateTermLifecycle(transactionRepositories.terms, destination, "merge");
+          const txRepositories: RenameRepositories = transactionRepositories;
+          const affected = yield* affectedFor(txRepositories, source);
+          const updatedSource = yield* transactionRepositories.terms.update(source.id, {
+            status: "merged",
+            mergedIntoId: destination.id,
+            replacementTermId: null,
+          });
+          const updatedTags: Tag[] = [];
+          for (const tag of affected.affectedTags) {
+            updatedTags.push(
+              yield* transactionRepositories.tags.update(tag.id, { termId: destination.id })
+            );
+          }
+          const journalEntry = yield* transactionRepositories.migrationJournal.record({
+            id: input.journalEntryId ?? journalIdFor("merge", source, destination),
+            operation: "merge",
+            kind: source.kind,
+            fromName: source.canonicalName,
+            toName: destination.canonicalName,
+            relatedTermId: destination.id,
+            termId: source.id,
+            affectedEntityIds: affected.affectedEntityIds,
+            ...(input.reason ? { reason: input.reason } : {}),
+            ...(input.appliedBy ? { appliedBy: input.appliedBy } : {}),
+            dryRun: false,
+          });
+          const plan = {
+            operation: "merge",
+            source,
+            destination,
+            ...affected,
+            affectedCount: affected.affectedEntityIds.length,
+            notes: [
+              `Will merge '${source.canonicalName}' into active term '${destination.canonicalName}'.`,
+            ],
+          } satisfies MergeMigrationPlan;
+          return {
+            plan,
+            source: updatedSource,
+            destination,
+            updatedTags,
+            journalEntry,
+          } satisfies MergeMigrationResult;
+        })
+      );
 
     const applyRename = (input: RenameTermInput) =>
       transactionEngine.run((transactionRepositories) =>
@@ -311,7 +546,6 @@ export const MigrationServiceLive = Layer.effect(
             term,
             plan.affectedTags
           );
-
           const journalEntry = yield* transactionRepositories.migrationJournal.record({
             id: normalized.journalEntryId ?? journalEntryIdFor(normalized),
             operation: "rename",
@@ -324,19 +558,20 @@ export const MigrationServiceLive = Layer.effect(
             ...(normalized.appliedBy ? { appliedBy: normalized.appliedBy } : {}),
             dryRun: false,
           });
-
-          return {
-            ...plan,
-            term,
-            updatedTags,
-            journalEntry,
-          };
+          return { ...plan, term, updatedTags, journalEntry };
         })
       );
 
     return {
       planRename,
       applyRename,
+      planDeprecate,
+      applyDeprecate,
+      planMerge,
+      applyMerge,
     } satisfies MigrationService;
   })
 );
+
+/** Repositories are the only dependencies of the standalone migration layer. */
+export const MigrationServiceLive = MigrationServiceImplementation;

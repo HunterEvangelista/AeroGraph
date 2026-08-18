@@ -1,7 +1,7 @@
 import {
   type CodeRef,
   EntityServiceTag,
-  EntityTypeEnum,
+  EntityType,
   GraphServiceTag,
   TagServiceTag,
 } from "@kioku/core";
@@ -185,7 +185,7 @@ const codeRefShowCommand = Command.make(
           const withLinks = yield* graphService.getEntityWithLinks(resolvedId);
           const entity = withLinks.entity;
 
-          if (entity._tag !== EntityTypeEnum.CodeRef) {
+          if (entity._tag !== EntityType.CodeRef) {
             return yield* new NotACodeRefError({ id: resolvedId });
           }
 
@@ -280,11 +280,11 @@ const codeRefListCommand = Command.make(
             ? yield* entityService.search(searchValue)
             : tagValue
               ? yield* entityService.getByTag(tagValue)
-              : yield* entityService.getAll(EntityTypeEnum.CodeRef);
+              : yield* entityService.getAll(EntityType.CodeRef);
 
           const codeRefs = results.filter(
             (entity): entity is CodeRef =>
-              entity._tag === EntityTypeEnum.CodeRef &&
+              entity._tag === EntityType.CodeRef &&
               (fileValue === undefined || entity.filePath === fileValue)
           );
           const displayIds = yield* loadFormattedEntityIds(codeRefs.map((codeRef) => codeRef.id));
@@ -341,7 +341,7 @@ const codeRefDeleteCommand = Command.make(
             resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
-          if (existing._tag !== EntityTypeEnum.CodeRef) {
+          if (existing._tag !== EntityType.CodeRef) {
             return yield* new NotACodeRefError({ id: resolvedId });
           }
 

@@ -12,6 +12,32 @@ describe("link commands", () => {
     workspace.cleanup();
   });
 
+  it("prefers exact IDs, resolves unique prefixes, and rejects ambiguous prefixes", () => {
+    const exact = workspace.run(
+      "link",
+      "doc-auth-overview",
+      "diagram-auth-flow",
+      "--type",
+      "references"
+    );
+    expect(exact.status).toBe(0);
+
+    const unique = workspace.run("link", "doc-auth-on", "diagram-auth-flow", "--type", "blocks");
+    expect(unique.status).toBe(0);
+
+    const ambiguous = workspace.run(
+      "link",
+      "doc-auth",
+      "diagram-auth-flow",
+      "--type",
+      "related_to"
+    );
+    expect(ambiguous.status).not.toBe(0);
+    expect(ambiguous.stderr).toContain('Entity id "doc-auth" is ambiguous');
+    expect(ambiguous.stderr).toContain("doc-auth-overview");
+    expect(ambiguous.stderr).toContain("doc-auth-only");
+  });
+
   it("creates and lists one-way links", () => {
     const create = workspace.run(
       "link",

@@ -130,6 +130,50 @@ const runDuplicateScenario = Effect.gen(function* () {
   assert.ok(error instanceof TermAlreadyExistsError);
 });
 
+const runBatchScenario = Effect.gen(function* () {
+  const repo = yield* TermRepositoryTag;
+  assert.deepEqual(yield* repo.getByIds([]), []);
+  assert.deepEqual(yield* repo.listNamesByTermIds([]), []);
+
+  for (let index = 0; index < 1100; index += 1) {
+    yield* repo.create({
+      id: `term-batch-${String(index).padStart(4, "0")}`,
+      canonicalName: `Batch ${String(index).padStart(4, "0")}`,
+      kind: index % 2 === 0 ? "brand" : "concept",
+      aliases: [`Batch Alias ${index}`],
+    });
+  }
+
+  const ids = [
+    "term-batch-1099" as TermId,
+    "term-batch-0001" as TermId,
+    "term-batch-1099" as TermId,
+    "term-batch-0000" as TermId,
+  ];
+  const terms = yield* repo.getByIds(ids);
+  assert.deepEqual(
+    terms.map(({ id }) => id),
+    ["term-batch-0000", "term-batch-0001", "term-batch-1099"]
+  );
+
+  const names = yield* repo.listNamesByTermIds([
+    ...ids,
+    ...Array.from(
+      { length: 1100 },
+      (_, index) => `term-batch-${String(index).padStart(4, "0")}` as TermId
+    ),
+  ]);
+  assert.equal(names.length, 2200);
+  assert.deepEqual(
+    names.slice(0, 3).map(({ termId, nameKind }) => [termId, nameKind]),
+    [
+      ["term-batch-0000", "canonical"],
+      ["term-batch-0000", "alias"],
+      ["term-batch-0001", "canonical"],
+    ]
+  );
+});
+
 const runJournalScenario = Effect.gen(function* () {
   const termRepo = yield* TermRepositoryTag;
   const journalRepo = yield* MigrationJournalRepositoryTag;
@@ -174,4 +218,5 @@ await Effect.runPromise(Effect.provide(runTermCreateScenario, createRepositoryLa
 await Effect.runPromise(Effect.provide(runTermResolutionScenario, createRepositoryLayer()));
 await Effect.runPromise(Effect.provide(runTermUpdateScenario, createRepositoryLayer()));
 await Effect.runPromise(Effect.provide(runDuplicateScenario, createRepositoryLayer()));
+await Effect.runPromise(Effect.provide(runBatchScenario, createRepositoryLayer()));
 await Effect.runPromise(Effect.provide(runJournalScenario, createRepositoryLayer()));

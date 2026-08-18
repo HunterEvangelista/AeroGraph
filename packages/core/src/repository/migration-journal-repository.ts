@@ -35,7 +35,9 @@ export interface MigrationJournalRepository {
   ) => Effect.Effect<MigrationJournalEntry, MigrationJournalEntryNotFoundError | RepositoryError>;
 
   /**
-   * List journal entries for a term, newest first.
+   * List journal entries involving a term as either primary or related term,
+   * newest first. This keeps merge/deprecate audit attribution complete
+   * without duplicating journal rows.
    */
   readonly listByTerm: (
     termId: TermId

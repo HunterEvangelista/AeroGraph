@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
 import { describe, expect, it } from "vitest";
-import type { Entity, EntityId, EntityType } from "../domain/entity";
-import { EntityTypeEnum } from "../domain/entity";
+import type { Entity, EntityId } from "../domain/entity";
+import { EntityType } from "../domain/entity";
 import type { Tag, TagId, UpdateTagInput } from "../domain/tag";
 import type {
   CreateTermInput,
@@ -59,7 +59,7 @@ interface MigrationStore {
 }
 
 const createTestEntity = (id: string, tags: ReadonlyArray<string> = []): Entity => ({
-  _tag: EntityTypeEnum.Doc,
+  _tag: EntityType.Doc,
   id: id as EntityId,
   title: `Entity ${id}`,
   content: `Content for ${id}`,
@@ -94,13 +94,14 @@ const createTestTerm = (
   id: string,
   canonicalName: string,
   kind: TermKind,
-  options: { status?: Term["status"]; mergedIntoId?: TermId } = {}
+  options: { status?: Term["status"]; mergedIntoId?: TermId; replacementTermId?: TermId } = {}
 ): Term => ({
   id: id as TermId,
   canonicalName,
   kind,
   status: options.status ?? "active",
   ...(options.mergedIntoId ? { mergedIntoId: options.mergedIntoId } : {}),
+  ...(options.replacementTermId ? { replacementTermId: options.replacementTermId } : {}),
   createdAt: FIXED_DATE,
   updatedAt: FIXED_DATE,
 });
@@ -265,6 +266,17 @@ const createMockTermRepository = (store: TermStore): TermRepository => {
         Array.from(store.terms.values()).filter((term) => !kind || term.kind === kind)
       ),
     addName,
+    getByIds: (ids) =>
+      Effect.succeed(
+        ids.flatMap((id) => {
+          const term = store.terms.get(id);
+          return term ? [term] : [];
+        })
+      ),
+    listNamesByTermIds: (ids) =>
+      Effect.succeed(store.names.filter((termName) => ids.includes(termName.termId))),
+    listMergedInto: (termId) =>
+      Effect.succeed([...store.terms.values()].filter((term) => term.mergedIntoId === termId)),
     listNames: (termId) =>
       Effect.gen(function* () {
         yield* getById(termId);
@@ -272,6 +284,7 @@ const createMockTermRepository = (store: TermStore): TermRepository => {
       }),
     updateName,
     update: (id: TermId, updates: UpdateTermInput) =>
+      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: test repository update mirrors all lifecycle fields.
       Effect.gen(function* () {
         const existing = yield* getById(id);
         const updated: Term = {
@@ -279,9 +292,14 @@ const createMockTermRepository = (store: TermStore): TermRepository => {
           status: updates.status ?? existing.status,
           ...(updates.description !== undefined ? { description: updates.description } : {}),
           ...(updates.mergedIntoId !== undefined
-            ? { mergedIntoId: updates.mergedIntoId }
+            ? { mergedIntoId: updates.mergedIntoId ?? undefined }
             : existing.mergedIntoId
               ? { mergedIntoId: existing.mergedIntoId }
+              : {}),
+          ...(updates.replacementTermId !== undefined
+            ? { replacementTermId: updates.replacementTermId ?? undefined }
+            : existing.replacementTermId
+              ? { replacementTermId: existing.replacementTermId }
               : {}),
           updatedAt: FIXED_DATE,
         };
@@ -412,6 +430,7 @@ const createMockMigrationJournalRepository = (
         fromName: input.fromName,
         toName: input.toName,
         termId: input.termId,
+        ...(input.relatedTermId ? { relatedTermId: input.relatedTermId } : {}),
         affectedEntityIds: input.affectedEntityIds,
         affectedCount: input.affectedEntityIds.length,
         ...(input.reason ? { reason: input.reason } : {}),
@@ -431,7 +450,11 @@ const createMockMigrationJournalRepository = (
       return entry;
     }),
   listByTerm: (termId) =>
-    Effect.succeed([...store.entries].reverse().filter((entry) => entry.termId === termId)),
+    Effect.succeed(
+      [...store.entries]
+        .reverse()
+        .filter((entry) => entry.termId === termId || entry.relatedTermId === termId)
+    ),
   listRecent: (limit = 50) => Effect.succeed([...store.entries].reverse().slice(0, limit)),
 });
 
@@ -754,7 +777,7 @@ describe("MigrationService", () => {
     );
 
     expect(error).toBeInstanceOf(TermMigrationError);
-    expect(error.message).toContain("Cannot rename merged term 'Kioku'");
+    expect(error.message).toContain("Lifecycle merge target");
   });
 
   it("rejects a rename that is already canonical", async () => {

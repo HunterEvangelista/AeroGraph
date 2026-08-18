@@ -97,6 +97,37 @@ interface LegacyTermRow {
   readonly canonicalName: string;
 }
 
+interface LegacyLifecycleRow {
+  readonly id: string;
+  readonly status: string;
+  readonly mergedIntoId: string | null;
+}
+
+interface LegacyJournalRow {
+  readonly id: string;
+  readonly operation: string;
+  readonly kind: string | null;
+  readonly fromName: string;
+  readonly toName: string;
+  readonly termId: string;
+  readonly affectedEntityIds: string;
+  readonly affectedCount: number;
+  readonly reason: string | null;
+  readonly appliedAt: string;
+  readonly appliedBy: string | null;
+  readonly dryRun: number;
+}
+
+interface LegacyJournalResolution {
+  readonly row: LegacyJournalRow;
+  readonly relatedTermId: string | null;
+}
+
+const RETIRED_V4_CANONICAL_TRIGGERS = new Set([
+  "terms_canonical_name_insert_check",
+  "terms_canonical_name_update_check",
+]);
+
 const validateLegacyTerms = (db: Database): void => {
   const terms = db
     .query("SELECT id, canonical_name AS canonicalName FROM terms")
@@ -134,6 +165,7 @@ const rebuildTermsV4 = (db: Database): void => {
   db.run("ALTER TABLE terms_v4 RENAME TO terms;");
   db.run("CREATE UNIQUE INDEX idx_terms_kind_canonical_name ON terms(kind, canonical_name);");
   db.run("CREATE INDEX idx_terms_status ON terms(status);");
+  db.run("CREATE INDEX idx_terms_merged_into_id ON terms(merged_into_id);");
 };
 
 const normalizeLegacyTermName = (row: LegacyTermNameRow): string => {
@@ -156,6 +188,202 @@ const normalizeLegacyTermName = (row: LegacyTermNameRow): string => {
   return normalizedName;
 };
 
+const validateLegacyLifecycle = (db: Database): void => {
+  const rows = db
+    .query("SELECT id, status, merged_into_id AS mergedIntoId FROM terms ORDER BY id")
+    .all() as LegacyLifecycleRow[];
+
+  for (const row of rows) {
+    if (row.status === "active" && row.mergedIntoId !== null) {
+      throw new Error(
+        `Cannot migrate term '${row.id}': active terms cannot have a merge destination.`
+      );
+    }
+    if (row.status === "deprecated" && row.mergedIntoId !== null) {
+      throw new Error(
+        `Cannot migrate term '${row.id}': deprecated terms cannot have a merge destination.`
+      );
+    }
+    if (row.status === "merged" && row.mergedIntoId === null) {
+      throw new Error(`Cannot migrate term '${row.id}': merged terms require a merge destination.`);
+    }
+    if (!["active", "deprecated", "merged"].includes(row.status)) {
+      throw new Error(`Cannot migrate term '${row.id}': invalid lifecycle status '${row.status}'.`);
+    }
+  }
+};
+
+const rebuildTermsV5 = (db: Database): void => {
+  validateLegacyLifecycle(db);
+  db.run("DROP TABLE IF EXISTS terms_v5;");
+  db.run(`
+    CREATE TABLE terms_v5 (
+      id TEXT PRIMARY KEY,
+      canonical_name TEXT NOT NULL CHECK(${TERM_CANONICAL_NAME_CHECK}),
+      kind TEXT NOT NULL CHECK(kind IN (${sqlStringList(TERM_KIND_VALUES)})),
+      description TEXT,
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN (${sqlStringList(TERM_STATUS_VALUES)})),
+      merged_into_id TEXT REFERENCES terms(id),
+      replacement_term_id TEXT REFERENCES terms(id),
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      CONSTRAINT terms_lifecycle_shape_check CHECK((status = 'active' AND merged_into_id IS NULL AND replacement_term_id IS NULL) OR (status = 'deprecated' AND merged_into_id IS NULL) OR (status = 'merged' AND merged_into_id IS NOT NULL AND replacement_term_id IS NULL))
+    );
+  `);
+  db.run(`
+    INSERT INTO terms_v5 (
+      id, canonical_name, kind, description, status, merged_into_id,
+      replacement_term_id, created_at, updated_at
+    )
+    SELECT id, canonical_name, kind, description, status, merged_into_id,
+      NULL, created_at, updated_at
+    FROM terms;
+  `);
+  db.run("DROP TABLE terms;");
+  db.run("ALTER TABLE terms_v5 RENAME TO terms;");
+  db.run("CREATE UNIQUE INDEX idx_terms_kind_canonical_name ON terms(kind, canonical_name);");
+  db.run("CREATE INDEX idx_terms_status ON terms(status);");
+  db.run("CREATE INDEX idx_terms_merged_into_id ON terms(merged_into_id);");
+};
+
+const legacyJournalRows = (db: Database): LegacyJournalRow[] =>
+  tableExists(db, "migration_journal")
+    ? (db
+        .query(`
+      SELECT id, operation, kind, from_name AS fromName, to_name AS toName,
+        term_id AS termId, affected_entity_ids AS affectedEntityIds,
+        affected_count AS affectedCount, reason, applied_at AS appliedAt,
+        applied_by AS appliedBy, dry_run AS dryRun
+      FROM migration_journal ORDER BY rowid
+    `)
+        .all() as LegacyJournalRow[])
+    : [];
+
+/**
+ * Resolve v4 audit relations before any table is rebuilt. The old canonical
+ * name is not authoritative: a durable journal may point at a name that is
+ * now an alias or deprecated name. Every matching registry row is considered,
+ * and a relation is accepted only when it identifies exactly one term.
+ */
+const resolveLegacyJournalRelation = (db: Database, row: LegacyJournalRow): string | null => {
+  if (row.operation !== "merge" && row.operation !== "deprecate") return null;
+  const source = db
+    .query("SELECT kind, merged_into_id AS mergedIntoId FROM terms WHERE id = ?")
+    .get(row.termId) as { kind: string; mergedIntoId: string | null } | null;
+  if (!source) throw new Error(`Cannot migrate journal '${row.id}': source term is missing.`);
+
+  const candidates = new Set<string>();
+  if (row.operation === "merge" && source.mergedIntoId) {
+    const directTarget = db
+      .query("SELECT id FROM terms WHERE id = ? AND kind = ?")
+      .get(source.mergedIntoId, source.kind) as { id: string } | null;
+    if (directTarget) candidates.add(directTarget.id);
+  }
+
+  const normalized = normalizeTermName(row.toName);
+  const matchingTerms = db
+    .query(`
+      SELECT DISTINCT t.id AS id
+      FROM terms t
+      LEFT JOIN term_names n ON n.term_id = t.id AND n.kind = t.kind
+      WHERE t.kind = ? AND (
+        lower(trim(t.canonical_name)) = lower(trim(?))
+        OR lower(trim(n.display_name)) = lower(trim(?))
+        OR n.name = ?
+      )
+    `)
+    .all(source.kind, row.toName, row.toName, normalized) as Array<{ id: string }>;
+  for (const candidate of matchingTerms) candidates.add(candidate.id);
+
+  if (candidates.size !== 1) {
+    const outcome = candidates.size === 0 ? "missing" : "ambiguous";
+    throw new Error(
+      `Cannot migrate journal '${row.id}': ${outcome} ${row.operation} target '${row.toName}'.`
+    );
+  }
+  return [...candidates][0] ?? null;
+};
+
+const captureUnmanagedTriggers = (db: Database): string[] =>
+  (
+    db
+      .query("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND sql IS NOT NULL")
+      .all() as Array<{ name: string; sql: string }>
+  ) // Keep custom triggers across rebuilt tables.
+    .filter(({ name }) => !RETIRED_V4_CANONICAL_TRIGGERS.has(name))
+    .map(({ sql }) => sql);
+
+const restoreUnmanagedTriggers = (db: Database, triggerSql: ReadonlyArray<string>): void => {
+  const existing = new Set(
+    (
+      db.query("SELECT name FROM sqlite_master WHERE type = 'trigger'").all() as Array<{
+        name: string;
+      }>
+    ).map(({ name }) => name)
+  );
+  for (const sql of triggerSql) {
+    const name = /^CREATE TRIGGER(?: IF NOT EXISTS)?\s+[`"]?([^`"\s]+)[`"]?/i.exec(sql)?.[1];
+    if (name && !existing.has(name)) db.run(sql);
+  }
+};
+
+const rebuildMigrationJournalV5 = (
+  db: Database,
+  resolutions: ReadonlyArray<LegacyJournalResolution>
+): void => {
+  db.run("DROP TABLE IF EXISTS migration_journal_v5;");
+  db.run(`
+    CREATE TABLE migration_journal_v5 (
+      id TEXT PRIMARY KEY,
+      operation TEXT NOT NULL CHECK(operation IN (${sqlStringList(["rename", "merge", "deprecate", "create"])})),
+      kind TEXT CHECK(kind IS NULL OR kind IN (${sqlStringList(TERM_KIND_VALUES)})),
+      from_name TEXT NOT NULL,
+      to_name TEXT,
+      term_id TEXT NOT NULL REFERENCES terms(id),
+      related_term_id TEXT REFERENCES terms(id),
+      affected_entity_ids TEXT NOT NULL,
+      affected_count INTEGER NOT NULL,
+      reason TEXT,
+      applied_at TEXT NOT NULL,
+      applied_by TEXT,
+      dry_run INTEGER NOT NULL DEFAULT 0,
+      CONSTRAINT migration_journal_semantics_check CHECK((operation = 'create' AND (to_name IS NULL OR length(trim(to_name)) > 0) AND related_term_id IS NULL) OR (operation = 'rename' AND to_name IS NOT NULL AND length(trim(to_name)) > 0 AND related_term_id IS NULL) OR (operation = 'merge' AND to_name IS NOT NULL AND length(trim(to_name)) > 0 AND related_term_id IS NOT NULL) OR (operation = 'deprecate' AND ((to_name IS NULL AND related_term_id IS NULL) OR (to_name IS NOT NULL AND length(trim(to_name)) > 0 AND related_term_id IS NOT NULL))))
+    );
+  `);
+  const insert = db.prepare(`
+    INSERT INTO migration_journal_v5 (
+      id, operation, kind, from_name, to_name, term_id, related_term_id,
+      affected_entity_ids, affected_count, reason, applied_at, applied_by, dry_run
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  for (const { row, relatedTermId } of resolutions) {
+    // Preserve the historical spelling verbatim. In particular, do not turn
+    // an unrecoverable deprecation target into NULL: resolution was validated
+    // before this table rebuild and an invalid row must abort the transaction.
+    insert.run(
+      row.id,
+      row.operation,
+      row.kind,
+      row.fromName,
+      row.toName,
+      row.termId,
+      relatedTermId,
+      row.affectedEntityIds,
+      row.affectedCount,
+      row.reason,
+      row.appliedAt,
+      row.appliedBy,
+      row.dryRun
+    );
+  }
+
+  db.run("DROP TABLE migration_journal;");
+  db.run("ALTER TABLE migration_journal_v5 RENAME TO migration_journal;");
+  db.run("CREATE INDEX idx_journal_term ON migration_journal(term_id);");
+  db.run("CREATE INDEX idx_journal_related_term ON migration_journal(related_term_id);");
+  db.run("CREATE INDEX idx_journal_applied_at ON migration_journal(applied_at);");
+};
 const rebuildTermNamesV4 = (db: Database): void => {
   const rows = db
     .query(
@@ -226,6 +454,27 @@ const runMigrations = (db: Database, fromVersion: number): void => {
     rebuildTermsV4(db);
     rebuildTermNamesV4(db);
     db.run("DROP INDEX IF EXISTS idx_terms_canonical_name;");
+  }
+  if (fromVersion < 5 && tableExists(db, "terms")) {
+    // v4 -> v5: validate every journal relation before the journal rebuild.
+    // Runtime/user DB upgrades preserve triggers dynamically; this application
+    // upgrader owns that behavior, while Drizzle migrations manage project schema.
+    // This is deliberately transactional: an absent or ambiguous historical
+    // target must leave the v4 schema, version, and audit data untouched.
+    const triggerSql = captureUnmanagedTriggers(db);
+    const hasJournal = tableExists(db, "migration_journal");
+    const resolutions = legacyJournalRows(db).map((row) => ({
+      row,
+      relatedTermId: resolveLegacyJournalRelation(db, row),
+    }));
+    rebuildTermsV5(db);
+    if (hasJournal) rebuildMigrationJournalV5(db, resolutions);
+    // Retire only the two managed v4 triggers. The named CHECK is now the
+    // canonical invariant; unrelated user triggers are restored unchanged.
+    // (The static Drizzle journal rebuild has no arbitrary-trigger preservation.)
+    restoreUnmanagedTriggers(db, triggerSql);
+    db.run("DROP TRIGGER IF EXISTS terms_canonical_name_insert_check;");
+    db.run("DROP TRIGGER IF EXISTS terms_canonical_name_update_check;");
   }
 };
 

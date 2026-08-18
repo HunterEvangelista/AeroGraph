@@ -55,27 +55,79 @@ const createV3Database = (
     insertTerm.run(row.termId, row.displayName, row.kind, "2026-01-01", "2026-01-01");
     insertName.run(row.termId, row.name, row.displayName, row.nameKind, "2026-01-01");
   }
+  if (version === "4") {
+    const legacyTerm = rows[0];
+    if (!legacyTerm) throw new Error("v4 fixture requires a term");
+    db.run("ALTER TABLE term_names ADD COLUMN kind TEXT;");
+    db.run(
+      "UPDATE term_names SET kind = (SELECT kind FROM terms WHERE terms.id = term_names.term_id);"
+    );
+    db.run("UPDATE term_names SET name = lower(replace(replace(trim(name), ' ', '-'), '_', '-'));");
+    db.run(`
+      CREATE TABLE term_names_v4 (
+        term_id TEXT NOT NULL REFERENCES terms(id),
+        kind TEXT NOT NULL,
+        name TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        name_kind TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (term_id, name),
+        CHECK(kind IN ('brand', 'project', 'feature', 'api', 'concept', 'package', 'other')),
+        CHECK(name_kind IN ('canonical', 'alias', 'deprecated')),
+        CHECK(name = lower(name) AND name = trim(name) AND instr(name, ' ') = 0 AND instr(name, '_') = 0 AND instr(name, ',') = 0)
+      );
+    `);
+    db.run(
+      "INSERT INTO term_names_v4 SELECT term_id, kind, name, display_name, name_kind, created_at FROM term_names;"
+    );
+    db.run("DROP TABLE term_names;");
+    db.run("ALTER TABLE term_names_v4 RENAME TO term_names;");
+    db.run(`
+      CREATE TABLE migration_journal (
+        id TEXT PRIMARY KEY,
+        operation TEXT NOT NULL,
+        kind TEXT,
+        from_name TEXT NOT NULL,
+        to_name TEXT NOT NULL,
+        term_id TEXT NOT NULL REFERENCES terms(id),
+        affected_entity_ids TEXT NOT NULL,
+        affected_count INTEGER NOT NULL,
+        reason TEXT,
+        applied_at TEXT NOT NULL,
+        applied_by TEXT,
+        dry_run INTEGER NOT NULL DEFAULT 0
+      );
+    `);
+    db.run(
+      "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, affected_entity_ids, affected_count, applied_at, dry_run) VALUES ('journal-v4-create', 'create', 'brand', 'Legacy', '  Legacy Create  ', ?, '[]', 0, '2026-01-01', 0)",
+      [legacyTerm.termId]
+    );
+  }
   db.close();
 };
 
 try {
   const validPath = join(root, "valid.db");
-  createV3Database(validPath, [
-    {
-      termId: "term-brand-kioku",
-      kind: "brand",
-      name: " Kioku_Name ",
-      displayName: "Kioku Name",
-      nameKind: "canonical",
-    },
-    {
-      termId: "term-package-kioku",
-      kind: "package",
-      name: "kioku name",
-      displayName: "Kioku Package",
-      nameKind: "canonical",
-    },
-  ]);
+  createV3Database(
+    validPath,
+    [
+      {
+        termId: "term-brand-kioku",
+        kind: "brand",
+        name: " Kioku_Name ",
+        displayName: "Kioku Name",
+        nameKind: "canonical",
+      },
+      {
+        termId: "term-package-kioku",
+        kind: "package",
+        name: "kioku name",
+        displayName: "Kioku Package",
+        nameKind: "canonical",
+      },
+    ],
+    "4"
+  );
   const client = await Effect.runPromise(makeDatabaseClient(validPath));
   const migrated = client.db
     .query("SELECT kind, name FROM term_names WHERE term_id = 'term-brand-kioku'")
@@ -114,6 +166,32 @@ try {
   assert.throws(() =>
     client.db.run("UPDATE terms SET canonical_name = 'Foo, Inc.' WHERE id = 'term-brand-kioku'")
   );
+  assert.equal(
+    (
+      client.db
+        .query(
+          "SELECT to_name, related_term_id FROM migration_journal WHERE id = 'journal-v4-create'"
+        )
+        .get() as { to_name: string; related_term_id: string | null }
+    ).to_name,
+    "  Legacy Create  "
+  );
+  client.db.run(
+    "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-null', 'create', 'brand', 'New', NULL, 'term-brand-kioku', NULL, '[]', 0, '2026-01-01')"
+  );
+  client.db.run(
+    "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-name', 'create', 'brand', 'New', 'New Create', 'term-brand-kioku', NULL, '[]', 0, '2026-01-01')"
+  );
+  assert.throws(() =>
+    client.db.run(
+      "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-empty', 'create', 'brand', 'New', '   ', 'term-brand-kioku', NULL, '[]', 0, '2026-01-01')"
+    )
+  );
+  assert.throws(() =>
+    client.db.run(
+      "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-related', 'create', 'brand', 'New', NULL, 'term-brand-kioku', 'term-package-kioku', '[]', 0, '2026-01-01')"
+    )
+  );
   assert.deepEqual(client.db.query("PRAGMA foreign_key_check").all(), []);
   assert.equal(
     (
@@ -121,7 +199,7 @@ try {
         value: string;
       }
     ).value,
-    "4"
+    "5"
   );
   await Effect.runPromise(client.close);
 
@@ -129,6 +207,14 @@ try {
   assert.equal(
     (reopened.db.query("SELECT name FROM term_names").get() as { name: string }).name,
     "kioku-name"
+  );
+  assert.equal(
+    (
+      reopened.db
+        .query("SELECT to_name FROM migration_journal WHERE id = 'journal-v4-create'")
+        .get() as { to_name: string }
+    ).to_name,
+    "  Legacy Create  "
   );
   await Effect.runPromise(reopened.close);
 

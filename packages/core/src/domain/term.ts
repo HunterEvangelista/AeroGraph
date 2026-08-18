@@ -75,7 +75,10 @@ export const Term = Schema.Struct({
   kind: TermKind,
   description: Schema.optional(Schema.String),
   status: TermStatus,
+  /** A merged term redirects tag resolution to this term. */
   mergedIntoId: Schema.optional(TermIdSchema),
+  /** A deprecated term recommends this term without redirecting reads or writes. */
+  replacementTermId: Schema.optional(TermIdSchema),
   createdAt: Schema.DateFromString,
   updatedAt: Schema.DateFromString,
 });
@@ -109,8 +112,10 @@ export const MigrationJournalEntry = Schema.Struct({
   operation: MigrationOperation,
   kind: Schema.optional(TermKind),
   fromName: Schema.String.check(Schema.isNonEmpty()),
-  toName: Schema.String.check(Schema.isNonEmpty()),
+  toName: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   termId: TermIdSchema,
+  /** The other term involved in a merge or deprecation recommendation. */
+  relatedTermId: Schema.optional(TermIdSchema),
   affectedEntityIds: Schema.Array(Schema.String),
   affectedCount: NonNegativeInteger,
   reason: Schema.optional(Schema.String),
@@ -143,7 +148,9 @@ export type CreateTermInput = typeof CreateTermInput.Type;
 export const UpdateTermInput = Schema.Struct({
   description: Schema.optional(Schema.String),
   status: Schema.optional(TermStatus),
-  mergedIntoId: Schema.optional(TermIdSchema),
+  // null explicitly clears a lifecycle relationship; omission preserves it.
+  mergedIntoId: Schema.optional(Schema.Union([TermIdSchema, Schema.Null])),
+  replacementTermId: Schema.optional(Schema.Union([TermIdSchema, Schema.Null])),
 });
 
 export type UpdateTermInput = typeof UpdateTermInput.Type;
@@ -182,8 +189,9 @@ export const RecordJournalEntryInput = Schema.Struct({
   operation: MigrationOperation,
   kind: Schema.optional(TermKind),
   fromName: Schema.String.check(Schema.isNonEmpty()),
-  toName: Schema.String.check(Schema.isNonEmpty()),
+  toName: Schema.optional(Schema.String.check(Schema.isNonEmpty())),
   termId: TermIdSchema,
+  relatedTermId: Schema.optional(TermIdSchema),
   affectedEntityIds: Schema.Array(Schema.String),
   reason: Schema.optional(Schema.String),
   appliedBy: Schema.optional(Schema.String),

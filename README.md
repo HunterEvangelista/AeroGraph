@@ -78,6 +78,41 @@ kioku migrate brand AcmeCorp AeroGraph \
 
 Applying a rename performs the term, registered-name, tag, and migration-journal updates in one SQLite transaction. If any update fails, the complete migration is rolled back. Successful migrations record the old and new names, term ID, affected entity IDs, reason, actor, and application time in the durable migration journal.
 
+### Governing Term Lifecycles
+
+Inspect governed terms and their history with human-readable output or `--json`:
+
+```bash
+kioku term list --kind api
+kioku term show "Legacy Client" --kind package
+kioku term audit term-package-client --json
+kioku term alias term-package-client "old-client"
+```
+
+Deprecation preserves the term and its governed tags. An optional replacement is advisory: historical selectors still resolve the deprecated term while output recommends the active replacement.
+
+```bash
+kioku term deprecate "Legacy Client" \
+  --kind package \
+  --replacement "Platform Client" \
+  --dry-run
+
+kioku term deprecate "Legacy Client" \
+  --kind package \
+  --replacement "Platform Client" \
+  --apply \
+  --reason "Client sunset"
+```
+
+Merge is for duplicate terms that represent the same concept. It redirects the source term to the active destination and reassigns governed tags without changing tag IDs, display names, aliases, entity attachments, or graph relationships.
+
+```bash
+kioku term merge "Duplicate API" "Canonical API" --kind api --dry-run
+kioku term merge "Duplicate API" "Canonical API" --kind api --apply
+```
+
+Both destructive lifecycle commands require exactly one of `--dry-run` or `--apply`. Names are scoped by kind; omit `--kind` only when the name is unambiguous. Exact stable term IDs always take precedence.
+
 Queries and context selection resolve canonical, alias, and deprecated term names to every tag governed by that term. Comma-separated selectors still intersect, while selectors that are not registered term names retain exact tag-ID behavior. Context can render governed tags using their current canonical names without rewriting entity titles or historical content:
 
 ```bash

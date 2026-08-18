@@ -10,7 +10,6 @@ export type {
   Doc,
   Entity,
   EntityId,
-  EntityType,
   Priority,
   Story,
   StoryStatus,
@@ -18,6 +17,7 @@ export type {
 // Entity types and schemas
 export {
   BaseEntitySchema,
+  BrandedId,
   CodeRefSchema,
   CreateCodeRefInputSchema,
   CreateDiagramInputSchema,
@@ -28,8 +28,9 @@ export {
   DiagramTypeSchema,
   DocSchema,
   EntitySchema,
-  EntityTypeEnum,
+  EntityType,
   EntityTypeSchema,
+  EntityTypes,
   PriorityEnum,
   PrioritySchema,
   StorySchema,

@@ -1,6 +1,7 @@
 import {
   type Entity,
-  EntityTypeEnum,
+  type EntityId,
+  EntityType,
   GraphServiceTag,
   type Link,
   resolveTagSelectors,
@@ -17,21 +18,21 @@ export interface QueryRunResult {
 // ============================================================================
 
 const roleOrder = [
-  EntityTypeEnum.Doc,
-  EntityTypeEnum.CodeRef,
-  EntityTypeEnum.Story,
-  EntityTypeEnum.Diagram,
+  EntityType.Doc,
+  EntityType.CodeRef,
+  EntityType.Story,
+  EntityType.Diagram,
 ] as const;
 
 const roleLabel = (type: Entity["_tag"]): string => {
   switch (type) {
-    case EntityTypeEnum.Doc:
+    case EntityType.Doc:
       return "Docs";
-    case EntityTypeEnum.CodeRef:
+    case EntityType.CodeRef:
       return "Code refs";
-    case EntityTypeEnum.Story:
+    case EntityType.Story:
       return "Stories";
-    case EntityTypeEnum.Diagram:
+    case EntityType.Diagram:
       return "Diagrams";
   }
 };
@@ -43,7 +44,7 @@ const preview = (content: string): string => {
 };
 
 const codeLocation = (entity: Entity): string | undefined => {
-  if (entity._tag !== EntityTypeEnum.CodeRef) return undefined;
+  if (entity._tag !== EntityType.CodeRef) return undefined;
 
   const start = entity.startLine ? `:${entity.startLine}` : "";
   const end = entity.endLine ? `-${entity.endLine}` : "";
@@ -58,7 +59,7 @@ const entitySummary = (entity: Entity, displayIds: ReadonlyMap<string, string>):
 
 const printEntityBody = (entity: Entity, displayIds: ReadonlyMap<string, string>) =>
   Effect.gen(function* () {
-    if (entity._tag === EntityTypeEnum.Story) {
+    if (entity._tag === EntityType.Story) {
       const priority = entity.priority ? `, priority: ${entity.priority}` : "";
       yield* Console.log(`    status: ${entity.status}${priority}`);
     }
@@ -109,18 +110,18 @@ const printGroupedEntities = (title: string, entities: ReadonlyArray<Entity>) =>
     }
   });
 
-const linkDirectionLabel = (link: Link, entityId: string): string => {
+const linkDirectionLabel = (link: Link, entityId: EntityId): string => {
   if (link.sourceId === entityId) return `--${link.type}-->`;
   return `<--${link.type}--`;
 };
 
-const otherEntityId = (link: Link, entityId: string): string =>
+const otherEntityId = (link: Link, entityId: EntityId): EntityId =>
   link.sourceId === entityId ? link.targetId : link.sourceId;
 
 const findLinkBetween = (
   links: ReadonlyArray<Link>,
-  fromId: string,
-  toId: string
+  fromId: EntityId,
+  toId: EntityId
 ): Link | undefined =>
   links.find(
     (link) =>
@@ -146,7 +147,7 @@ export const runTagsQuery = (selectors: ReadonlyArray<string>) =>
     return { displayedEntityIds: entities.map((entity) => entity.id) } satisfies QueryRunResult;
   });
 
-export const runRelatedQuery = (entityId: string) =>
+export const runRelatedQuery = (entityId: EntityId) =>
   Effect.gen(function* () {
     const graphService = yield* GraphServiceTag;
     const center = yield* graphService.getEntityWithLinks(entityId);
@@ -190,7 +191,7 @@ export const runRelatedQuery = (entityId: string) =>
     } satisfies QueryRunResult;
   });
 
-export const runTraverseQuery = (entityId: string, depth: number) =>
+export const runTraverseQuery = (entityId: EntityId, depth: number) =>
   Effect.gen(function* () {
     const graphService = yield* GraphServiceTag;
     const result = yield* graphService.traverse(entityId, depth);
@@ -203,7 +204,7 @@ export const runTraverseQuery = (entityId: string, depth: number) =>
     } satisfies QueryRunResult;
   });
 
-export const runPathQuery = (fromId: string, toId: string) =>
+export const runPathQuery = (fromId: EntityId, toId: EntityId) =>
   Effect.gen(function* () {
     const graphService = yield* GraphServiceTag;
     const pathEntities = yield* graphService.findPath(fromId, toId);

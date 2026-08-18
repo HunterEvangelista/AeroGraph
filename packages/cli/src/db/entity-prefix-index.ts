@@ -1,7 +1,7 @@
-import { RepositoryError } from "@kioku/core";
+import { BrandedId, type EntityId, RepositoryError } from "@kioku/core";
 import { and, eq, inArray, like } from "drizzle-orm";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Option, Schema } from "effect";
 import { DatabaseClientTag } from "./client";
 
 export {
@@ -16,8 +16,10 @@ import { entities, entityIdPrefixes } from "./schema";
 import type { DatabaseSession } from "./session";
 import { withSqliteWriteRetry } from "./sqlite-retry";
 
+const decodeEntityId = Schema.decodeUnknownOption(BrandedId);
+
 export interface EntityPrefixMatch {
-  readonly id: string;
+  readonly id: EntityId;
   readonly title: string;
   readonly type: "doc" | "code_ref" | "story" | "diagram";
 }
@@ -27,7 +29,7 @@ export interface EntityPrefixIndex {
   readonly resolvePrefix: (
     prefix: string,
     scope?: string
-  ) => Effect.Effect<string | null, RepositoryError>;
+  ) => Effect.Effect<EntityId | null, RepositoryError>;
   readonly findMatchesByPrefix: (
     prefix: string
   ) => Effect.Effect<ReadonlyArray<EntityPrefixMatch>, RepositoryError>;
@@ -93,7 +95,7 @@ export const EntityPrefixIndexLive = Layer.effect(
             .from(entityIdPrefixes)
             .where(and(eq(entityIdPrefixes.scope, scope), eq(entityIdPrefixes.prefix, prefix)))
             .get();
-          return row?.entityId ?? null;
+          return row ? Option.getOrNull(decodeEntityId(row.entityId)) : null;
         },
         catch: (error) =>
           new RepositoryError({
@@ -104,13 +106,19 @@ export const EntityPrefixIndexLive = Layer.effect(
 
     const findMatchesByPrefix = (prefix: string) =>
       Effect.try({
-        try: () =>
-          drizzle
+        try: () => {
+          const rows = drizzle
             .select({ id: entities.id, title: entities.title, type: entities.type })
             .from(entities)
             .where(like(entities.id, `${prefix}%`))
             .orderBy(entities.id)
-            .all() satisfies EntityPrefixMatch[],
+            .all();
+
+          return rows.flatMap((row) => {
+            const id = Option.getOrUndefined(decodeEntityId(row.id));
+            return id ? [{ ...row, id }] : [];
+          });
+        },
         catch: (error) =>
           new RepositoryError({
             message: `Failed to find entity id prefix matches: ${error instanceof Error ? error.message : String(error)}`,

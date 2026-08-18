@@ -1,6 +1,7 @@
 import {
+  type EntityId,
   EntityServiceTag,
-  EntityTypeEnum,
+  EntityType,
   GraphServiceTag,
   type Story,
   StoryStatusEnum,
@@ -18,7 +19,7 @@ import { resolveEntityId } from "../entity-id";
 // ============================================================================
 
 class NotAStoryError extends Data.TaggedError("NotAStoryError")<{
-  readonly id: string;
+  readonly id: EntityId;
 }> {}
 
 class NoUpdatesError extends Data.TaggedError("NoUpdatesError")<object> {}
@@ -203,7 +204,7 @@ const storyShowCommand = Command.make(
           const withLinks = yield* graphService.getEntityWithLinks(resolvedId);
           const entity = withLinks.entity;
 
-          if (entity._tag !== EntityTypeEnum.Story) {
+          if (entity._tag !== EntityType.Story) {
             return yield* new NotAStoryError({ id: resolvedId });
           }
 
@@ -300,11 +301,11 @@ const storyListCommand = Command.make(
             ? yield* entityService.search(searchValue)
             : tagValue
               ? yield* entityService.getByTag(tagValue)
-              : yield* entityService.getAll(EntityTypeEnum.Story);
+              : yield* entityService.getAll(EntityType.Story);
 
           const stories = results.filter(
             (entity): entity is Story =>
-              entity._tag === EntityTypeEnum.Story &&
+              entity._tag === EntityType.Story &&
               (statusValue === undefined || entity.status === statusValue)
           );
           const displayIds = yield* loadFormattedEntityIds(stories.map((story) => story.id));
@@ -374,7 +375,7 @@ const storyEditCommand = Command.make(
             resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
-          if (existing._tag !== EntityTypeEnum.Story) {
+          if (existing._tag !== EntityType.Story) {
             return yield* new NotAStoryError({ id: resolvedId });
           }
 
@@ -392,7 +393,7 @@ const storyEditCommand = Command.make(
         }).pipe(Effect.provide(ServiceLayers))
       );
 
-      if (updated._tag !== EntityTypeEnum.Story) {
+      if (updated._tag !== EntityType.Story) {
         return yield* new NotAStoryError({ id: updated.id });
       }
 
@@ -435,7 +436,7 @@ const storyDeleteCommand = Command.make(
             resolvedId as Parameters<typeof entityService.getById>[0]
           );
 
-          if (existing._tag !== EntityTypeEnum.Story) {
+          if (existing._tag !== EntityType.Story) {
             return yield* new NotAStoryError({ id: resolvedId });
           }
 

@@ -14,3 +14,4 @@ export { queryCommand } from "./query";
 export { statusCommand } from "./status";
 export { storyCommand } from "./story";
 export { tagCommand } from "./tag";
+export { termCommand } from "./term";

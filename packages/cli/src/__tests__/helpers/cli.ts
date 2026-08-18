@@ -10,6 +10,11 @@ export interface CliResult {
   readonly stderr: string;
 }
 
+export interface CliWorkspaceOptions {
+  /** Seed the term-governance fixture in addition to the baseline query data. */
+  readonly seedTerms?: boolean;
+}
+
 export interface CliWorkspace {
   readonly rootPath: string;
   readonly run: (...args: ReadonlyArray<string>) => CliResult;
@@ -20,6 +25,7 @@ export interface CliWorkspace {
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const cliEntrypoint = join(packageRoot, "src/cli.ts");
 const seedQueryFixtureEntrypoint = join(packageRoot, "src/__tests__/helpers/seed-query-fixture.ts");
+const seedTermFixtureEntrypoint = join(packageRoot, "src/__tests__/helpers/term-cli-fixture.ts");
 
 const runBun = (args: ReadonlyArray<string>, cwd: string): CliResult => {
   const result = spawnSync("bun", args, {
@@ -61,7 +67,7 @@ const runBunAsync = (args: ReadonlyArray<string>, cwd: string): Promise<CliResul
     });
   });
 
-export const createCliWorkspace = (): CliWorkspace => {
+export const createCliWorkspace = (options: CliWorkspaceOptions = {}): CliWorkspace => {
   const rootPath = mkdtempSync(join(tmpdir(), "kioku-cli-test-"));
   const kiokuPath = join(rootPath, ".kioku");
   mkdirSync(kiokuPath);
@@ -82,6 +88,14 @@ export const createCliWorkspace = (): CliWorkspace => {
   if (seed.status !== 0) {
     rmSync(rootPath, { recursive: true, force: true });
     throw new Error(`Failed to seed CLI workspace:\n${seed.stderr}\n${seed.stdout}`);
+  }
+
+  if (options.seedTerms) {
+    const termSeed = runBun(["run", seedTermFixtureEntrypoint, rootPath], packageRoot);
+    if (termSeed.status !== 0) {
+      rmSync(rootPath, { recursive: true, force: true });
+      throw new Error(`Failed to seed term CLI workspace:\n${termSeed.stderr}\n${termSeed.stdout}`);
+    }
   }
 
   return {

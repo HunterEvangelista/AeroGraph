@@ -18,6 +18,7 @@ import {
   statusCommand,
   storyCommand,
   tagCommand,
+  termCommand,
   unlinkCommand,
 } from "./commands/index";
 import { ConfigServiceLive } from "./config";
@@ -40,6 +41,7 @@ const command = kioku.pipe(
     contextCommand,
     storyCommand,
     tagCommand,
+    termCommand,
     linkCommand,
     unlinkCommand,
     migrateCommand,
