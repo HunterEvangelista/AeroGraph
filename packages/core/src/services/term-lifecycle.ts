@@ -1,12 +1,12 @@
 import { Effect } from "effect";
-import type { Term, TermId } from "../domain/term.js";
+import type { Term, TermId } from "../domain/term";
 import {
   type RepositoryError,
   TermMigrationError,
   type TermNotFoundError,
   ValidationError,
-} from "../errors.js";
-import type { TermRepository } from "../repository/term-repository.js";
+} from "../errors";
+import type { TermRepository } from "../repository/term-repository";
 
 const invalid = (field: string, message: string) =>
   Effect.fail(new ValidationError({ field, message }));

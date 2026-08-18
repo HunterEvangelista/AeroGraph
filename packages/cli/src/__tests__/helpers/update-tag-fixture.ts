@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { type TagId, TagRepositoryTag } from "@kioku/core";
 import { Effect } from "effect";
-import { CliServicesLive } from "../../db/layers.js";
+import { CliServicesLive } from "../../db/layers";
 
 const rootPath = process.argv[2];
 const tagId = process.argv[3] as TagId | undefined;

@@ -7,7 +7,7 @@ import {
   TermRepositoryTag,
 } from "@kioku/core";
 import { Effect, Exit } from "effect";
-import { CliServicesLive } from "../../layers.js";
+import { CliServicesLive } from "../../layers";
 
 const result = await Effect.runPromise(
   Effect.scoped(

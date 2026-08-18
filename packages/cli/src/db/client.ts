@@ -6,8 +6,8 @@ import { Database } from "bun:sqlite";
 import { DatabaseError, MigrationError, normalizeTermName } from "@kioku/core";
 import { type BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
 import { Context, Effect, Layer } from "effect";
-import { rebuildEntityIdPrefixes } from "./entity-prefix-index.js";
-import * as schema from "./schema.js";
+import { rebuildEntityIdPrefixes } from "./entity-prefix-index";
+import * as schema from "./schema";
 import {
   CREATE_SCHEMA_META_SQL,
   CREATE_TABLES_SQL,
@@ -21,7 +21,7 @@ import {
   TERM_NAME_KIND_VALUES,
   TERM_NAME_NORMALIZED_CHECK,
   TERM_STATUS_VALUES,
-} from "./schema.js";
+} from "./schema";
 
 // ============================================================================
 // Database Client Interface

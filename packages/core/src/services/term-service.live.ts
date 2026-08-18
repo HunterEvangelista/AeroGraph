@@ -1,17 +1,17 @@
 /** Term service live implementation. */
 import { Effect, Layer } from "effect";
-import type { CreateTermNameInput, Term, TermId, TermKind, TermName } from "../domain/term.js";
-import { TermAlreadyExistsError, TermMigrationError } from "../errors.js";
-import { TermRepositoryTag } from "../repository/term-repository.js";
-import { validateTermLifecycle } from "./term-lifecycle.js";
-import { resolveTermName, resolveTermSelector } from "./term-resolution.js";
+import type { CreateTermNameInput, Term, TermId, TermKind, TermName } from "../domain/term";
+import { TermAlreadyExistsError, TermMigrationError } from "../errors";
+import { TermRepositoryTag } from "../repository/term-repository";
+import { validateTermLifecycle } from "./term-lifecycle";
+import { resolveTermName, resolveTermSelector } from "./term-resolution";
 import {
   type TermInspection,
   type TermResolution,
   type TermSelector,
   type TermService,
   TermServiceTag,
-} from "./term-service.js";
+} from "./term-service";
 
 const sameRegisteredName = (left: TermName, right: CreateTermNameInput): boolean =>
   left.displayName === right.displayName && left.nameKind === right.nameKind;

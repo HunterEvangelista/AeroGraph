@@ -5,10 +5,10 @@ import { Console, Data, Effect } from "effect";
  * Runnable follow-up suggestions emitted by prior commands.
  */
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { EntityPrefixIndexTag, formatEntityIdWithBoldPrefix } from "../db/entity-prefix-index.js";
-import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
-import { runRelatedQuery, runTraverseQuery } from "./query-runners.js";
-import { withCliServices } from "./workspace.js";
+import { EntityPrefixIndexTag, formatEntityIdWithBoldPrefix } from "../db/entity-prefix-index";
+import { formatEntityIdMatches, resolveEntityId } from "../entity-id";
+import { runRelatedQuery, runTraverseQuery } from "./query-runners";
+import { withCliServices } from "./workspace";
 
 // ============================================================================
 // Custom Error Types

@@ -20,8 +20,8 @@ import {
   tagCommand,
   termCommand,
   unlinkCommand,
-} from "./commands/index.js";
-import { ConfigServiceLive } from "./config.js";
+} from "./commands/index";
+import { ConfigServiceLive } from "./config";
 
 // ============================================================================
 // CLI Application

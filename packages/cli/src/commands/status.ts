@@ -5,8 +5,8 @@ import { Console, Effect } from "effect";
  * Display workspace and graph statistics
  */
 import { Command } from "effect/unstable/cli";
-import { ConfigServiceTag } from "../config.js";
-import { CliCoreLive } from "../db/index.js";
+import { ConfigServiceTag } from "../config";
+import { CliCoreLive } from "../db/index";
 
 export const statusCommand = Command.make("status", {}, () =>
   Effect.gen(function* () {

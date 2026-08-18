@@ -1,5 +1,5 @@
 import { Context, type Effect } from "effect";
-import type { MigrationJournalEntry, TermKind, TermName } from "../domain/term.js";
+import type { MigrationJournalEntry, TermKind, TermName } from "../domain/term";
 import type {
   AmbiguousTermNameError,
   RepositoryError,
@@ -7,8 +7,8 @@ import type {
   TermMigrationError,
   TermNotFoundError,
   ValidationError,
-} from "../errors.js";
-import type { TermInspection, TermSelector } from "./term-service.js";
+} from "../errors";
+import type { TermInspection, TermSelector } from "./term-service";
 
 export interface AddTermAliasInput {
   readonly term: TermSelector;

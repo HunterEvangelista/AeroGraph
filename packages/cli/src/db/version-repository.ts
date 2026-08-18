@@ -14,8 +14,8 @@ import { and, desc, count as drizzleCount, eq, gte, lte } from "drizzle-orm";
  * SQLite Version Repository Implementation
  */
 import { Effect, Layer } from "effect";
-import { entities, entityVersions } from "./schema.js";
-import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session.js";
+import { entities, entityVersions } from "./schema";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
 // ============================================================================
 // Helper Functions

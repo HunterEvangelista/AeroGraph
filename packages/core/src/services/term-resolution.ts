@@ -1,15 +1,15 @@
 import { Effect } from "effect";
-import type { Term, TermId, TermName } from "../domain/term.js";
-import { TermIdSchema } from "../domain/term.js";
+import type { Term, TermId, TermName } from "../domain/term";
+import { TermIdSchema } from "../domain/term";
 import {
   AmbiguousTermNameError,
   type RepositoryError,
   TermMigrationError,
   TermNotFoundError,
-} from "../errors.js";
-import type { ResolvedTermName, TermRepository } from "../repository/term-repository.js";
-import { validateTermLocalLifecycle } from "./term-lifecycle.js";
-import type { TermResolution, TermSelector } from "./term-service.js";
+} from "../errors";
+import type { ResolvedTermName, TermRepository } from "../repository/term-repository";
+import { validateTermLocalLifecycle } from "./term-lifecycle";
+import type { TermResolution, TermSelector } from "./term-service";
 
 const candidateLabel = ({ term, termName }: ResolvedTermName): string =>
   `${term.kind}:${term.canonicalName} (${termName.nameKind})`;

@@ -10,7 +10,7 @@ import {
 } from "@kioku/core";
 import { Console, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { withCliServices } from "./workspace.js";
+import { withCliServices } from "./workspace";
 
 const validKind = (value: string): value is TermKind =>
   (TERM_KINDS as ReadonlyArray<string>).includes(value);

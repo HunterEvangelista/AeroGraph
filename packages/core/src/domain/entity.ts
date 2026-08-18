@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { PositiveInteger } from "./scalars.js";
+import { PositiveInteger } from "./scalars";
 
 // ============================================================================
 // Entity Types

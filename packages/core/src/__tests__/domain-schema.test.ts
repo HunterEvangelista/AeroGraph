@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { EntityType } from "../domain/entity.js";
+import { EntityType } from "../domain/entity";
 import {
   CodeRefSchema,
   CreateTagInput,
@@ -13,8 +13,8 @@ import {
   StorySchema,
   Tag,
   UpdateTagInput,
-} from "../domain/index.js";
-import { ChangeType, EntityVersion } from "../domain/version.js";
+} from "../domain/index";
+import { ChangeType, EntityVersion } from "../domain/version";
 import {
   ConfigError,
   DatabaseError,
@@ -27,8 +27,8 @@ import {
   VersionNotFoundError,
   WorkspaceAlreadyExistsError,
   WorkspaceNotFoundError,
-} from "../errors.js";
-import { FIXED_TIMESTAMP_ISO } from "./helpers/index.js";
+} from "../errors";
+import { FIXED_TIMESTAMP_ISO } from "./helpers/index";
 
 const FIXED_DATE_ISO = FIXED_TIMESTAMP_ISO;
 

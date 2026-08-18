@@ -8,12 +8,12 @@ import type {
   MigrationJournalEntry,
   RecordJournalEntryInput,
   TermId,
-} from "../domain/term.js";
+} from "../domain/term";
 import type {
   MigrationJournalEntryNotFoundError,
   RepositoryError,
   ValidationError,
-} from "../errors.js";
+} from "../errors";
 
 // ============================================================================
 // Migration Journal Repository Interface

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createInMemoryDatabase } from "./index.js";
+import { createInMemoryDatabase } from "./index";
 
 describe("cli db test helpers", () => {
   it("uses the runtime-appropriate in-memory database behavior", async () => {

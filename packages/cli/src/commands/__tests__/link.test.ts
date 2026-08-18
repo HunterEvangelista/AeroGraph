@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type CliWorkspace, createCliWorkspace } from "../../__tests__/helpers/cli.js";
+import { type CliWorkspace, createCliWorkspace } from "../../__tests__/helpers/cli";
 
 describe("link commands", () => {
   let workspace: CliWorkspace;

@@ -1,12 +1,12 @@
 import { Context, type Effect } from "effect";
-import type { EntityId } from "../domain/entity.js";
-import type { CreateLinkInput, Link, LinkId, LinkType } from "../domain/link.js";
+import type { EntityId } from "../domain/entity";
+import type { CreateLinkInput, Link, LinkId, LinkType } from "../domain/link";
 import type {
   EntityNotFoundError,
   LinkNotFoundError,
   RepositoryError,
   ValidationError,
-} from "../errors.js";
+} from "../errors";
 
 // ============================================================================
 // Link Repository Interface

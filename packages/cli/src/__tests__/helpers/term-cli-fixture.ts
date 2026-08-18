@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { EntityRepositoryTag, TagRepositoryTag, TermRepositoryTag } from "@kioku/core";
 import { Effect } from "effect";
-import { CliServicesLive } from "../../db/layers.js";
+import { CliServicesLive } from "../../db/layers";
 
 const root = process.argv[2];
 if (!root) throw new Error("Workspace path is required");

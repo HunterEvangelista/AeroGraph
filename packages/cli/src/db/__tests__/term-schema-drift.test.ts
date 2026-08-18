@@ -15,7 +15,7 @@ import {
   TERM_STATUS_VALUES,
   termNames,
   terms,
-} from "../schema.js";
+} from "../schema";
 
 const checkNames = (table: Parameters<typeof getTableConfig>[0]): ReadonlyArray<string> =>
   getTableConfig(table)

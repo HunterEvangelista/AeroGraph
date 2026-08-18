@@ -3,9 +3,9 @@
  * Business logic for governed terminology migrations.
  */
 import { Context, type Effect } from "effect";
-import type { Entity } from "../domain/entity.js";
-import type { Tag } from "../domain/tag.js";
-import type { JournalEntryId, MigrationJournalEntry, Term, TermKind } from "../domain/term.js";
+import type { Entity } from "../domain/entity";
+import type { Tag } from "../domain/tag";
+import type { JournalEntryId, MigrationJournalEntry, Term, TermKind } from "../domain/term";
 import type {
   AmbiguousTermNameError,
   RepositoryError,
@@ -14,8 +14,8 @@ import type {
   TermMigrationError,
   TermNotFoundError,
   ValidationError,
-} from "../errors.js";
-import type { TermSelector } from "./term-service.js";
+} from "../errors";
+import type { TermSelector } from "./term-service";
 
 export interface RenameTermInput {
   readonly kind: TermKind;

@@ -3,13 +3,13 @@
  * Storage-agnostic interface for tag operations
  */
 import { Context, type Effect } from "effect";
-import type { CreateTagInput, Tag, TagId, UpdateTagInput } from "../domain/tag.js";
+import type { CreateTagInput, Tag, TagId, UpdateTagInput } from "../domain/tag";
 import type {
   EntityNotFoundError,
   RepositoryError,
   TagNotFoundError,
   ValidationError,
-} from "../errors.js";
+} from "../errors";
 
 // ============================================================================
 // Tag Repository Interface

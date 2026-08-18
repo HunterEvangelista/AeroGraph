@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type CliWorkspace, createCliWorkspace } from "../../__tests__/helpers/cli.js";
+import { type CliWorkspace, createCliWorkspace } from "../../__tests__/helpers/cli";
 
 const governTagFixture = join(
   dirname(fileURLToPath(import.meta.url)),

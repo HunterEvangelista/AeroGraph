@@ -10,7 +10,7 @@ export const createInMemoryDatabase = async (): Promise<InMemoryDatabase> => {
     throw new Error("In-memory SQLite helper requires Bun runtime");
   }
 
-  const { makeDatabaseClient } = await import("../../client.js");
+  const { makeDatabaseClient } = await import("../../client");
   const client = await Effect.runPromise(makeDatabaseClient(":memory:"));
 
   return {

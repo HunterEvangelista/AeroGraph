@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Effect, Exit } from "effect";
-import { makeDatabaseClient } from "../../client.js";
+import { makeDatabaseClient } from "../../client";
 
 const root = mkdtempSync(join(tmpdir(), "kioku-upgrade-"));
 

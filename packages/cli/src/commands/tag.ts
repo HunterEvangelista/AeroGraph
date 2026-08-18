@@ -5,7 +5,7 @@ import { Console, Effect, Option } from "effect";
  * Operations for managing tags and entity tagging
  */
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { withCliServices } from "./workspace.js";
+import { withCliServices } from "./workspace";
 
 // ============================================================================
 // Tag Create Command

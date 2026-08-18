@@ -10,7 +10,7 @@ import type {
   TermId,
   TermKind,
   TermName,
-} from "../domain/term.js";
+} from "../domain/term";
 import type {
   AmbiguousTermNameError,
   RepositoryError,
@@ -18,7 +18,7 @@ import type {
   TermMigrationError,
   TermNotFoundError,
   ValidationError,
-} from "../errors.js";
+} from "../errors";
 
 export type TermSelector =
   | string

@@ -4,8 +4,8 @@ import { Console, Effect, Option } from "effect";
  * Initialize a new kioku workspace
  */
 import { Argument, Command } from "effect/unstable/cli";
-import { ConfigServiceTag } from "../config.js";
-import { makeDatabaseClient } from "../db/index.js";
+import { ConfigServiceTag } from "../config";
+import { makeDatabaseClient } from "../db/index";
 
 export const initCommand = Command.make(
   "init",

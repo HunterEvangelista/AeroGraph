@@ -6,7 +6,7 @@ import {
   fixedDate,
   runEffect,
   runEffectExit,
-} from "./index.js";
+} from "./index";
 
 describe("core test helpers", () => {
   it("produces deterministic incremental ids", () => {

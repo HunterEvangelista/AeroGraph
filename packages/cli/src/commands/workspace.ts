@@ -1,6 +1,6 @@
 import { Effect } from "effect";
-import { ConfigServiceTag } from "../config.js";
-import { CliServicesLive } from "../db/index.js";
+import { ConfigServiceTag } from "../config";
+import { CliServicesLive } from "../db/index";
 
 export const withCliServices = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
   Effect.gen(function* () {

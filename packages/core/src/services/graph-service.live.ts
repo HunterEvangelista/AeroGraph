@@ -1,18 +1,18 @@
 /** biome-ignore-all lint/complexity/noExcessiveCognitiveComplexity: deferred */
 import { Effect, Layer, Result } from "effect";
-import { type Entity, type EntityId, type EntityType, EntityTypes } from "../domain/entity.js";
-import type { LinkType } from "../domain/link.js";
-import { EntityNotFoundError } from "../errors.js";
-import { EntityRepositoryTag } from "../repository/entity-repository.js";
-import { LinkRepositoryTag } from "../repository/link-repository.js";
-import { TagRepositoryTag } from "../repository/tag-repository.js";
+import { type Entity, type EntityId, type EntityType, EntityTypes } from "../domain/entity";
+import type { LinkType } from "../domain/link";
+import { EntityNotFoundError } from "../errors";
+import { EntityRepositoryTag } from "../repository/entity-repository";
+import { LinkRepositoryTag } from "../repository/link-repository";
+import { TagRepositoryTag } from "../repository/tag-repository";
 import {
   type EntityWithLinks,
   type GraphService,
   GraphServiceTag,
   type GraphStats,
   type TraversalResult,
-} from "./graph-service.js";
+} from "./graph-service";
 
 export const GraphServiceLive = Layer.effect(
   GraphServiceTag,

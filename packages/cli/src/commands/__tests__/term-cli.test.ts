@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, describe, test } from "vitest";
-import { type CliWorkspace, createCliWorkspace } from "../../__tests__/helpers/cli.js";
+import { type CliWorkspace, createCliWorkspace } from "../../__tests__/helpers/cli";
 
 describe("term CLI (SQLite integration)", () => {
   let workspace: CliWorkspace;

@@ -9,10 +9,10 @@ import {
 } from "@kioku/core";
 import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { ConfigServiceTag } from "../config.js";
-import { CliServicesLive } from "../db/index.js";
-import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
-import { resolveEntityId } from "../entity-id.js";
+import { ConfigServiceTag } from "../config";
+import { CliServicesLive } from "../db/index";
+import { formattedEntityId, loadFormattedEntityIds } from "../entity-display";
+import { resolveEntityId } from "../entity-id";
 
 // ============================================================================
 // Custom Error Types

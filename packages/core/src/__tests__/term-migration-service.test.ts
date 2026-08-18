@@ -1,8 +1,8 @@
 import { Effect, Layer } from "effect";
 import { describe, expect, it } from "vitest";
-import type { Entity, EntityId } from "../domain/entity.js";
-import { EntityType } from "../domain/entity.js";
-import type { Tag, TagId, UpdateTagInput } from "../domain/tag.js";
+import type { Entity, EntityId } from "../domain/entity";
+import { EntityType } from "../domain/entity";
+import type { Tag, TagId, UpdateTagInput } from "../domain/tag";
 import type {
   CreateTermInput,
   CreateTermNameInput,
@@ -15,8 +15,8 @@ import type {
   TermName,
   UpdateTermInput,
   UpdateTermNameInput,
-} from "../domain/term.js";
-import { normalizeTermName } from "../domain/term.js";
+} from "../domain/term";
+import { normalizeTermName } from "../domain/term";
 import {
   AmbiguousTermNameError,
   EntityNotFoundError,
@@ -26,26 +26,26 @@ import {
   TermMigrationError,
   TermNotFoundError,
   ValidationError,
-} from "../errors.js";
-import type { EntityRepository } from "../repository/entity-repository.js";
-import { EntityRepositoryTag } from "../repository/entity-repository.js";
-import type { MigrationJournalRepository } from "../repository/migration-journal-repository.js";
-import { MigrationJournalRepositoryTag } from "../repository/migration-journal-repository.js";
-import type { TagRepository } from "../repository/tag-repository.js";
-import { TagRepositoryTag } from "../repository/tag-repository.js";
-import type { ResolvedTermName, TermRepository } from "../repository/term-repository.js";
-import { TermRepositoryTag } from "../repository/term-repository.js";
+} from "../errors";
+import type { EntityRepository } from "../repository/entity-repository";
+import { EntityRepositoryTag } from "../repository/entity-repository";
+import type { MigrationJournalRepository } from "../repository/migration-journal-repository";
+import { MigrationJournalRepositoryTag } from "../repository/migration-journal-repository";
+import type { TagRepository } from "../repository/tag-repository";
+import { TagRepositoryTag } from "../repository/tag-repository";
+import type { ResolvedTermName, TermRepository } from "../repository/term-repository";
+import { TermRepositoryTag } from "../repository/term-repository";
 import type {
   TransactionEngine,
   TransactionRepositories,
-} from "../repository/transaction-engine.js";
-import { TransactionEngineTag } from "../repository/transaction-engine.js";
-import { MigrationServiceTag } from "../services/migration-service.js";
-import { MigrationServiceLive } from "../services/migration-service.live.js";
-import { resolveTagSelectors } from "../services/tag-selector.js";
-import { TermServiceTag } from "../services/term-service.js";
-import { TermServiceLive } from "../services/term-service.live.js";
-import { FIXED_TIMESTAMP_ISO } from "./helpers/index.js";
+} from "../repository/transaction-engine";
+import { TransactionEngineTag } from "../repository/transaction-engine";
+import { MigrationServiceTag } from "../services/migration-service";
+import { MigrationServiceLive } from "../services/migration-service.live";
+import { resolveTagSelectors } from "../services/tag-selector";
+import { TermServiceTag } from "../services/term-service";
+import { TermServiceLive } from "../services/term-service.live";
+import { FIXED_TIMESTAMP_ISO } from "./helpers/index";
 
 const FIXED_DATE = new Date(FIXED_TIMESTAMP_ISO);
 

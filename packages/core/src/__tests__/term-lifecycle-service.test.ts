@@ -1,34 +1,34 @@
 import { Effect, Layer } from "effect";
 import { describe, expect, it } from "vitest";
-import type { Entity, EntityId } from "../domain/entity.js";
-import { EntityType } from "../domain/entity.js";
-import type { Tag, TagId } from "../domain/tag.js";
-import type { JournalEntryId, Term, TermId, TermName } from "../domain/term.js";
-import { normalizeTermName } from "../domain/term.js";
+import type { Entity, EntityId } from "../domain/entity";
+import { EntityType } from "../domain/entity";
+import type { Tag, TagId } from "../domain/tag";
+import type { JournalEntryId, Term, TermId, TermName } from "../domain/term";
+import { normalizeTermName } from "../domain/term";
 import {
   EntityNotFoundError,
   TagNotFoundError,
   TermMigrationError,
   TermNotFoundError,
   ValidationError,
-} from "../errors.js";
-import type { EntityRepository } from "../repository/entity-repository.js";
-import { EntityRepositoryTag } from "../repository/entity-repository.js";
-import type { MigrationJournalRepository } from "../repository/migration-journal-repository.js";
-import { MigrationJournalRepositoryTag } from "../repository/migration-journal-repository.js";
-import type { TagRepository } from "../repository/tag-repository.js";
-import { TagRepositoryTag } from "../repository/tag-repository.js";
-import type { TermRepository } from "../repository/term-repository.js";
-import { TermRepositoryTag } from "../repository/term-repository.js";
+} from "../errors";
+import type { EntityRepository } from "../repository/entity-repository";
+import { EntityRepositoryTag } from "../repository/entity-repository";
+import type { MigrationJournalRepository } from "../repository/migration-journal-repository";
+import { MigrationJournalRepositoryTag } from "../repository/migration-journal-repository";
+import type { TagRepository } from "../repository/tag-repository";
+import { TagRepositoryTag } from "../repository/tag-repository";
+import type { TermRepository } from "../repository/term-repository";
+import { TermRepositoryTag } from "../repository/term-repository";
 import type {
   TransactionEngine,
   TransactionRepositories,
-} from "../repository/transaction-engine.js";
-import { TransactionEngineTag } from "../repository/transaction-engine.js";
-import { MigrationServiceTag } from "../services/migration-service.js";
-import { MigrationServiceLive } from "../services/migration-service.live.js";
-import { TermServiceTag } from "../services/term-service.js";
-import { TermServiceLive } from "../services/term-service.live.js";
+} from "../repository/transaction-engine";
+import { TransactionEngineTag } from "../repository/transaction-engine";
+import { MigrationServiceTag } from "../services/migration-service";
+import { MigrationServiceLive } from "../services/migration-service.live";
+import { TermServiceTag } from "../services/term-service";
+import { TermServiceLive } from "../services/term-service.live";
 
 const date = new Date("2025-01-01T00:00:00.000Z");
 const term = (
@@ -81,7 +81,7 @@ interface State {
   tags: Map<string, Tag>;
   entities: Map<string, Entity>;
   byTag: Map<string, Set<string>>;
-  entries: import("../domain/term.js").MigrationJournalEntry[];
+  entries: import("../domain/term").MigrationJournalEntry[];
 }
 
 const layer = (state: State) => {

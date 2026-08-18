@@ -8,9 +8,9 @@ import {
   ValidationError,
 } from "@kioku/core";
 import { Effect, Layer } from "effect";
-import { DatabaseClientLive } from "../../client.js";
-import { SqliteMigrationJournalRepositoryLive } from "../../migration-journal-repository.js";
-import { SqliteTermRepositoryLive } from "../../term-repository.js";
+import { DatabaseClientLive } from "../../client";
+import { SqliteMigrationJournalRepositoryLive } from "../../migration-journal-repository";
+import { SqliteTermRepositoryLive } from "../../term-repository";
 
 const createRepositoryLayer = () => {
   return Layer.mergeAll(SqliteTermRepositoryLive, SqliteMigrationJournalRepositoryLive).pipe(

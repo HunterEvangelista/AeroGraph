@@ -12,13 +12,13 @@ import type {
   TermName,
   UpdateTermInput,
   UpdateTermNameInput,
-} from "../domain/term.js";
+} from "../domain/term";
 import type {
   RepositoryError,
   TermAlreadyExistsError,
   TermNotFoundError,
   ValidationError,
-} from "../errors.js";
+} from "../errors";
 
 export interface ResolvedTermName {
   readonly term: Term;
