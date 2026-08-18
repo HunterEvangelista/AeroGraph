@@ -1,5 +1,6 @@
 import {
   type JournalEntryId,
+  JournalEntryIdSchema,
   type MigrationJournalEntry,
   MigrationJournalEntryNotFoundError,
   type MigrationJournalRepository,
@@ -7,9 +8,10 @@ import {
   type RecordJournalEntryInput,
   RepositoryError,
   type TermId,
+  TermIdSchema,
 } from "@kioku/core";
 import { desc, eq, or } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { migrationJournal } from "./schema";
 import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
@@ -18,15 +20,18 @@ const now = (): string => new Date().toISOString();
 type MigrationJournalRow = typeof migrationJournal.$inferSelect;
 
 const rowToJournalEntry = (row: MigrationJournalRow, context: string): MigrationJournalEntry => {
-  let decoded: unknown;
+  let parsed: unknown;
   try {
-    decoded = JSON.parse(row.affectedEntityIds) as unknown;
+    parsed = JSON.parse(row.affectedEntityIds);
   } catch (error) {
     throw new Error(
       `Journal '${row.id}' ${context} has malformed affected_entity_ids JSON: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-  if (!Array.isArray(decoded) || decoded.some((value) => typeof value !== "string")) {
+  let decoded: ReadonlyArray<string>;
+  try {
+    decoded = Schema.decodeUnknownSync(Schema.Array(Schema.String))(parsed);
+  } catch {
     throw new Error(
       `Journal '${row.id}' ${context} has invalid affected_entity_ids; expected string[].`
     );
@@ -44,14 +49,12 @@ const rowToJournalEntry = (row: MigrationJournalRow, context: string): Migration
     throw new Error(`Journal '${row.id}' ${context} has an invalid applied_at date.`);
   }
 
-  return {
-    id: row.id as JournalEntryId,
+  const entry: MigrationJournalEntry = {
+    id: Schema.decodeUnknownSync(JournalEntryIdSchema)(row.id),
     operation: row.operation,
     kind: row.kind ?? undefined,
     fromName: row.fromName,
-    ...(row.toName === null ? {} : { toName: row.toName }),
-    termId: row.termId as TermId,
-    ...(row.relatedTermId === null ? {} : { relatedTermId: row.relatedTermId as TermId }),
+    termId: Schema.decodeUnknownSync(TermIdSchema)(row.termId),
     affectedEntityIds: decoded,
     affectedCount: row.affectedCount,
     reason: row.reason ?? undefined,
@@ -59,6 +62,13 @@ const rowToJournalEntry = (row: MigrationJournalRow, context: string): Migration
     appliedBy: row.appliedBy ?? undefined,
     dryRun: row.dryRun,
   };
+  if (row.toName !== null) Object.assign(entry, { toName: row.toName });
+  if (row.relatedTermId !== null) {
+    Object.assign(entry, {
+      relatedTermId: Schema.decodeUnknownSync(TermIdSchema)(row.relatedTermId),
+    });
+  }
+  return entry;
 };
 
 export const SqliteMigrationJournalRepositorySessionLive = Layer.effect(

@@ -1,8 +1,9 @@
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import type { Entity, EntityId } from "../domain/entity";
-import { EntityType } from "../domain/entity";
+import type { Entity } from "../domain/entity";
+import { BrandedId, EntityType } from "../domain/entity";
 import type { Tag, TagId, UpdateTagInput } from "../domain/tag";
+import { TagIdSchema } from "../domain/tag";
 import type {
   CreateTermInput,
   CreateTermNameInput,
@@ -16,7 +17,7 @@ import type {
   UpdateTermInput,
   UpdateTermNameInput,
 } from "../domain/term";
-import { normalizeTermName } from "../domain/term";
+import { JournalEntryIdSchema, normalizeTermName, TermIdSchema } from "../domain/term";
 import {
   AmbiguousTermNameError,
   EntityNotFoundError,
@@ -35,10 +36,7 @@ import type { TagRepository } from "../repository/tag-repository";
 import { TagRepositoryTag } from "../repository/tag-repository";
 import type { ResolvedTermName, TermRepository } from "../repository/term-repository";
 import { TermRepositoryTag } from "../repository/term-repository";
-import type {
-  TransactionEngine,
-  TransactionRepositories,
-} from "../repository/transaction-engine";
+import type { TransactionEngine, TransactionRepositories } from "../repository/transaction-engine";
 import { TransactionEngineTag } from "../repository/transaction-engine";
 import { MigrationServiceTag } from "../services/migration-service";
 import { MigrationServiceLive } from "../services/migration-service.live";
@@ -48,6 +46,11 @@ import { TermServiceLive } from "../services/term-service.live";
 import { FIXED_TIMESTAMP_ISO } from "./helpers/index";
 
 const FIXED_DATE = new Date(FIXED_TIMESTAMP_ISO);
+const entityId = (value: string) => Schema.decodeUnknownSync(BrandedId)(value);
+const tagId = (value: string): TagId => Schema.decodeUnknownSync(TagIdSchema)(value);
+const termId = (value: string): TermId => Schema.decodeUnknownSync(TermIdSchema)(value);
+const journalEntryId = (value: string): JournalEntryId =>
+  Schema.decodeUnknownSync(JournalEntryIdSchema)(value);
 
 interface TermStore {
   readonly terms: Map<string, Term>;
@@ -58,9 +61,52 @@ interface MigrationStore {
   readonly entries: MigrationJournalEntry[];
 }
 
+interface MutableMigrationJournalEntry {
+  id: JournalEntryId;
+  operation: MigrationJournalEntry["operation"];
+  kind: TermKind | undefined;
+  fromName: string;
+  toName: string | undefined;
+  termId: TermId;
+  relatedTermId: TermId | undefined;
+  affectedEntityIds: ReadonlyArray<string>;
+  affectedCount: number;
+  reason: string | undefined;
+  appliedAt: Date;
+  appliedBy: string | undefined;
+  dryRun: boolean;
+}
+
+interface TestTagOptions {
+  aliases?: ReadonlyArray<string>;
+  termId?: TermId;
+}
+
+interface MutableTagDraft {
+  id: Tag["id"];
+  name: string;
+  description: string | undefined;
+  parentId: string | undefined;
+  aliases: ReadonlyArray<string> | undefined;
+  termId: TermId | undefined;
+  createdAt: Date;
+}
+
+interface MutableTermDraft {
+  id: TermId;
+  canonicalName: string;
+  kind: TermKind;
+  description: string | undefined;
+  status: Term["status"];
+  mergedIntoId: TermId | undefined;
+  replacementTermId: TermId | undefined;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 const createTestEntity = (id: string, tags: ReadonlyArray<string> = []): Entity => ({
   _tag: EntityType.Doc,
-  id: id as EntityId,
+  id: entityId(id),
   title: `Entity ${id}`,
   content: `Content for ${id}`,
   tags: [...tags],
@@ -69,42 +115,51 @@ const createTestEntity = (id: string, tags: ReadonlyArray<string> = []): Entity 
   version: 1,
 });
 
-const createTestTag = (
-  id: string,
-  name: string,
-  options: { aliases?: ReadonlyArray<string>; termId?: TermId } = {}
-): Tag => ({
-  id: id as TagId,
+const createTestTag = (id: string, name: string, options: TestTagOptions = {}): Tag => ({
+  id: tagId(id),
   name,
-  ...(options.aliases ? { aliases: [...options.aliases] } : {}),
-  ...(options.termId ? { termId: options.termId } : {}),
+  description: undefined,
+  parentId: undefined,
+  aliases: options.aliases === undefined ? undefined : [...options.aliases],
+  termId: options.termId,
   createdAt: FIXED_DATE,
 });
 
-const applyTagUpdates = (existing: Tag, updates: UpdateTagInput): Tag => ({
-  ...existing,
-  name: updates.name ?? existing.name,
-  ...(updates.description !== undefined ? { description: updates.description } : {}),
-  ...(updates.parentId !== undefined ? { parentId: updates.parentId } : {}),
-  ...(updates.aliases !== undefined ? { aliases: updates.aliases } : {}),
-  ...(updates.termId !== undefined ? { termId: updates.termId } : {}),
-});
+const applyTagUpdates = (existing: Tag, updates: UpdateTagInput): Tag => {
+  const updated: MutableTagDraft = {
+    ...existing,
+    name: updates.name ?? existing.name,
+    description: existing.description,
+    parentId: existing.parentId,
+    aliases: existing.aliases,
+    termId: existing.termId,
+  };
+  if (updates.description !== undefined) updated.description = updates.description;
+  if (updates.parentId !== undefined) updated.parentId = updates.parentId;
+  if (updates.aliases !== undefined) updated.aliases = updates.aliases;
+  if (updates.termId !== undefined) updated.termId = updates.termId;
+  return updated;
+};
 
 const createTestTerm = (
   id: string,
   canonicalName: string,
   kind: TermKind,
   options: { status?: Term["status"]; mergedIntoId?: TermId; replacementTermId?: TermId } = {}
-): Term => ({
-  id: id as TermId,
-  canonicalName,
-  kind,
-  status: options.status ?? "active",
-  ...(options.mergedIntoId ? { mergedIntoId: options.mergedIntoId } : {}),
-  ...(options.replacementTermId ? { replacementTermId: options.replacementTermId } : {}),
-  createdAt: FIXED_DATE,
-  updatedAt: FIXED_DATE,
-});
+): Term => {
+  const term: MutableTermDraft = {
+    id: termId(id),
+    canonicalName,
+    kind,
+    description: undefined,
+    status: options.status ?? "active",
+    mergedIntoId: options.mergedIntoId,
+    replacementTermId: options.replacementTermId,
+    createdAt: FIXED_DATE,
+    updatedAt: FIXED_DATE,
+  };
+  return term;
+};
 
 const createTestTermName = (
   termId: TermId,
@@ -122,14 +177,24 @@ const createTestTermName = (
 
 const createTermStore = (): TermStore => ({ terms: new Map(), names: [] });
 
+interface TermNameCandidate {
+  displayName: string;
+  nameKind: "canonical" | "alias";
+}
+
 const uniqueTermNames = (
   canonicalName: string,
   aliases: ReadonlyArray<string> | undefined
-): ReadonlyArray<{ displayName: string; nameKind: "canonical" | "alias" }> => {
+): ReadonlyArray<TermNameCandidate> => {
   const seen = new Set<string>();
-  const names = [
-    { displayName: canonicalName, nameKind: "canonical" as const },
-    ...(aliases ?? []).map((displayName) => ({ displayName, nameKind: "alias" as const })),
+  const names: ReadonlyArray<TermNameCandidate> = [
+    { displayName: canonicalName, nameKind: "canonical" },
+    ...(aliases ?? []).map(
+      (displayName): TermNameCandidate => ({
+        displayName,
+        nameKind: "alias",
+      })
+    ),
   ];
 
   return names.filter(({ displayName }) => {
@@ -284,25 +349,22 @@ const createMockTermRepository = (store: TermStore): TermRepository => {
       }),
     updateName,
     update: (id: TermId, updates: UpdateTermInput) =>
-      // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: test repository update mirrors all lifecycle fields.
       Effect.gen(function* () {
         const existing = yield* getById(id);
-        const updated: Term = {
+        const updated: MutableTermDraft = {
           ...existing,
+          description: existing.description,
+          mergedIntoId: existing.mergedIntoId,
+          replacementTermId: existing.replacementTermId,
           status: updates.status ?? existing.status,
-          ...(updates.description !== undefined ? { description: updates.description } : {}),
-          ...(updates.mergedIntoId !== undefined
-            ? { mergedIntoId: updates.mergedIntoId ?? undefined }
-            : existing.mergedIntoId
-              ? { mergedIntoId: existing.mergedIntoId }
-              : {}),
-          ...(updates.replacementTermId !== undefined
-            ? { replacementTermId: updates.replacementTermId ?? undefined }
-            : existing.replacementTermId
-              ? { replacementTermId: existing.replacementTermId }
-              : {}),
           updatedAt: FIXED_DATE,
         };
+        if (updates.description !== undefined) updated.description = updates.description;
+        if (updates.mergedIntoId !== undefined)
+          updated.mergedIntoId = updates.mergedIntoId ?? undefined;
+        if (updates.replacementTermId !== undefined) {
+          updated.replacementTermId = updates.replacementTermId ?? undefined;
+        }
         store.terms.set(id, updated);
         return updated;
       }),
@@ -345,13 +407,12 @@ const createMockTermRepository = (store: TermStore): TermRepository => {
 };
 
 const createMockTagRepository = (tags: Map<string, Tag>): TagRepository => ({
-  create: (input) =>
-    Effect.succeed(
-      createTestTag(input.id, input.name, {
-        ...(input.aliases ? { aliases: input.aliases } : {}),
-        ...(input.termId ? { termId: input.termId } : {}),
-      })
-    ),
+  create: (input) => {
+    const options: TestTagOptions = {};
+    if (input.aliases !== undefined) options.aliases = input.aliases;
+    if (input.termId !== undefined) options.termId = input.termId;
+    return Effect.succeed(createTestTag(input.id, input.name, options));
+  },
   getById: (id) =>
     Effect.gen(function* () {
       const tag = tags.get(id);
@@ -422,25 +483,25 @@ const createMockMigrationJournalRepository = (
   store: MigrationStore
 ): MigrationJournalRepository => ({
   record: (input: RecordJournalEntryInput) =>
-    Effect.succeed(() => {
-      const entry: MigrationJournalEntry = {
-        id: input.id as JournalEntryId,
+    Effect.sync(() => {
+      const entry: MutableMigrationJournalEntry = {
+        id: journalEntryId(input.id),
         operation: input.operation,
-        ...(input.kind ? { kind: input.kind } : {}),
+        kind: input.kind,
         fromName: input.fromName,
         toName: input.toName,
         termId: input.termId,
-        ...(input.relatedTermId ? { relatedTermId: input.relatedTermId } : {}),
+        relatedTermId: input.relatedTermId,
         affectedEntityIds: input.affectedEntityIds,
         affectedCount: input.affectedEntityIds.length,
-        ...(input.reason ? { reason: input.reason } : {}),
+        reason: input.reason,
         appliedAt: FIXED_DATE,
-        ...(input.appliedBy ? { appliedBy: input.appliedBy } : {}),
+        appliedBy: input.appliedBy,
         dryRun: input.dryRun,
       };
       store.entries.push(entry);
       return entry;
-    }).pipe(Effect.flatMap((createEntry) => Effect.succeed(createEntry()))),
+    }),
   getById: (id) =>
     Effect.gen(function* () {
       const entry = store.entries.find((candidate) => candidate.id === id);
@@ -474,12 +535,43 @@ const createTestLayer = (config: {
   const tagRepository = createMockTagRepository(tags);
   const entityRepository = createMockEntityRepository(entities, taggedEntities);
   const migrationJournalRepository = createMockMigrationJournalRepository(migrationStore);
-  const transactionRepositories = {
+  const unavailable = () => Effect.die(new Error("not implemented"));
+  const transactionRepositories: TransactionRepositories = {
     terms: termRepository,
     tags: tagRepository,
     entities: entityRepository,
     migrationJournal: migrationJournalRepository,
-  } as TransactionRepositories;
+    links: {
+      create: unavailable,
+      createBidirectional: unavailable,
+      getById: unavailable,
+      getFromSource: unavailable,
+      getToTarget: unavailable,
+      getAllForEntity: unavailable,
+      getByType: unavailable,
+      getLinkBetween: unavailable,
+      delete: unavailable,
+      deleteAllForEntity: unavailable,
+      deleteBetween: unavailable,
+      count: unavailable(),
+    },
+    next: {
+      create: unavailable,
+      list: unavailable,
+      clear: unavailable,
+      replaceAll: unavailable,
+    },
+    versions: {
+      create: unavailable,
+      getVersion: unavailable,
+      getAllForEntity: unavailable,
+      getLatest: unavailable,
+      getEntityAtVersion: unavailable,
+      countForEntity: unavailable,
+      getInTimeRange: unavailable,
+      deleteAllForEntity: unavailable,
+    },
+  };
   const transactionEngine = {
     run: <A, E>(operation: (repositories: TransactionRepositories) => Effect.Effect<A, E>) =>
       operation(transactionRepositories),
@@ -633,7 +725,7 @@ describe("MigrationService", () => {
         kind: "brand",
         fromName: "kioku",
         toName: "AeroGraph",
-        journalEntryId: "journal-rename-1" as JournalEntryId,
+        journalEntryId: journalEntryId("journal-rename-1"),
         reason: "Project rename",
         appliedBy: "test",
       });
@@ -759,7 +851,7 @@ describe("MigrationService", () => {
     const termStore = createTermStore();
     const sourceTerm = createTestTerm("term-brand-kioku", "Kioku", "brand", {
       status: "merged",
-      mergedIntoId: "term-brand-aerograph" as TermId,
+      mergedIntoId: termId("term-brand-aerograph"),
     });
     termStore.terms.set(sourceTerm.id, sourceTerm);
     termStore.names.push(createTestTermName(sourceTerm.id, "brand", "Kioku", "canonical"));
@@ -829,7 +921,7 @@ describe("MigrationService", () => {
         kind: "package",
         fromName: "Legacy Client",
         toName: "Platform Client",
-        journalEntryId: "journal-rename-2" as JournalEntryId,
+        journalEntryId: journalEntryId("journal-rename-2"),
       });
     });
 
@@ -870,7 +962,7 @@ describe("MigrationService", () => {
             kind: "brand",
             fromName: "kioku",
             toName: "AeroGraph",
-            journalEntryId: "journal-preserve-source" as JournalEntryId,
+            journalEntryId: journalEntryId("journal-preserve-source"),
           });
         }),
         createTestLayer({ termStore, tags })
@@ -902,7 +994,7 @@ describe("MigrationService", () => {
             kind: "brand",
             fromName: "Kioku",
             toName: "KIOKU",
-            journalEntryId: "journal-display-only" as JournalEntryId,
+            journalEntryId: journalEntryId("journal-display-only"),
           });
         }),
         createTestLayer({ termStore, tags })

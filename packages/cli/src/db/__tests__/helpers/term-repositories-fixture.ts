@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import {
-  type JournalEntryId,
+  JournalEntryIdSchema,
   MigrationJournalRepositoryTag,
   TermAlreadyExistsError,
-  type TermId,
+  TermIdSchema,
   TermRepositoryTag,
   ValidationError,
 } from "@kioku/core";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { DatabaseClientLive } from "../../client";
 import { SqliteMigrationJournalRepositoryLive } from "../../migration-journal-repository";
 import { SqliteTermRepositoryLive } from "../../term-repository";
@@ -106,17 +106,22 @@ const runTermUpdateScenario = Effect.gen(function* () {
   assert.equal(canonical?.displayName, "GOVERNED_MEMORY_GRAPH");
 
   const canonicalAddError = yield* Effect.flip(
-    repo.addName({
-      termId: term.id,
-      kind: "feature",
-      name: "Second Canonical",
-      displayName: "Second Canonical",
-      nameKind: "canonical",
-    } as never)
+    repo.addName(
+      yield* Schema.decodeUnknownEffect(Schema.Any)({
+        termId: term.id,
+        kind: "feature",
+        name: "Second Canonical",
+        displayName: "Second Canonical",
+        nameKind: "canonical",
+      })
+    )
   );
   assert.ok(canonicalAddError instanceof ValidationError);
   const canonicalUpdateError = yield* Effect.flip(
-    repo.update(term.id, { canonicalName: "Direct Change" } as never)
+    repo.update(
+      term.id,
+      yield* Schema.decodeUnknownEffect(Schema.Any)({ canonicalName: "Direct Change" })
+    )
   );
   assert.ok(canonicalUpdateError instanceof ValidationError);
 });
@@ -145,10 +150,10 @@ const runBatchScenario = Effect.gen(function* () {
   }
 
   const ids = [
-    "term-batch-1099" as TermId,
-    "term-batch-0001" as TermId,
-    "term-batch-1099" as TermId,
-    "term-batch-0000" as TermId,
+    TermIdSchema.make("term-batch-1099"),
+    TermIdSchema.make("term-batch-0001"),
+    TermIdSchema.make("term-batch-1099"),
+    TermIdSchema.make("term-batch-0000"),
   ];
   const terms = yield* repo.getByIds(ids);
   assert.deepEqual(
@@ -158,9 +163,8 @@ const runBatchScenario = Effect.gen(function* () {
 
   const names = yield* repo.listNamesByTermIds([
     ...ids,
-    ...Array.from(
-      { length: 1100 },
-      (_, index) => `term-batch-${String(index).padStart(4, "0")}` as TermId
+    ...Array.from({ length: 1100 }, (_, index) =>
+      TermIdSchema.make(`term-batch-${String(index).padStart(4, "0")}`)
     ),
   ]);
   assert.equal(names.length, 2200);
@@ -197,8 +201,8 @@ const runJournalScenario = Effect.gen(function* () {
     dryRun: false,
   });
 
-  const byId = yield* journalRepo.getById(entry.id as JournalEntryId);
-  const byTerm = yield* journalRepo.listByTerm(term.id as TermId);
+  const byId = yield* journalRepo.getById(JournalEntryIdSchema.make(entry.id));
+  const byTerm = yield* journalRepo.listByTerm(TermIdSchema.make(term.id));
   const recent = yield* journalRepo.listRecent(1);
 
   assert.equal(entry.affectedCount, 2);

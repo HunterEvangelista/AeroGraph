@@ -1,4 +1,4 @@
-import { type TagId, TagServiceTag } from "@kioku/core";
+import { TagIdSchema, TagServiceTag } from "@kioku/core";
 import { Console, Effect, Option } from "effect";
 /**
  * Tag Commands
@@ -236,7 +236,7 @@ const tagRemoveCommand = Command.make(
       yield* withCliServices(
         Effect.gen(function* () {
           const tagService = yield* TagServiceTag;
-          yield* tagService.removeFromEntity(tagId as TagId, entityId);
+          yield* tagService.removeFromEntity(TagIdSchema.make(tagId), entityId);
         })
       );
 
@@ -276,11 +276,11 @@ const tagShowCommand = Command.make(
         Effect.gen(function* () {
           const tagService = yield* TagServiceTag;
 
-          const tag = yield* tagService.getById(id as TagId);
+          const tag = yield* tagService.getById(TagIdSchema.make(id));
           const ancestors = yield* tagService.getAncestors(tag.id);
           const children = yield* tagService
             .getChildren(tag.id)
-            .pipe(Effect.orElseSucceed(() => [] as ReadonlyArray<typeof tag>));
+            .pipe(Effect.orElseSucceed(() => []));
 
           return { tag, ancestors, children };
         })
@@ -347,7 +347,7 @@ const tagDeleteCommand = Command.make(
         Effect.gen(function* () {
           const tagService = yield* TagServiceTag;
 
-          const tag = yield* tagService.getById(id as TagId);
+          const tag = yield* tagService.getById(TagIdSchema.make(id));
 
           if (!force) {
             yield* Console.log(`Deleting tag: #${tag.id}`);

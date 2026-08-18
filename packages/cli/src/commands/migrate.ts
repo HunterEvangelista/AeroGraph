@@ -1,10 +1,15 @@
-import { MigrationServiceTag, TERM_KINDS, type TermKind, ValidationError } from "@kioku/core";
-import { Console, Effect, Option } from "effect";
+import {
+  MigrationServiceTag,
+  TERM_KINDS,
+  type TermKind,
+  TermKind as TermKindSchema,
+  ValidationError,
+} from "@kioku/core";
+import { Console, Effect, Option, Schema } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { withCliServices } from "./workspace";
 
-const isTermKind = (kind: string): kind is TermKind =>
-  (TERM_KINDS as ReadonlyArray<string>).includes(kind);
+const isTermKind = (kind: string): kind is TermKind => Schema.is(TermKindSchema)(kind);
 
 const parseTermKind = (kind: string) =>
   isTermKind(kind)
@@ -26,6 +31,14 @@ const formatMigrationError = (error: {
   readonly _tag: string;
   readonly message?: string;
 }): string => `${error._tag}: ${error.message ?? String(error)}`;
+
+interface RenameInput {
+  kind: TermKind;
+  fromName: string;
+  toName: string;
+  reason?: string;
+  appliedBy?: string;
+}
 
 const shellArgument = (value: string): string =>
   /^[a-zA-Z0-9_./-]+$/.test(value) ? value : `'${value.replaceAll("'", `'\\''`)}'`;
@@ -118,13 +131,14 @@ const migrateCommand = Command.make(
       const result = yield* withCliServices(
         Effect.gen(function* () {
           const migrationService = yield* MigrationServiceTag;
-          return yield* migrationService.applyRename({
+          const input: RenameInput = {
             kind: termKind,
             fromName,
             toName,
-            ...(reasonValue ? { reason: reasonValue } : {}),
-            ...(appliedByValue ? { appliedBy: appliedByValue } : {}),
-          });
+          };
+          if (reasonValue !== undefined) input.reason = reasonValue;
+          if (appliedByValue !== undefined) input.appliedBy = appliedByValue;
+          return yield* migrationService.applyRename(input);
         })
       );
 

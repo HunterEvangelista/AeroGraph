@@ -5,7 +5,7 @@ import { Console, Effect, Option } from "effect";
  */
 import { Argument, Command } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config";
-import { makeDatabaseClient } from "../db/index";
+import { DatabaseClientLive, DatabaseClientTag } from "../db/index";
 
 export const initCommand = Command.make(
   "init",
@@ -25,7 +25,9 @@ export const initCommand = Command.make(
       // Initialize the database
       yield* Console.log("Creating database...");
 
-      yield* Effect.scoped(makeDatabaseClient(workspace.dbPath));
+      yield* Effect.scoped(
+        DatabaseClientTag.pipe(Effect.provide(DatabaseClientLive(workspace.dbPath)))
+      );
 
       yield* Console.log("");
       yield* Console.log(`Kioku workspace initialized at: ${workspace.rootPath}`);

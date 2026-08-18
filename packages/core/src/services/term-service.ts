@@ -20,8 +20,7 @@ import type {
   ValidationError,
 } from "../errors";
 
-export type TermSelector =
-  | string
+export type TermSelectorObject =
   | {
       readonly id: TermId;
       readonly name?: never;
@@ -32,6 +31,8 @@ export type TermSelector =
       readonly kind?: TermKind;
       readonly id?: never;
     };
+
+export type TermSelector = string | TermSelectorObject;
 
 export interface TermResolutionMetadata {
   readonly matchedBy: "id" | "name";

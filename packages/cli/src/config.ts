@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { ConfigError, WorkspaceAlreadyExistsError, WorkspaceNotFoundError } from "@kioku/core";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Schema } from "effect";
 
 // ============================================================================
 // Constants
@@ -76,6 +76,20 @@ export class ConfigServiceTag extends Context.Service<ConfigServiceTag, ConfigSe
 // ============================================================================
 // Config Servpice Implementation
 // ============================================================================
+
+const KiokuConfigSchema = Schema.Struct({
+  version: Schema.Finite,
+  createdAt: Schema.String,
+  repoPath: Schema.optional(Schema.String),
+});
+
+const decodeConfig = (content: string): KiokuConfig => {
+  const config = Schema.decodeUnknownSync(KiokuConfigSchema)(JSON.parse(content));
+  if (Schema.is(Schema.String)(config.repoPath)) {
+    return { version: config.version, createdAt: config.createdAt, repoPath: config.repoPath };
+  }
+  return { version: config.version, createdAt: config.createdAt };
+};
 
 const findWorkspaceRoot = (startPath: string): string | null => {
   let current = resolve(startPath);
@@ -162,7 +176,7 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
       const config = yield* Effect.try({
         try: () => {
           const content = readFileSync(configPath, "utf-8");
-          return JSON.parse(content) as KiokuConfig;
+          return decodeConfig(content);
         },
         catch: (error) =>
           new ConfigError({
@@ -218,7 +232,7 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
       const existingConfig = yield* Effect.try({
         try: () => {
           const content = readFileSync(configPath, "utf-8");
-          return JSON.parse(content) as KiokuConfig;
+          return decodeConfig(content);
         },
         catch: (error) =>
           new ConfigError({

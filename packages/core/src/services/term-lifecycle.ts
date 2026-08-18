@@ -11,8 +11,10 @@ import type { TermRepository } from "../repository/term-repository";
 const invalid = (field: string, message: string) =>
   Effect.fail(new ValidationError({ field, message }));
 
-const lifecycleError = (operation: string, message: string, cause?: unknown) =>
-  Effect.fail(new TermMigrationError({ operation, message, ...(cause ? { cause } : {}) }));
+const lifecycleError = (operation: string, message: string, cause?: unknown) => {
+  if (cause) return Effect.fail(new TermMigrationError({ operation, message, cause }));
+  return Effect.fail(new TermMigrationError({ operation, message }));
+};
 
 const getLifecycleTarget = (repo: TermRepository, id: TermId, operation: string, pointer: string) =>
   repo

@@ -19,7 +19,7 @@
     "lint:fix": "turbo lint:fix",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "typecheck": "turbo typecheck",
+    "typecheck": "turbo typecheck && tsc -p tools/oxlint/tsconfig.json",
     "typecheck:core": "turbo typecheck --filter=@kioku/core",
     "typecheck:cli": "turbo typecheck --filter=@kioku/cli",
     "typecheck:ai": "turbo typecheck --filter=@kioku/ai",
@@ -36,7 +36,9 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
     "@effect/tsgo": "^0.24.3",
+    "@oxlint/plugins": "1.78.0",
     "drizzle-kit": "^0.31.10",
+    "oxlint": "1.78.0",
     "turbo": "^2.3.3",
     "typescript": "^7.0.2"
   },

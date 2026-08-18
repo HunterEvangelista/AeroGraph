@@ -4,23 +4,20 @@ import {
   RepositoryError,
   type Tag,
   type TagId,
+  TagIdSchema,
   TagNotFoundError,
   type TagRepository,
   TagRepositoryTag,
-  type TermId,
+  TermIdSchema,
   type UpdateTagInput,
 } from "@kioku/core";
 import { and, count as drizzleCount, eq, like, or } from "drizzle-orm";
 /**
  * SQLite Tag Repository Implementation
  */
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { entities, entityTags, tags } from "./schema";
 import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
 
 const now = (): string => new Date().toISOString();
 
@@ -35,18 +32,14 @@ interface TagRow {
 }
 
 const rowToTag = (row: TagRow): Tag => ({
-  id: row.id as TagId,
+  id: Schema.decodeUnknownSync(TagIdSchema)(row.id),
   name: row.name,
   description: row.description ?? undefined,
-  parentId: row.parentId ?? undefined,
+  parentId: row.parentId === null ? undefined : Schema.decodeUnknownSync(TagIdSchema)(row.parentId),
   aliases: row.aliases ? JSON.parse(row.aliases) : undefined,
-  termId: (row.termId ?? undefined) as TermId | undefined,
+  termId: row.termId === null ? undefined : Schema.decodeUnknownSync(TermIdSchema)(row.termId),
   createdAt: new Date(row.createdAt),
 });
-
-// ============================================================================
-// Repository Implementation
-// ============================================================================
 
 export const SqliteTagRepositorySessionLive = Layer.effect(
   TagRepositoryTag,
@@ -115,7 +108,6 @@ export const SqliteTagRepositorySessionLive = Layer.effect(
 
     const getChildren = (parentId: TagId) =>
       Effect.gen(function* () {
-        // Verify parent exists
         yield* getById(parentId);
 
         return yield* Effect.try({
@@ -142,7 +134,16 @@ export const SqliteTagRepositorySessionLive = Layer.effect(
         let current = yield* getById(id);
 
         while (current.parentId) {
-          const parent = yield* getById(current.parentId as TagId);
+          const parentId = yield* Schema.decodeUnknownEffect(TagIdSchema)(current.parentId).pipe(
+            Effect.mapError(
+              (error) =>
+                new RepositoryError({
+                  message: `Failed to decode parent tag ID: ${error instanceof Error ? error.message : String(error)}`,
+                  cause: error,
+                })
+            )
+          );
+          const parent = yield* getById(parentId);
           ancestors.push(parent);
           current = parent;
         }
@@ -206,7 +207,6 @@ export const SqliteTagRepositorySessionLive = Layer.effect(
 
     const applyToEntity = (tagId: TagId, entityId: string) =>
       Effect.gen(function* () {
-        // Verify both exist
         yield* getById(tagId);
 
         const entityExists = yield* Effect.try({

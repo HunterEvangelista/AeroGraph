@@ -4,9 +4,26 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Effect, Exit } from "effect";
-import { makeDatabaseClient } from "../../client";
+import { type DatabaseClient, DatabaseClientLive, DatabaseClientTag } from "../../client";
 
 const root = mkdtempSync(join(tmpdir(), "kioku-upgrade-"));
+const getRequired = <T>(row: T | null): T => {
+  assert.ok(row);
+  return row;
+};
+const withDatabase = <A>(path: string, assertions: (client: DatabaseClient) => A) =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const client = yield* DatabaseClientTag;
+      return yield* Effect.sync(() => assertions(client));
+    }).pipe(Effect.provide(DatabaseClientLive(path)))
+  );
+
+type CountRow = { count: number };
+type SchemaMetaRow = { value: string };
+type TermNameRow = { kind: string; name: string };
+type TableInfoRow = { name: string; notnull: number };
+type MigrationJournalRow = { to_name: string; related_term_id: string | null };
 
 const createV3Database = (
   path: string,
@@ -128,95 +145,99 @@ try {
     ],
     "4"
   );
-  const client = await Effect.runPromise(makeDatabaseClient(validPath));
-  const migrated = client.db
-    .query("SELECT kind, name FROM term_names WHERE term_id = 'term-brand-kioku'")
-    .get() as {
-    kind: string;
-    name: string;
-  };
-  assert.deepEqual(migrated, { kind: "brand", name: "kioku-name" });
-  assert.equal(
-    (
-      client.db
-        .query("SELECT count(*) AS count FROM term_names WHERE name = 'kioku-name'")
-        .get() as {
-        count: number;
-      }
-    ).count,
-    2
-  );
-  const kindColumn = (
-    client.db.query("PRAGMA table_info(term_names)").all() as Array<{
-      name: string;
-      notnull: number;
-    }>
-  ).find(({ name }) => name === "kind");
-  assert.equal(kindColumn?.notnull, 1);
-  assert.throws(() =>
-    client.db.run(
-      "INSERT INTO term_names VALUES ('term-brand-kioku', NULL, 'alias', 'Alias', 'alias', '2026-01-01')"
-    )
-  );
-  assert.throws(() =>
-    client.db.run(
-      "INSERT INTO term_names VALUES ('term-brand-kioku', 'brand', 'UPPER', 'Upper', 'alias', '2026-01-01')"
-    )
-  );
-  assert.throws(() =>
-    client.db.run("UPDATE terms SET canonical_name = 'Foo, Inc.' WHERE id = 'term-brand-kioku'")
-  );
-  assert.equal(
-    (
-      client.db
-        .query(
-          "SELECT to_name, related_term_id FROM migration_journal WHERE id = 'journal-v4-create'"
+  await Effect.runPromise(
+    withDatabase(validPath, (client) => {
+      const migrated = client.db
+        .query<TermNameRow, []>(
+          "SELECT kind, name FROM term_names WHERE term_id = 'term-brand-kioku'"
         )
-        .get() as { to_name: string; related_term_id: string | null }
-    ).to_name,
-    "  Legacy Create  "
+        .get();
+      assert.deepEqual(migrated, { kind: "brand", name: "kioku-name" });
+      assert.equal(
+        getRequired(
+          client.db
+            .query<CountRow, []>(
+              "SELECT count(*) AS count FROM term_names WHERE name = 'kioku-name'"
+            )
+            .get()
+        ).count,
+        2
+      );
+      const kindColumn = client.db
+        .query<TableInfoRow, []>("PRAGMA table_info(term_names)")
+        .all()
+        .find(({ name }) => name === "kind");
+      assert.equal(kindColumn?.notnull, 1);
+      assert.throws(() =>
+        client.db.run(
+          "INSERT INTO term_names VALUES ('term-brand-kioku', NULL, 'alias', 'Alias', 'alias', '2026-01-01')"
+        )
+      );
+      assert.throws(() =>
+        client.db.run(
+          "INSERT INTO term_names VALUES ('term-brand-kioku', 'brand', 'UPPER', 'Upper', 'alias', '2026-01-01')"
+        )
+      );
+      assert.throws(() =>
+        client.db.run("UPDATE terms SET canonical_name = 'Foo, Inc.' WHERE id = 'term-brand-kioku'")
+      );
+      assert.equal(
+        getRequired(
+          client.db
+            .query<MigrationJournalRow, []>(
+              "SELECT to_name, related_term_id FROM migration_journal WHERE id = 'journal-v4-create'"
+            )
+            .get()
+        ).to_name,
+        "  Legacy Create  "
+      );
+      client.db.run(
+        "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-null', 'create', 'brand', 'New', NULL, 'term-brand-kioku', NULL, '[]', 0, '2026-01-01')"
+      );
+      client.db.run(
+        "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-name', 'create', 'brand', 'New', 'New Create', 'term-brand-kioku', NULL, '[]', 0, '2026-01-01')"
+      );
+      assert.throws(() =>
+        client.db.run(
+          "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-empty', 'create', 'brand', 'New', '   ', 'term-brand-kioku', NULL, '[]', 0, '2026-01-01')"
+        )
+      );
+      assert.throws(() =>
+        client.db.run(
+          "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-related', 'create', 'brand', 'New', NULL, 'term-brand-kioku', 'term-package-kioku', '[]', 0, '2026-01-01')"
+        )
+      );
+      assert.deepEqual(client.db.query("PRAGMA foreign_key_check").all(), []);
+      assert.equal(
+        getRequired(
+          client.db
+            .query<SchemaMetaRow, []>("SELECT value FROM schema_meta WHERE key = 'version'")
+            .get()
+        ).value,
+        "5"
+      );
+    })
   );
-  client.db.run(
-    "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-null', 'create', 'brand', 'New', NULL, 'term-brand-kioku', NULL, '[]', 0, '2026-01-01')"
-  );
-  client.db.run(
-    "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-name', 'create', 'brand', 'New', 'New Create', 'term-brand-kioku', NULL, '[]', 0, '2026-01-01')"
-  );
-  assert.throws(() =>
-    client.db.run(
-      "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-empty', 'create', 'brand', 'New', '   ', 'term-brand-kioku', NULL, '[]', 0, '2026-01-01')"
-    )
-  );
-  assert.throws(() =>
-    client.db.run(
-      "INSERT INTO migration_journal (id, operation, kind, from_name, to_name, term_id, related_term_id, affected_entity_ids, affected_count, applied_at) VALUES ('journal-create-related', 'create', 'brand', 'New', NULL, 'term-brand-kioku', 'term-package-kioku', '[]', 0, '2026-01-01')"
-    )
-  );
-  assert.deepEqual(client.db.query("PRAGMA foreign_key_check").all(), []);
-  assert.equal(
-    (
-      client.db.query("SELECT value FROM schema_meta WHERE key = 'version'").get() as {
-        value: string;
-      }
-    ).value,
-    "5"
-  );
-  await Effect.runPromise(client.close);
 
-  const reopened = await Effect.runPromise(makeDatabaseClient(validPath));
-  assert.equal(
-    (reopened.db.query("SELECT name FROM term_names").get() as { name: string }).name,
-    "kioku-name"
+  await Effect.runPromise(
+    withDatabase(validPath, (reopened) => {
+      assert.equal(
+        getRequired(reopened.db.query<{ name: string }, []>("SELECT name FROM term_names").get())
+          .name,
+        "kioku-name"
+      );
+      assert.equal(
+        getRequired(
+          reopened.db
+            .query<{ to_name: string }, []>(
+              "SELECT to_name FROM migration_journal WHERE id = 'journal-v4-create'"
+            )
+            .get()
+        ).to_name,
+        "  Legacy Create  "
+      );
+    })
   );
-  assert.equal(
-    (
-      reopened.db
-        .query("SELECT to_name FROM migration_journal WHERE id = 'journal-v4-create'")
-        .get() as { to_name: string }
-    ).to_name,
-    "  Legacy Create  "
-  );
-  await Effect.runPromise(reopened.close);
 
   const collisionPath = join(root, "collision.db");
   createV3Database(collisionPath, [
@@ -235,19 +256,19 @@ try {
       nameKind: "canonical",
     },
   ]);
-  const collisionExit = await Effect.runPromiseExit(makeDatabaseClient(collisionPath));
+  const collisionExit = await Effect.runPromiseExit(withDatabase(collisionPath, () => undefined));
   assert.ok(Exit.isFailure(collisionExit));
   const collisionDb = new Database(collisionPath);
   assert.equal(
-    (
-      collisionDb.query("SELECT value FROM schema_meta WHERE key = 'version'").get() as {
-        value: string;
-      }
+    getRequired(
+      collisionDb
+        .query<SchemaMetaRow, []>("SELECT value FROM schema_meta WHERE key = 'version'")
+        .get()
     ).value,
     "3"
   );
   assert.equal(
-    (collisionDb.query("SELECT count(*) AS count FROM term_names").get() as { count: number })
+    getRequired(collisionDb.query<CountRow, []>("SELECT count(*) AS count FROM term_names").get())
       .count,
     2
   );
@@ -263,14 +284,12 @@ try {
       nameKind: "canonical",
     },
   ]);
-  const commaExit = await Effect.runPromiseExit(makeDatabaseClient(commaPath));
+  const commaExit = await Effect.runPromiseExit(withDatabase(commaPath, () => undefined));
   assert.ok(Exit.isFailure(commaExit));
   const commaDb = new Database(commaPath);
   assert.equal(
-    (
-      commaDb.query("SELECT value FROM schema_meta WHERE key = 'version'").get() as {
-        value: string;
-      }
+    getRequired(
+      commaDb.query<SchemaMetaRow, []>("SELECT value FROM schema_meta WHERE key = 'version'").get()
     ).value,
     "3"
   );
@@ -278,14 +297,14 @@ try {
 
   const malformedPath = join(root, "malformed.db");
   createV3Database(malformedPath, [], "3garbage");
-  const malformedExit = await Effect.runPromiseExit(makeDatabaseClient(malformedPath));
+  const malformedExit = await Effect.runPromiseExit(withDatabase(malformedPath, () => undefined));
   assert.ok(Exit.isFailure(malformedExit));
   const malformedDb = new Database(malformedPath);
   assert.equal(
-    (
-      malformedDb.query("SELECT value FROM schema_meta WHERE key = 'version'").get() as {
-        value: string;
-      }
+    getRequired(
+      malformedDb
+        .query<SchemaMetaRow, []>("SELECT value FROM schema_meta WHERE key = 'version'")
+        .get()
     ).value,
     "3garbage"
   );

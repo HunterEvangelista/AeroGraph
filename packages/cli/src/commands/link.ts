@@ -1,5 +1,6 @@
 import {
   type Entity,
+  type EntityId,
   EntityServiceTag,
   type Link,
   LinkRepositoryTag,
@@ -41,10 +42,10 @@ interface LinkCommandError {
   readonly value?: string;
 }
 
-const parseLinkType = (value: string) =>
-  linkTypes.includes(value as LinkType)
-    ? Effect.succeed(value as LinkType)
-    : Effect.fail(new InvalidLinkTypeError({ value }));
+const parseLinkType = (value: string) => {
+  const linkType = linkTypes.find((candidate) => candidate === value);
+  return linkType ? Effect.succeed(linkType) : Effect.fail(new InvalidLinkTypeError({ value }));
+};
 
 const entitySummary = (entity: Entity, displayIds: ReadonlyMap<string, string>): string =>
   `${formattedEntityId(displayIds, entity.id)}  [${entity._tag}] ${entity.title}`;
@@ -52,10 +53,10 @@ const entitySummary = (entity: Entity, displayIds: ReadonlyMap<string, string>):
 const directionLabel = (link: Link, entityId: string): string =>
   link.sourceId === entityId ? `--${link.type}-->` : `<--${link.type}--`;
 
-const otherEntityId = (link: Link, entityId: string): string =>
+const otherEntityId = (link: Link, entityId: EntityId): EntityId =>
   link.sourceId === entityId ? link.targetId : link.sourceId;
 
-const printLinkGroup = (title: string, entityId: string, links: ReadonlyArray<Link>) =>
+const printLinkGroup = (title: string, entityId: EntityId, links: ReadonlyArray<Link>) =>
   Effect.gen(function* () {
     yield* Console.log("");
     yield* Console.log(title);
@@ -69,9 +70,7 @@ const printLinkGroup = (title: string, entityId: string, links: ReadonlyArray<Li
     const entityService = yield* EntityServiceTag;
     const others: Entity[] = [];
     for (const link of links) {
-      const other = yield* entityService.getById(
-        otherEntityId(link, entityId) as Parameters<typeof entityService.getById>[0]
-      );
+      const other = yield* entityService.getById(otherEntityId(link, entityId));
       others.push(other);
     }
 

@@ -49,6 +49,7 @@ export const GraphServiceLive = Layer.effect(
 
         const entities: Entity[] = [];
         for (const id of relatedIds) {
+          // SAFETY: Related IDs come directly from persisted links and use the entity ID representation.
           const result = yield* Effect.result(entityRepo.getById(id as Entity["id"]));
           if (Result.isSuccess(result)) {
             entities.push(result.success);

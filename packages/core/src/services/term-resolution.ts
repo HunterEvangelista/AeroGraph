@@ -9,7 +9,16 @@ import {
 } from "../errors";
 import type { ResolvedTermName, TermRepository } from "../repository/term-repository";
 import { validateTermLocalLifecycle } from "./term-lifecycle";
-import type { TermResolution, TermSelector } from "./term-service";
+import type {
+  TermResolution,
+  TermResolutionMetadata,
+  TermSelector,
+  TermSelectorObject,
+} from "./term-service";
+
+/** Identifies the object-shaped selector variants without excluding string selectors. */
+export const isTermSelectorObject = (selector: TermSelector): selector is TermSelectorObject =>
+  Object.hasOwn(Object(selector), "id") || Object.hasOwn(Object(selector), "name");
 
 const candidateLabel = ({ term, termName }: ResolvedTermName): string =>
   `${term.kind}:${term.canonicalName} (${termName.nameKind})`;
@@ -31,10 +40,10 @@ const resolutionNotes = (term: Term, matchedName: TermName): ReadonlyArray<strin
 const canonicalName = (names: ReadonlyArray<TermName>): TermName | undefined =>
   names.find(({ nameKind }) => nameKind === "canonical") ?? names[0];
 
-const corruption = (message: string, cause?: unknown) =>
-  Effect.fail(
-    new TermMigrationError({ operation: "resolve", message, ...(cause ? { cause } : {}) })
-  );
+const corruption = (message: string, cause?: unknown) => {
+  if (cause) return Effect.fail(new TermMigrationError({ operation: "resolve", message, cause }));
+  return Effect.fail(new TermMigrationError({ operation: "resolve", message }));
+};
 
 interface ResolutionContext {
   readonly matchedBy: "id" | "name";
@@ -162,17 +171,22 @@ const resolveMatch = (
       matchedName: context.originalMatchedName,
       names,
       resolutionNotes: notes,
-      resolutionMetadata: {
-        matchedBy: context.matchedBy,
-        selector: context.selector,
-        matchedNameKind: context.originalMatchedName.nameKind,
-        selectedTermId: context.selectedTermId,
-        redirectPath: context.redirectPath,
-        ...(context.redirectPath.length > 1
-          ? { redirectedFromTermId: context.selectedTermId }
-          : {}),
-        ...(replacementId ? { recommendedReplacementTermId: replacementId } : {}),
-      },
+      resolutionMetadata: (() => {
+        let metadata: TermResolutionMetadata = {
+          matchedBy: context.matchedBy,
+          selector: context.selector,
+          matchedNameKind: context.originalMatchedName.nameKind,
+          selectedTermId: context.selectedTermId,
+          redirectPath: context.redirectPath,
+        };
+        if (context.redirectPath.length > 1) {
+          metadata = { ...metadata, redirectedFromTermId: context.selectedTermId };
+        }
+        if (replacementId) {
+          metadata = { ...metadata, recommendedReplacementTermId: replacementId };
+        }
+        return metadata;
+      })(),
     } satisfies TermResolution;
   });
 
@@ -240,7 +254,7 @@ export const resolveTermName = (
 
 /** Resolve a selector using only the supplied repository. */
 export const resolveTermSelector = (repo: TermRepository, selector: TermSelector) => {
-  if (typeof selector === "string") return resolveTermName(repo, selector);
+  if (!isTermSelectorObject(selector)) return resolveTermName(repo, selector);
   if (selector.id !== undefined) {
     return Effect.gen(function* () {
       const term = yield* repo.getById(selector.id);

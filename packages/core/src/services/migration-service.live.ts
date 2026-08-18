@@ -4,7 +4,13 @@
 import { Effect, Layer } from "effect";
 import type { Entity } from "../domain/entity";
 import type { Tag } from "../domain/tag";
-import { type JournalEntryId, normalizeTermName, type Term } from "../domain/term";
+import {
+  type JournalEntryId,
+  JournalEntryIdSchema,
+  normalizeTermName,
+  type RecordJournalEntryInput,
+  type Term,
+} from "../domain/term";
 import { type RepositoryError, TermMigrationError, ValidationError } from "../errors";
 import { EntityRepositoryTag } from "../repository/entity-repository";
 import { MigrationJournalRepositoryTag } from "../repository/migration-journal-repository";
@@ -40,6 +46,7 @@ interface NormalizedRenameInput extends RenameTermInput {
 }
 
 const randomJournalSuffix = (): string => {
+  // SAFETY: Web Crypto is the platform API used by this service; only its optional randomUUID member is accessed.
   const webCrypto = (
     globalThis as {
       readonly crypto?: { readonly randomUUID?: () => string };
@@ -52,7 +59,9 @@ const randomJournalSuffix = (): string => {
 };
 
 const journalEntryIdFor = (input: NormalizedRenameInput): JournalEntryId =>
-  `journal-rename-${input.kind}-${input.normalizedFromName}-${input.normalizedToName}-${randomJournalSuffix()}` as JournalEntryId;
+  JournalEntryIdSchema.make(
+    `journal-rename-${input.kind}-${input.normalizedFromName}-${input.normalizedToName}-${randomJournalSuffix()}`
+  );
 
 const validateRenameInput = (input: RenameTermInput) =>
   Effect.gen(function* () {
@@ -317,7 +326,9 @@ const journalIdFor = (
   source: Term,
   target?: Term
 ): JournalEntryId =>
-  `journal-${operation}-${source.id}-${target?.id ?? "none"}-${randomJournalSuffix()}` as JournalEntryId;
+  JournalEntryIdSchema.make(
+    `journal-${operation}-${source.id}-${target?.id ?? "none"}-${randomJournalSuffix()}`
+  );
 
 const deprecationPlan = (
   source: Term,
@@ -325,19 +336,22 @@ const deprecationPlan = (
   affected: ReturnType<typeof affectedFor> extends Effect.Effect<infer A, infer _E, infer _R>
     ? A
     : never
-): DeprecateMigrationPlan => ({
-  operation: "deprecate",
-  term: source,
-  ...(replacement ? { replacement } : {}),
-  ...affected,
-  affectedCount: affected.affectedEntityIds.length,
-  notes: [
-    `Will deprecate ${source.kind} term '${source.canonicalName}'.`,
-    ...(replacement
-      ? [`Recommend active replacement '${replacement.canonicalName}'.`]
-      : ["No replacement is recommended."]),
-  ],
-});
+): DeprecateMigrationPlan => {
+  let plan: DeprecateMigrationPlan = {
+    operation: "deprecate",
+    term: source,
+    ...affected,
+    affectedCount: affected.affectedEntityIds.length,
+    notes: [
+      `Will deprecate ${source.kind} term '${source.canonicalName}'.`,
+      ...(replacement
+        ? [`Recommend active replacement '${replacement.canonicalName}'.`]
+        : ["No replacement is recommended."]),
+    ],
+  };
+  if (replacement) plan = { ...plan, replacement };
+  return plan;
+};
 
 const MigrationServiceImplementation = Layer.effect(
   MigrationServiceTag,
@@ -428,20 +442,25 @@ const MigrationServiceImplementation = Layer.effect(
             status: "deprecated",
             replacementTermId: replacement?.id ?? null,
           });
-          const journalEntry = yield* transactionRepositories.migrationJournal.record({
+          let journalInput: RecordJournalEntryInput = {
             id: input.journalEntryId ?? journalIdFor("deprecate", source, replacement),
             operation: "deprecate",
             kind: source.kind,
             fromName: source.canonicalName,
-            ...(replacement
-              ? { toName: replacement.canonicalName, relatedTermId: replacement.id }
-              : {}),
             termId: source.id,
             affectedEntityIds: affected.affectedEntityIds,
-            ...(input.reason ? { reason: input.reason } : {}),
-            ...(input.appliedBy ? { appliedBy: input.appliedBy } : {}),
             dryRun: false,
-          });
+          };
+          if (replacement) {
+            journalInput = {
+              ...journalInput,
+              toName: replacement.canonicalName,
+              relatedTermId: replacement.id,
+            };
+          }
+          if (input.reason) journalInput = { ...journalInput, reason: input.reason };
+          if (input.appliedBy) journalInput = { ...journalInput, appliedBy: input.appliedBy };
+          const journalEntry = yield* transactionRepositories.migrationJournal.record(journalInput);
           const plan = deprecationPlan(source, replacement, affected);
           return { plan, term, journalEntry } satisfies DeprecateMigrationResult;
         })
@@ -495,7 +514,7 @@ const MigrationServiceImplementation = Layer.effect(
               yield* transactionRepositories.tags.update(tag.id, { termId: destination.id })
             );
           }
-          const journalEntry = yield* transactionRepositories.migrationJournal.record({
+          let journalInput: RecordJournalEntryInput = {
             id: input.journalEntryId ?? journalIdFor("merge", source, destination),
             operation: "merge",
             kind: source.kind,
@@ -504,10 +523,11 @@ const MigrationServiceImplementation = Layer.effect(
             relatedTermId: destination.id,
             termId: source.id,
             affectedEntityIds: affected.affectedEntityIds,
-            ...(input.reason ? { reason: input.reason } : {}),
-            ...(input.appliedBy ? { appliedBy: input.appliedBy } : {}),
             dryRun: false,
-          });
+          };
+          if (input.reason) journalInput = { ...journalInput, reason: input.reason };
+          if (input.appliedBy) journalInput = { ...journalInput, appliedBy: input.appliedBy };
+          const journalEntry = yield* transactionRepositories.migrationJournal.record(journalInput);
           const plan = {
             operation: "merge",
             source,
@@ -546,7 +566,7 @@ const MigrationServiceImplementation = Layer.effect(
             term,
             plan.affectedTags
           );
-          const journalEntry = yield* transactionRepositories.migrationJournal.record({
+          let journalInput: RecordJournalEntryInput = {
             id: normalized.journalEntryId ?? journalEntryIdFor(normalized),
             operation: "rename",
             kind: normalized.kind,
@@ -554,10 +574,12 @@ const MigrationServiceImplementation = Layer.effect(
             toName: normalized.toName,
             termId: term.id,
             affectedEntityIds: plan.affectedEntityIds,
-            ...(normalized.reason ? { reason: normalized.reason } : {}),
-            ...(normalized.appliedBy ? { appliedBy: normalized.appliedBy } : {}),
             dryRun: false,
-          });
+          };
+          if (normalized.reason) journalInput = { ...journalInput, reason: normalized.reason };
+          if (normalized.appliedBy)
+            journalInput = { ...journalInput, appliedBy: normalized.appliedBy };
+          const journalEntry = yield* transactionRepositories.migrationJournal.record(journalInput);
           return { ...plan, term, updatedTags, journalEntry };
         })
       );

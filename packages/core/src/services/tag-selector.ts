@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { TagId } from "../domain/tag";
+import { type TagId, TagIdSchema } from "../domain/tag";
 import type { TermId } from "../domain/term";
 import type { AmbiguousTermNameError, RepositoryError, TermMigrationError } from "../errors";
 import { TagRepositoryTag } from "../repository/tag-repository";
@@ -50,7 +50,7 @@ export const resolveTagSelectors = (
       const key = `tag:${selector}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      resolvedSelectors.push({ selector, tagIds: [selector as TagId] });
+      resolvedSelectors.push({ selector, tagIds: [TagIdSchema.make(selector)] });
     }
 
     return resolvedSelectors;

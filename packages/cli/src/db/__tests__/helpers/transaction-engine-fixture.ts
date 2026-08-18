@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import {
   EntityRepositoryTag,
-  type JournalEntryId,
+  JournalEntryIdSchema,
   MigrationJournalRepositoryTag,
   MigrationServiceTag,
-  type TagId,
+  TagIdSchema,
   TagRepositoryTag,
   TermRepositoryTag,
   TransactionEngineTag,
@@ -34,11 +34,11 @@ const program = Effect.gen(function* () {
     canonicalName: "Kioku",
     kind: "brand",
   });
-  const tagId = "kioku" as TagId;
+  const tagId = TagIdSchema.make("kioku");
   yield* tagRepo.create({ id: tagId, name: "Kioku", termId: sourceTerm.id });
   yield* tagRepo.applyToEntity(tagId, document.id);
 
-  const duplicateJournalId = "journal-duplicate" as JournalEntryId;
+  const duplicateJournalId = JournalEntryIdSchema.make("journal-duplicate");
   yield* journalRepo.record({
     id: duplicateJournalId,
     operation: "rename",

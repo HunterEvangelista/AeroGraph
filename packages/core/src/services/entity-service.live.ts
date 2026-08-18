@@ -24,6 +24,7 @@ export const EntityServiceLive = Layer.effect(
 
     const changedFields = (before: Entity, after: Entity): ReadonlyArray<string> => {
       const fields = new Set<string>();
+      // SAFETY: Object.keys(after) enumerates only fields defined by the Entity value.
       for (const key of Object.keys(after) as Array<keyof Entity>) {
         if (key === "updatedAt" || key === "version") continue;
         if (JSON.stringify(before[key]) !== JSON.stringify(after[key])) {

@@ -1,11 +1,15 @@
+import type { SQLQueryBindings } from "bun:sqlite";
 import {
   type CodeRef,
+  CodeRefSchema,
   type CreateCodeRefInput,
   type CreateDiagramInput,
   type CreateDocInput,
   type CreateStoryInput,
   type Diagram,
+  DiagramSchema,
   type Doc,
+  DocSchema,
   type Entity,
   type EntityId,
   EntityNotFoundError,
@@ -14,10 +18,11 @@ import {
   EntityType,
   RepositoryError,
   type Story,
+  StorySchema,
   StoryStatusEnum,
 } from "@kioku/core";
 import { desc, count as drizzleCount, eq, inArray, sql } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { rebuildEntityIdPrefixes } from "./entity-prefix-index";
 import { entities, entityTags } from "./schema";
 import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
@@ -63,89 +68,100 @@ const rawRowToEntityRow = (row: RawEntityRow): EntityRow => ({
   version: row.version,
 });
 
+const EntityMetadataSchema = Schema.Record(Schema.String, Schema.Unknown);
+
+const parseMetadata = (value: string | null) =>
+  Schema.decodeUnknownSync(EntityMetadataSchema)(value === null ? {} : JSON.parse(value));
+
 const rowToEntity = (row: EntityRow): Entity => {
-  const metadata = row.metadata ? JSON.parse(row.metadata) : {};
+  const metadata = parseMetadata(row.metadata);
   const base = {
-    id: row.id as EntityId,
+    id: row.id,
     title: row.title,
     content: row.content ?? "",
     tags: [], // Tags are loaded separately
-    createdAt: new Date(row.createdAt),
-    updatedAt: new Date(row.updatedAt),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
     version: row.version,
   };
 
   switch (row.type) {
     case "doc":
-      return { ...base, _tag: EntityType.Doc } as Doc;
+      return Schema.decodeUnknownSync(DocSchema)({ ...base, _tag: EntityType.Doc });
     case "code_ref":
-      return {
+      return Schema.decodeUnknownSync(CodeRefSchema)({
         ...base,
         _tag: EntityType.CodeRef,
-        repoPath: metadata.repoPath ?? "",
-        filePath: metadata.filePath ?? "",
-        startLine: metadata.startLine,
-        endLine: metadata.endLine,
-        commitHash: metadata.commitHash,
-        symbol: metadata.symbol,
-      } as CodeRef;
+        repoPath: metadata["repoPath"] ?? "",
+        filePath: metadata["filePath"] ?? "",
+        startLine: metadata["startLine"],
+        endLine: metadata["endLine"],
+        commitHash: metadata["commitHash"],
+        symbol: metadata["symbol"],
+      });
     case "story":
-      return {
+      return Schema.decodeUnknownSync(StorySchema)({
         ...base,
         _tag: EntityType.Story,
-        status: metadata.status ?? StoryStatusEnum.Backlog,
-        priority: metadata.priority,
-        parentId: metadata.parentId,
-      } as Story;
+        status: metadata["status"] ?? StoryStatusEnum.Backlog,
+        priority: metadata["priority"],
+        parentId: metadata["parentId"],
+      });
     case "diagram":
-      return {
+      return Schema.decodeUnknownSync(DiagramSchema)({
         ...base,
         _tag: EntityType.Diagram,
-        diagramType: metadata.diagramType ?? "other",
-        source: metadata.source ?? "",
-        generatedFrom: metadata.generatedFrom,
-      } as Diagram;
-    default:
-      throw new Error(`Unknown entity type: ${row.type}`);
+        diagramType: metadata["diagramType"] ?? "other",
+        source: metadata["source"] ?? "",
+        generatedFrom: metadata["generatedFrom"],
+      });
   }
 };
 
-const mergeDocMetadata = (_existing: Doc, _updates: Partial<Doc>): string | null => null;
+const mergeDocMetadata = (_existing: Doc, _updates: Partial<Entity>): string | null => null;
 
-const mergeCodeRefMetadata = (existing: CodeRef, updates: Partial<CodeRef>): string =>
+const mergeCodeRefMetadata = (existing: CodeRef, updates: Partial<Entity>): string =>
   JSON.stringify({
-    repoPath: updates.repoPath ?? existing.repoPath,
-    filePath: updates.filePath ?? existing.filePath,
-    startLine: updates.startLine ?? existing.startLine,
-    endLine: updates.endLine ?? existing.endLine,
-    commitHash: updates.commitHash ?? existing.commitHash,
-    symbol: updates.symbol ?? existing.symbol,
+    repoPath: "repoPath" in updates ? (updates.repoPath ?? existing.repoPath) : existing.repoPath,
+    filePath: "filePath" in updates ? (updates.filePath ?? existing.filePath) : existing.filePath,
+    startLine:
+      "startLine" in updates ? (updates.startLine ?? existing.startLine) : existing.startLine,
+    endLine: "endLine" in updates ? (updates.endLine ?? existing.endLine) : existing.endLine,
+    commitHash:
+      "commitHash" in updates ? (updates.commitHash ?? existing.commitHash) : existing.commitHash,
+    symbol: "symbol" in updates ? (updates.symbol ?? existing.symbol) : existing.symbol,
   });
 
-const mergeStoryMetadata = (existing: Story, updates: Partial<Story>): string =>
+const mergeStoryMetadata = (existing: Story, updates: Partial<Entity>): string =>
   JSON.stringify({
-    status: updates.status ?? existing.status,
-    priority: updates.priority ?? existing.priority,
-    parentId: updates.parentId ?? existing.parentId,
+    status: "status" in updates ? (updates.status ?? existing.status) : existing.status,
+    priority: "priority" in updates ? (updates.priority ?? existing.priority) : existing.priority,
+    parentId: "parentId" in updates ? (updates.parentId ?? existing.parentId) : existing.parentId,
   });
 
-const mergeDiagramMetadata = (existing: Diagram, updates: Partial<Diagram>): string =>
+const mergeDiagramMetadata = (existing: Diagram, updates: Partial<Entity>): string =>
   JSON.stringify({
-    diagramType: updates.diagramType ?? existing.diagramType,
-    source: updates.source ?? existing.source,
-    generatedFrom: updates.generatedFrom ?? existing.generatedFrom,
+    diagramType:
+      "diagramType" in updates
+        ? (updates.diagramType ?? existing.diagramType)
+        : existing.diagramType,
+    source: "source" in updates ? (updates.source ?? existing.source) : existing.source,
+    generatedFrom:
+      "generatedFrom" in updates
+        ? (updates.generatedFrom ?? existing.generatedFrom)
+        : existing.generatedFrom,
   });
 
 const mergeEntityMetadata = (existing: Entity, updates: Partial<Entity>): string | null => {
   switch (existing._tag) {
     case EntityType.Doc:
-      return mergeDocMetadata(existing, updates as Partial<Doc>);
+      return mergeDocMetadata(existing, updates);
     case EntityType.CodeRef:
-      return mergeCodeRefMetadata(existing, updates as Partial<CodeRef>);
+      return mergeCodeRefMetadata(existing, updates);
     case EntityType.Story:
-      return mergeStoryMetadata(existing, updates as Partial<Story>);
+      return mergeStoryMetadata(existing, updates);
     case EntityType.Diagram:
-      return mergeDiagramMetadata(existing, updates as Partial<Diagram>);
+      return mergeDiagramMetadata(existing, updates);
   }
 };
 
@@ -158,7 +174,7 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
   Effect.gen(function* () {
     const { db, drizzle, transaction, write } = yield* DatabaseSessionTag;
 
-    const searchFts = db.prepare(`
+    const searchFts = db.prepare<RawEntityRow, SQLQueryBindings[]>(`
       SELECT e.* FROM entities e
       JOIN entities_fts fts ON e.id = fts.id
       WHERE entities_fts MATCH ?
@@ -188,7 +204,10 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
           rebuildEntityIdPrefixes(drizzle, undefined, transaction);
-          return rowToEntity(row) as Doc;
+          const entity = rowToEntity(row);
+          if (entity._tag !== EntityType.Doc)
+            throw new Error("Inserted entity has an unexpected type");
+          return entity;
         },
         catch: (error) =>
           new RepositoryError({
@@ -227,7 +246,10 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
           rebuildEntityIdPrefixes(drizzle, undefined, transaction);
-          return rowToEntity(row) as CodeRef;
+          const entity = rowToEntity(row);
+          if (entity._tag !== EntityType.CodeRef)
+            throw new Error("Inserted entity has an unexpected type");
+          return entity;
         },
         catch: (error) =>
           new RepositoryError({
@@ -263,7 +285,10 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
           rebuildEntityIdPrefixes(drizzle, undefined, transaction);
-          return rowToEntity(row) as Story;
+          const entity = rowToEntity(row);
+          if (entity._tag !== EntityType.Story)
+            throw new Error("Inserted entity has an unexpected type");
+          return entity;
         },
         catch: (error) =>
           new RepositoryError({
@@ -299,7 +324,10 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
           const row = drizzle.select().from(entities).where(eq(entities.id, id)).get();
           if (!row) throw new Error(`Inserted entity not found: ${id}`);
           rebuildEntityIdPrefixes(drizzle, undefined, transaction);
-          return rowToEntity(row) as Diagram;
+          const entity = rowToEntity(row);
+          if (entity._tag !== EntityType.Diagram)
+            throw new Error("Inserted entity has an unexpected type");
+          return entity;
         },
         catch: (error) =>
           new RepositoryError({
@@ -484,7 +512,7 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
           const sanitized = query.replace(/['"]/g, "").trim();
           if (!sanitized) return [];
 
-          const rows = searchFts.all(`${sanitized}*`) as RawEntityRow[];
+          const rows = searchFts.all(`${sanitized}*`);
           return rows.map((row) => rowToEntity(rawRowToEntityRow(row)));
         },
         catch: (error) =>

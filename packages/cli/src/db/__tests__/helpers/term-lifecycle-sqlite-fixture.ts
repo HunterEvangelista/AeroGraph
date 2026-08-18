@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {
   EntityRepositoryTag,
+  JournalEntryIdSchema,
   MigrationJournalRepositoryTag,
   MigrationServiceTag,
   TagRepositoryTag,
@@ -68,7 +69,7 @@ const result = await Effect.runPromise(
       yield* migrations.applyMerge({
         source: { id: mergeSource.id },
         destination: { id: mergeTarget.id },
-        journalEntryId: "duplicate-journal" as never,
+        journalEntryId: JournalEntryIdSchema.make("duplicate-journal"),
       });
 
       const secondSource = yield* terms.create({
@@ -85,7 +86,7 @@ const result = await Effect.runPromise(
         migrations.applyMerge({
           source: { id: secondSource.id },
           destination: { id: mergeTarget.id },
-          journalEntryId: "duplicate-journal" as never,
+          journalEntryId: JournalEntryIdSchema.make("duplicate-journal"),
         })
       );
       assert.ok(Exit.isFailure(failed));

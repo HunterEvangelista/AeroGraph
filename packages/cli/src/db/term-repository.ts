@@ -7,6 +7,7 @@ import {
   type Term,
   TermAlreadyExistsError,
   type TermId,
+  TermIdSchema,
   type TermKind,
   type TermName,
   TermNotFoundError,
@@ -17,7 +18,7 @@ import {
   ValidationError,
 } from "@kioku/core";
 import { and, eq, inArray } from "drizzle-orm";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { termNames, terms } from "./schema";
 import { type DatabaseExecutor, DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
@@ -53,28 +54,25 @@ const validateTermName = (value: string, field: string) => {
   return Effect.succeed(normalized);
 };
 
-const isUniqueConstraintError = (error: unknown): boolean => {
-  const code =
-    typeof error === "object" && error !== null && "code" in error
-      ? String((error as { readonly code?: unknown }).code)
-      : "";
-  const message = error instanceof Error ? error.message : String(error);
+const isUniqueConstraintError = (cause: unknown): boolean => {
+  const code = cause instanceof Error && "code" in cause ? String(cause.code) : "";
+  const message = cause instanceof Error ? cause.message : String(cause);
   return `${code} ${message}`.toLowerCase().includes("unique constraint");
 };
 
-const writeError = (action: string, name: string, error: unknown) =>
-  isUniqueConstraintError(error)
+const writeError = (action: string, name: string, cause: unknown) =>
+  isUniqueConstraintError(cause)
     ? new TermAlreadyExistsError({
         name,
         message: `Term name '${name}' already exists within this term kind.`,
       })
     : new RepositoryError({
-        message: `Failed to ${action}: ${error instanceof Error ? error.message : String(error)}`,
-        cause: error,
+        message: `Failed to ${action}: ${cause instanceof Error ? cause.message : String(cause)}`,
+        cause,
       });
 
 const validateNameUpdate = (existing: TermNameRow, updates: UpdateTermNameInput) => {
-  const requestedNameKind = updates.nameKind as string | undefined;
+  const requestedNameKind = String(updates.nameKind);
   const changesCanonicalState =
     (existing.nameKind === "canonical" &&
       (updates.displayName !== undefined || updates.nameKind !== undefined)) ||
@@ -139,19 +137,25 @@ const writeCanonicalName = (
 };
 
 const rowToTerm = (row: TermRow): Term => ({
-  id: row.id as TermId,
+  id: Schema.decodeUnknownSync(TermIdSchema)(row.id),
   canonicalName: row.canonicalName,
   kind: row.kind,
   description: row.description ?? undefined,
   status: row.status,
-  mergedIntoId: (row.mergedIntoId ?? undefined) as TermId | undefined,
-  replacementTermId: (row.replacementTermId ?? undefined) as TermId | undefined,
+  mergedIntoId:
+    row.mergedIntoId === null
+      ? undefined
+      : Schema.decodeUnknownSync(TermIdSchema)(row.mergedIntoId),
+  replacementTermId:
+    row.replacementTermId === null
+      ? undefined
+      : Schema.decodeUnknownSync(TermIdSchema)(row.replacementTermId),
   createdAt: new Date(row.createdAt),
   updatedAt: new Date(row.updatedAt),
 });
 
 const rowToTermName = (row: TermNameRow): TermName => ({
-  termId: row.termId as TermId,
+  termId: Schema.decodeUnknownSync(TermIdSchema)(row.termId),
   kind: row.kind,
   name: row.name,
   displayName: row.displayName,
@@ -443,7 +447,7 @@ export const SqliteTermRepositorySessionLive = Layer.effect(
             message: `Term name kind '${input.kind}' does not match term kind '${term.kind}'`,
           });
         }
-        if ((input.nameKind as string) === "canonical") {
+        if (String(input.nameKind) === "canonical") {
           return yield* new ValidationError({
             field: "nameKind",
             message: "Canonical names must be changed through renameCanonical.",
@@ -575,8 +579,8 @@ export const SqliteTermRepositorySessionLive = Layer.effect(
     const update = (id: TermId, updates: UpdateTermInput) =>
       Effect.gen(function* () {
         const existing = yield* getById(id);
-        const requestedCanonicalName = (updates as { readonly canonicalName?: string })
-          .canonicalName;
+        const requestedCanonicalName =
+          "canonicalName" in updates ? updates.canonicalName : undefined;
         if (
           requestedCanonicalName !== undefined &&
           requestedCanonicalName !== existing.canonicalName

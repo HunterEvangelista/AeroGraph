@@ -75,9 +75,7 @@ describe("term registry schema drift guards", () => {
       dirname(fileURLToPath(import.meta.url)),
       "../../../drizzle/meta/0004_snapshot.json"
     );
-    const snapshot = JSON.parse(readFileSync(snapshotPath, "utf8")) as {
-      readonly tables: Record<string, { readonly checkConstraints: Record<string, unknown> }>;
-    };
+    const snapshot = JSON.parse(readFileSync(snapshotPath, "utf8"));
 
     expect(Object.keys(snapshot.tables.terms?.checkConstraints ?? {}).sort()).toEqual(
       checkNames(terms)

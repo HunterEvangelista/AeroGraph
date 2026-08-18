@@ -2,7 +2,7 @@
  * SQLite Database Client
  * Manages database connection and initialization
  */
-import { Database } from "bun:sqlite";
+import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { DatabaseError, MigrationError, normalizeTermName } from "@kioku/core";
 import { type BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
 import { Context, Effect, Layer } from "effect";
@@ -73,7 +73,9 @@ const addColumnIfMissing = (
   column: string,
   definition: string
 ): void => {
-  const columns = db.query(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  const columns = db
+    .query<{ name: string }, SQLQueryBindings[]>(`PRAGMA table_info(${table})`)
+    .all();
   if (columns.length === 0) return;
   if (!columns.some((c) => c.name === column)) {
     db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
@@ -130,8 +132,10 @@ const RETIRED_V4_CANONICAL_TRIGGERS = new Set([
 
 const validateLegacyTerms = (db: Database): void => {
   const terms = db
-    .query("SELECT id, canonical_name AS canonicalName FROM terms")
-    .all() as LegacyTermRow[];
+    .query<LegacyTermRow, SQLQueryBindings[]>(
+      "SELECT id, canonical_name AS canonicalName FROM terms"
+    )
+    .all();
   for (const term of terms) {
     if (!term.canonicalName.trim() || term.canonicalName.includes(",")) {
       throw new Error(`Cannot migrate term '${term.id}': invalid canonical name.`);
@@ -169,13 +173,10 @@ const rebuildTermsV4 = (db: Database): void => {
 };
 
 const normalizeLegacyTermName = (row: LegacyTermNameRow): string => {
-  if (
-    !row.termKind ||
-    !TERM_KIND_VALUES.includes(row.termKind as (typeof TERM_KIND_VALUES)[number])
-  ) {
+  if (!row.termKind || !new Set<string>(TERM_KIND_VALUES).has(row.termKind)) {
     throw new Error(`Cannot migrate term name '${row.name}': invalid or missing term kind.`);
   }
-  if (!TERM_NAME_KIND_VALUES.includes(row.nameKind as (typeof TERM_NAME_KIND_VALUES)[number])) {
+  if (!new Set<string>(TERM_NAME_KIND_VALUES).has(row.nameKind)) {
     throw new Error(`Cannot migrate term name '${row.name}': invalid name kind.`);
   }
   if (!row.displayName.trim() || row.displayName.includes(",")) {
@@ -190,8 +191,10 @@ const normalizeLegacyTermName = (row: LegacyTermNameRow): string => {
 
 const validateLegacyLifecycle = (db: Database): void => {
   const rows = db
-    .query("SELECT id, status, merged_into_id AS mergedIntoId FROM terms ORDER BY id")
-    .all() as LegacyLifecycleRow[];
+    .query<LegacyLifecycleRow, SQLQueryBindings[]>(
+      "SELECT id, status, merged_into_id AS mergedIntoId FROM terms ORDER BY id"
+    )
+    .all();
 
   for (const row of rows) {
     if (row.status === "active" && row.mergedIntoId !== null) {
@@ -248,15 +251,15 @@ const rebuildTermsV5 = (db: Database): void => {
 
 const legacyJournalRows = (db: Database): LegacyJournalRow[] =>
   tableExists(db, "migration_journal")
-    ? (db
-        .query(`
+    ? db
+        .query<LegacyJournalRow, SQLQueryBindings[]>(`
       SELECT id, operation, kind, from_name AS fromName, to_name AS toName,
         term_id AS termId, affected_entity_ids AS affectedEntityIds,
         affected_count AS affectedCount, reason, applied_at AS appliedAt,
         applied_by AS appliedBy, dry_run AS dryRun
       FROM migration_journal ORDER BY rowid
     `)
-        .all() as LegacyJournalRow[])
+        .all()
     : [];
 
 /**
@@ -268,21 +271,23 @@ const legacyJournalRows = (db: Database): LegacyJournalRow[] =>
 const resolveLegacyJournalRelation = (db: Database, row: LegacyJournalRow): string | null => {
   if (row.operation !== "merge" && row.operation !== "deprecate") return null;
   const source = db
-    .query("SELECT kind, merged_into_id AS mergedIntoId FROM terms WHERE id = ?")
-    .get(row.termId) as { kind: string; mergedIntoId: string | null } | null;
+    .query<{ kind: string; mergedIntoId: string | null }, SQLQueryBindings[]>(
+      "SELECT kind, merged_into_id AS mergedIntoId FROM terms WHERE id = ?"
+    )
+    .get(row.termId);
   if (!source) throw new Error(`Cannot migrate journal '${row.id}': source term is missing.`);
 
   const candidates = new Set<string>();
   if (row.operation === "merge" && source.mergedIntoId) {
     const directTarget = db
-      .query("SELECT id FROM terms WHERE id = ? AND kind = ?")
-      .get(source.mergedIntoId, source.kind) as { id: string } | null;
+      .query<{ id: string }, SQLQueryBindings[]>("SELECT id FROM terms WHERE id = ? AND kind = ?")
+      .get(source.mergedIntoId, source.kind);
     if (directTarget) candidates.add(directTarget.id);
   }
 
   const normalized = normalizeTermName(row.toName);
   const matchingTerms = db
-    .query(`
+    .query<{ id: string }, SQLQueryBindings[]>(`
       SELECT DISTINCT t.id AS id
       FROM terms t
       LEFT JOIN term_names n ON n.term_id = t.id AND n.kind = t.kind
@@ -292,7 +297,7 @@ const resolveLegacyJournalRelation = (db: Database, row: LegacyJournalRow): stri
         OR n.name = ?
       )
     `)
-    .all(source.kind, row.toName, row.toName, normalized) as Array<{ id: string }>;
+    .all(source.kind, row.toName, row.toName, normalized);
   for (const candidate of matchingTerms) candidates.add(candidate.id);
 
   if (candidates.size !== 1) {
@@ -305,21 +310,22 @@ const resolveLegacyJournalRelation = (db: Database, row: LegacyJournalRow): stri
 };
 
 const captureUnmanagedTriggers = (db: Database): string[] =>
-  (
-    db
-      .query("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND sql IS NOT NULL")
-      .all() as Array<{ name: string; sql: string }>
-  ) // Keep custom triggers across rebuilt tables.
+  db
+    .query<{ name: string; sql: string }, SQLQueryBindings[]>(
+      "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND sql IS NOT NULL"
+    )
+    .all() // Keep custom triggers across rebuilt tables.
     .filter(({ name }) => !RETIRED_V4_CANONICAL_TRIGGERS.has(name))
     .map(({ sql }) => sql);
 
 const restoreUnmanagedTriggers = (db: Database, triggerSql: ReadonlyArray<string>): void => {
   const existing = new Set(
-    (
-      db.query("SELECT name FROM sqlite_master WHERE type = 'trigger'").all() as Array<{
-        name: string;
-      }>
-    ).map(({ name }) => name)
+    db
+      .query<{ name: string }, SQLQueryBindings[]>(
+        "SELECT name FROM sqlite_master WHERE type = 'trigger'"
+      )
+      .all()
+      .map(({ name }) => name)
   );
   for (const sql of triggerSql) {
     const name = /^CREATE TRIGGER(?: IF NOT EXISTS)?\s+[`"]?([^`"\s]+)[`"]?/i.exec(sql)?.[1];
@@ -386,7 +392,7 @@ const rebuildMigrationJournalV5 = (
 };
 const rebuildTermNamesV4 = (db: Database): void => {
   const rows = db
-    .query(
+    .query<LegacyTermNameRow, SQLQueryBindings[]>(
       `SELECT
         term_names.term_id AS termId,
         term_names.name AS name,
@@ -397,7 +403,7 @@ const rebuildTermNamesV4 = (db: Database): void => {
       FROM term_names
       LEFT JOIN terms ON terms.id = term_names.term_id`
     )
-    .all() as LegacyTermNameRow[];
+    .all();
 
   db.run("DROP TABLE IF EXISTS term_names_v4;");
   db.run(`
@@ -486,7 +492,9 @@ const initializeDatabase = (db: Database): Effect.Effect<void, MigrationError> =
       db.run(CREATE_SCHEMA_META_SQL);
 
       // Check/set schema version
-      const versionResult = db.query(GET_SCHEMA_VERSION_SQL).get() as { value: string } | undefined;
+      const versionResult = db
+        .query<{ value: string }, SQLQueryBindings[]>(GET_SCHEMA_VERSION_SQL)
+        .get();
 
       if (!versionResult) {
         // First time setup — CREATE_TABLES_SQL creates everything fresh
