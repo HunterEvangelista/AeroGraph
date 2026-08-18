@@ -14,6 +14,12 @@ export type {
 export { GraphServiceTag } from "./graph-service.js";
 export { GraphServiceLive } from "./graph-service.live.js";
 export type {
+  DeprecateMigrationPlan,
+  DeprecateMigrationResult,
+  DeprecateTermInput,
+  MergeMigrationPlan,
+  MergeMigrationResult,
+  MergeTermInput,
   MigrationService,
   RenameMigrationPlan,
   RenameMigrationResult,
@@ -29,6 +35,19 @@ export { resolveTagSelectors } from "./tag-selector.js";
 export type { TagService } from "./tag-service.js";
 export { TagServiceTag } from "./tag-service.js";
 export { TagServiceLive } from "./tag-service.live.js";
-export type { TermResolution, TermService } from "./term-service.js";
+export type {
+  AddTermAliasInput,
+  TermAudit,
+  TermGovernanceService,
+} from "./term-governance-service.js";
+export { TermGovernanceServiceTag } from "./term-governance-service.js";
+export { TermGovernanceServiceLive } from "./term-governance-service.live.js";
+export type {
+  TermInspection,
+  TermResolution,
+  TermResolutionMetadata,
+  TermSelector,
+  TermService,
+} from "./term-service.js";
 export { TermServiceTag } from "./term-service.js";
 export { TermServiceLive } from "./term-service.live.js";

@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import type { TagId } from "../domain/tag.js";
 import type { TermId } from "../domain/term.js";
-import type { AmbiguousTermNameError, RepositoryError } from "../errors.js";
+import type { AmbiguousTermNameError, RepositoryError, TermMigrationError } from "../errors.js";
 import { TagRepositoryTag } from "../repository/tag-repository.js";
 import { TermServiceTag } from "./term-service.js";
 
@@ -16,7 +16,7 @@ export const resolveTagSelectors = (
   selectors: ReadonlyArray<string>
 ): Effect.Effect<
   ReadonlyArray<ResolvedTagSelector>,
-  AmbiguousTermNameError | RepositoryError,
+  AmbiguousTermNameError | RepositoryError | TermMigrationError,
   TagRepositoryTag | TermServiceTag
 > =>
   Effect.gen(function* () {

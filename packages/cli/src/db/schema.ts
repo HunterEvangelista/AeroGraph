@@ -71,14 +71,20 @@ export const terms = sqliteTable(
     description: text("description"),
     status: text("status", { enum: TERM_STATUS_VALUES }).notNull().default("active"),
     mergedIntoId: text("merged_into_id").references((): AnySQLiteColumn => terms.id),
+    replacementTermId: text("replacement_term_id").references((): AnySQLiteColumn => terms.id),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
   },
   (table) => [
     uniqueIndex("idx_terms_kind_canonical_name").on(table.kind, table.canonicalName),
     index("idx_terms_status").on(table.status),
+    index("idx_terms_merged_into_id").on(table.mergedIntoId),
     check("terms_kind_check", sql`${table.kind} in (${sql.raw(TERM_KIND_CHECK_VALUES)})`),
     check("terms_status_check", sql`${table.status} in (${sql.raw(TERM_STATUS_CHECK_VALUES)})`),
+    check(
+      "terms_lifecycle_shape_check",
+      sql`(${table.status} = 'active' AND ${table.mergedIntoId} IS NULL AND ${table.replacementTermId} IS NULL) OR (${table.status} = 'deprecated' AND ${table.mergedIntoId} IS NULL) OR (${table.status} = 'merged' AND ${table.mergedIntoId} IS NOT NULL AND ${table.replacementTermId} IS NULL)`
+    ),
     check("terms_canonical_name_check", sql`instr(${table.canonicalName}, ',') = 0`),
   ]
 );
@@ -122,10 +128,11 @@ export const migrationJournal = sqliteTable(
     operation: text("operation", { enum: MIGRATION_OPERATION_VALUES }).notNull(),
     kind: text("kind", { enum: TERM_KIND_VALUES }),
     fromName: text("from_name").notNull(),
-    toName: text("to_name").notNull(),
+    toName: text("to_name"),
     termId: text("term_id")
       .notNull()
       .references(() => terms.id),
+    relatedTermId: text("related_term_id").references(() => terms.id),
     affectedEntityIds: text("affected_entity_ids").notNull(),
     affectedCount: integer("affected_count").notNull(),
     reason: text("reason"),
@@ -135,6 +142,7 @@ export const migrationJournal = sqliteTable(
   },
   (table) => [
     index("idx_journal_term").on(table.termId),
+    index("idx_journal_related_term").on(table.relatedTermId),
     index("idx_journal_applied_at").on(table.appliedAt),
     check(
       "migration_journal_operation_check",
@@ -143,6 +151,10 @@ export const migrationJournal = sqliteTable(
     check(
       "migration_journal_kind_check",
       sql`${table.kind} is null OR ${table.kind} in (${sql.raw(TERM_KIND_CHECK_VALUES)})`
+    ),
+    check(
+      "migration_journal_semantics_check",
+      sql`(${table.operation} = 'create' AND (${table.toName} IS NULL OR length(trim(${table.toName})) > 0) AND ${table.relatedTermId} IS NULL) OR (${table.operation} = 'rename' AND ${table.toName} IS NOT NULL AND length(trim(${table.toName})) > 0 AND ${table.relatedTermId} IS NULL) OR (${table.operation} = 'merge' AND ${table.toName} IS NOT NULL AND length(trim(${table.toName})) > 0 AND ${table.relatedTermId} IS NOT NULL) OR (${table.operation} = 'deprecate' AND ((${table.toName} IS NULL AND ${table.relatedTermId} IS NULL) OR (${table.toName} IS NOT NULL AND length(trim(${table.toName})) > 0 AND ${table.relatedTermId} IS NOT NULL)))`
     ),
   ]
 );
@@ -262,7 +274,7 @@ export const schemaMeta = sqliteTable("schema_meta", {
   value: text("value").notNull(),
 });
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const CREATE_SCHEMA_META_SQL = `
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -292,11 +304,16 @@ CREATE TABLE IF NOT EXISTS terms (
   description TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN (${TERM_STATUS_CHECK_VALUES})),
   merged_into_id TEXT REFERENCES terms(id),
+  replacement_term_id TEXT,
   created_at TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (replacement_term_id) REFERENCES terms(id),
+  CONSTRAINT terms_lifecycle_shape_check CHECK((status = 'active' AND merged_into_id IS NULL AND replacement_term_id IS NULL) OR (status = 'deprecated' AND merged_into_id IS NULL) OR (status = 'merged' AND merged_into_id IS NOT NULL AND replacement_term_id IS NULL))
 );
 
 -- Term names (maps canonical, alias, and deprecated names to a term)
+CREATE INDEX IF NOT EXISTS idx_terms_merged_into_id ON terms(merged_into_id);
+
 CREATE TABLE IF NOT EXISTS term_names (
   term_id TEXT NOT NULL REFERENCES terms(id) ON DELETE CASCADE,
   kind TEXT NOT NULL CHECK(kind IN (${TERM_KIND_CHECK_VALUES})),
@@ -313,14 +330,17 @@ CREATE TABLE IF NOT EXISTS migration_journal (
   operation TEXT NOT NULL CHECK(operation IN (${MIGRATION_OPERATION_CHECK_VALUES})),
   kind TEXT CHECK(kind IN (${TERM_KIND_CHECK_VALUES})),
   from_name TEXT NOT NULL,
-  to_name TEXT NOT NULL,
+  to_name TEXT,
   term_id TEXT NOT NULL REFERENCES terms(id),
+  related_term_id TEXT,
   affected_entity_ids TEXT NOT NULL,
   affected_count INTEGER NOT NULL,
   reason TEXT,
   applied_at TEXT NOT NULL,
   applied_by TEXT,
-  dry_run INTEGER NOT NULL DEFAULT 0
+  dry_run INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (related_term_id) REFERENCES terms(id),
+  CONSTRAINT migration_journal_semantics_check CHECK((operation = 'create' AND (to_name IS NULL OR length(trim(to_name)) > 0) AND related_term_id IS NULL) OR (operation = 'rename' AND to_name IS NOT NULL AND length(trim(to_name)) > 0 AND related_term_id IS NULL) OR (operation = 'merge' AND to_name IS NOT NULL AND length(trim(to_name)) > 0 AND related_term_id IS NOT NULL) OR (operation = 'deprecate' AND ((to_name IS NULL AND related_term_id IS NULL) OR (to_name IS NOT NULL AND length(trim(to_name)) > 0 AND related_term_id IS NOT NULL))))
 );
 
 -- Tags table
@@ -402,6 +422,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_term_names_kind_name ON term_names(kind, n
 CREATE UNIQUE INDEX IF NOT EXISTS idx_term_names_one_canonical ON term_names(term_id) WHERE name_kind = 'canonical';
 CREATE INDEX IF NOT EXISTS idx_term_names_name ON term_names(name);
 CREATE INDEX IF NOT EXISTS idx_journal_term ON migration_journal(term_id);
+CREATE INDEX IF NOT EXISTS idx_journal_related_term ON migration_journal(related_term_id);
 CREATE INDEX IF NOT EXISTS idx_journal_applied_at ON migration_journal(applied_at);
 
 -- Full-text search for entities

@@ -5,16 +5,15 @@ import { describe, expect, it } from "vitest";
 
 const fixturePath = join(
   dirname(fileURLToPath(import.meta.url)),
-  "helpers/database-upgrade-fixture.ts"
+  "helpers/term-lifecycle-sqlite-fixture.ts"
 );
 
-describe("database upgrades", () => {
-  it("preserves v4 create journal names while stamping v5 constraints", () => {
+describe("SQLite term lifecycle persistence", () => {
+  it("persists lifecycle pointers and rolls back failed merge journaling", () => {
     const result = spawnSync("bun", ["run", fixturePath], {
       encoding: "utf8",
       shell: false,
     });
-
     expect(result.status, `${result.stderr}\n${result.stdout}`).toBe(0);
   });
 });

@@ -43,9 +43,20 @@ export class TermAlreadyExistsError extends Data.TaggedError("TermAlreadyExistsE
   readonly message?: string;
 }> {}
 
+export interface TermNameCandidate {
+  readonly id: string;
+  readonly kind: string;
+  readonly canonicalName: string;
+  readonly matchedName: string;
+  readonly nameKind: string;
+}
+
 export class AmbiguousTermNameError extends Data.TaggedError("AmbiguousTermNameError")<{
   readonly name: string;
+  /** Kept as display labels for existing callers. */
   readonly candidates: ReadonlyArray<string>;
+  /** Stable, serializable candidate data for interface layers. */
+  readonly candidateMetadata?: ReadonlyArray<TermNameCandidate>;
   readonly message?: string;
 }> {}
 

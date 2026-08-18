@@ -11,6 +11,7 @@ import {
   EntityNotFoundError,
   RepositoryError,
   TagNotFoundError,
+  TermNotFoundError,
   ValidationError,
 } from "../errors.js";
 import type { EntityRepository } from "../repository/entity-repository.js";
@@ -175,13 +176,20 @@ const createMockTermRepository = (
   matches: ReadonlyArray<ResolvedTermName> = []
 ): TermRepository => ({
   create: () => Effect.die(new Error("not implemented")),
-  getById: () => Effect.die(new Error("not implemented")),
+  getById: (id) => {
+    const match = matches.find(({ term }) => term.id === id);
+    return match ? Effect.succeed(match.term) : Effect.fail(new TermNotFoundError({ name: id }));
+  },
+  getByIds: () => Effect.succeed([]),
+  listNamesByTermIds: () => Effect.succeed([]),
+  listMergedInto: () => Effect.succeed([]),
   getByCanonicalName: () => Effect.die(new Error("not implemented")),
   findByName: (name) =>
     Effect.succeed(matches.filter(({ termName }) => termName.name === normalizeTermName(name))),
   list: () => Effect.succeed([]),
   addName: () => Effect.die(new Error("not implemented")),
-  listNames: () => Effect.succeed([]),
+  listNames: (id) =>
+    Effect.succeed(matches.filter(({ term }) => term.id === id).map(({ termName }) => termName)),
   updateName: () => Effect.die(new Error("not implemented")),
   update: () => Effect.die(new Error("not implemented")),
   renameCanonical: () => Effect.die(new Error("not implemented")),

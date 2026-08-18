@@ -16,7 +16,7 @@ import {
   type UpdateTermNameInput,
   ValidationError,
 } from "@kioku/core";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { Effect, Layer } from "effect";
 import { termNames, terms } from "./schema.js";
 import { type DatabaseExecutor, DatabaseSessionTag, RootDatabaseSessionLive } from "./session.js";
@@ -27,6 +27,15 @@ type TermRow = typeof terms.$inferSelect;
 type TermNameRow = typeof termNames.$inferSelect;
 
 const termNameKindOrder = { canonical: 0, alias: 1, deprecated: 2 } as const;
+const SQLITE_BIND_CHUNK_SIZE = 500;
+
+const chunks = <T>(values: ReadonlyArray<T>): ReadonlyArray<ReadonlyArray<T>> => {
+  const result: Array<ReadonlyArray<T>> = [];
+  for (let index = 0; index < values.length; index += SQLITE_BIND_CHUNK_SIZE) {
+    result.push(values.slice(index, index + SQLITE_BIND_CHUNK_SIZE));
+  }
+  return result;
+};
 
 const validateTermName = (value: string, field: string) => {
   const normalized = normalizeTermName(value);
@@ -136,6 +145,7 @@ const rowToTerm = (row: TermRow): Term => ({
   description: row.description ?? undefined,
   status: row.status,
   mergedIntoId: (row.mergedIntoId ?? undefined) as TermId | undefined,
+  replacementTermId: (row.replacementTermId ?? undefined) as TermId | undefined,
   createdAt: new Date(row.createdAt),
   updatedAt: new Date(row.updatedAt),
 });
@@ -198,6 +208,82 @@ export const SqliteTermRepositorySessionLive = Layer.effect(
         return rowToTerm(row);
       });
 
+    const getByIds = (ids: ReadonlyArray<TermId>) => {
+      const uniqueIds = [...new Set(ids)];
+      return uniqueIds.length === 0
+        ? Effect.succeed<ReadonlyArray<Term>>([])
+        : Effect.try({
+            try: () =>
+              chunks(uniqueIds)
+                .flatMap((chunk) =>
+                  drizzle
+                    .select()
+                    .from(terms)
+                    .where(inArray(terms.id, [...chunk]))
+                    .all()
+                    .map(rowToTerm)
+                )
+                .sort(
+                  (a, b) =>
+                    a.kind.localeCompare(b.kind) ||
+                    a.canonicalName.localeCompare(b.canonicalName) ||
+                    a.id.localeCompare(b.id)
+                ),
+            catch: (error) =>
+              new RepositoryError({
+                message: `Failed to get terms: ${error instanceof Error ? error.message : String(error)}`,
+                cause: error,
+              }),
+          });
+    };
+
+    const listMergedInto = (termId: TermId) =>
+      Effect.try({
+        try: () =>
+          drizzle
+            .select()
+            .from(terms)
+            .where(eq(terms.mergedIntoId, termId))
+            .orderBy(terms.kind, terms.canonicalName, terms.id)
+            .all()
+            .map(rowToTerm),
+        catch: (error) =>
+          new RepositoryError({
+            message: `Failed to list terms merged into '${termId}': ${error instanceof Error ? error.message : String(error)}`,
+            cause: error,
+          }),
+      });
+
+    const listNamesByTermIds = (ids: ReadonlyArray<TermId>) => {
+      const uniqueIds = [...new Set(ids)];
+      return uniqueIds.length === 0
+        ? Effect.succeed<ReadonlyArray<TermName>>([])
+        : Effect.try({
+            try: () =>
+              chunks(uniqueIds)
+                .flatMap((chunk) =>
+                  drizzle
+                    .select()
+                    .from(termNames)
+                    .where(inArray(termNames.termId, [...chunk]))
+                    .all()
+                    .map(rowToTermName)
+                )
+                .sort(
+                  (a, b) =>
+                    a.termId.localeCompare(b.termId) ||
+                    termNameKindOrder[a.nameKind] - termNameKindOrder[b.nameKind] ||
+                    a.name.localeCompare(b.name) ||
+                    a.displayName.localeCompare(b.displayName)
+                ),
+            catch: (error) =>
+              new RepositoryError({
+                message: `Failed to list term names: ${error instanceof Error ? error.message : String(error)}`,
+                cause: error,
+              }),
+          });
+    };
+
     const create = (input: CreateTermInput) =>
       Effect.gen(function* () {
         yield* validateTermName(input.canonicalName, "canonicalName");
@@ -217,6 +303,7 @@ export const SqliteTermRepositorySessionLive = Layer.effect(
                   description: input.description ?? null,
                   status: "active",
                   mergedIntoId: null,
+                  replacementTermId: null,
                   createdAt: timestamp,
                   updatedAt: timestamp,
                 })
@@ -286,6 +373,7 @@ export const SqliteTermRepositorySessionLive = Layer.effect(
               description: terms.description,
               status: terms.status,
               mergedIntoId: terms.mergedIntoId,
+              replacementTermId: terms.replacementTermId,
               termCreatedAt: terms.createdAt,
               updatedAt: terms.updatedAt,
               nameTermId: termNames.termId,
@@ -310,6 +398,7 @@ export const SqliteTermRepositorySessionLive = Layer.effect(
                 description: row.description,
                 status: row.status,
                 mergedIntoId: row.mergedIntoId,
+                replacementTermId: row.replacementTermId,
                 createdAt: row.termCreatedAt,
                 updatedAt: row.updatedAt,
               }),
@@ -500,6 +589,7 @@ export const SqliteTermRepositorySessionLive = Layer.effect(
 
         yield* Effect.try({
           try: () =>
+            // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: lifecycle field omission and explicit null clearing are intentionally handled together.
             write(() =>
               drizzle
                 .update(terms)
@@ -507,7 +597,12 @@ export const SqliteTermRepositorySessionLive = Layer.effect(
                   canonicalName: existing.canonicalName,
                   description: updates.description ?? existing.description ?? null,
                   status: updates.status ?? existing.status,
-                  mergedIntoId: updates.mergedIntoId ?? existing.mergedIntoId ?? null,
+                  mergedIntoId: Object.hasOwn(updates, "mergedIntoId")
+                    ? (updates.mergedIntoId ?? null)
+                    : (existing.mergedIntoId ?? null),
+                  replacementTermId: Object.hasOwn(updates, "replacementTermId")
+                    ? (updates.replacementTermId ?? null)
+                    : (existing.replacementTermId ?? null),
                   updatedAt: now(),
                 })
                 .where(eq(terms.id, id))
@@ -574,6 +669,9 @@ export const SqliteTermRepositorySessionLive = Layer.effect(
     return {
       create,
       getById,
+      getByIds,
+      listNamesByTermIds,
+      listMergedInto,
       getByCanonicalName,
       findByName,
       list,

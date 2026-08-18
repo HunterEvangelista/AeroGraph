@@ -51,6 +51,7 @@ describe("term registry schema drift guards", () => {
     expect(checkNames(terms)).toEqual([
       "terms_canonical_name_check",
       "terms_kind_check",
+      "terms_lifecycle_shape_check",
       "terms_status_check",
     ]);
     expect(checkNames(termNames)).toEqual([
@@ -62,6 +63,7 @@ describe("term registry schema drift guards", () => {
     expect(checkNames(migrationJournal)).toEqual([
       "migration_journal_kind_check",
       "migration_journal_operation_check",
+      "migration_journal_semantics_check",
     ]);
     expect(getTableConfig(termNames).indexes.map(({ config }) => config.name)).toContain(
       "idx_term_names_one_canonical"
@@ -71,7 +73,7 @@ describe("term registry schema drift guards", () => {
   it("commits term registry checks to the Drizzle snapshot", () => {
     const snapshotPath = join(
       dirname(fileURLToPath(import.meta.url)),
-      "../../../drizzle/meta/0003_snapshot.json"
+      "../../../drizzle/meta/0004_snapshot.json"
     );
     const snapshot = JSON.parse(readFileSync(snapshotPath, "utf8")) as {
       readonly tables: Record<string, { readonly checkConstraints: Record<string, unknown> }>;
