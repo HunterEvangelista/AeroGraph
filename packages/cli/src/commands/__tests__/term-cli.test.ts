@@ -75,11 +75,11 @@ describe("term CLI (SQLite integration)", () => {
   const entityTags = () => state().entity_tags;
   const journal = () => state().migration_journal;
   const iso = (value: string) => assert.match(value, /^\d{4}-\d{2}-\d{2}T/);
-  test("help registers governance commands and does not create terms", () => {
+  test("help registers term creation and lifecycle commands", () => {
     const result = workspace.run("term", "--help");
     assert.equal(result.status, 0);
     assert.match(result.stdout, /list|show|audit|alias|deprecate|merge/);
-    assert.doesNotMatch(result.stdout, /term create/);
+    assert.match(result.stdout, /create/);
   });
 
   test("lists and shows required fields, with kind filtering", () => {

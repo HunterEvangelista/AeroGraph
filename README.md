@@ -11,55 +11,51 @@ Kioku is a local-first knowledge platform for codebases. It models docs, stories
 
 ## Tags and Terms
 
-Tags and Terms are both canonical pieces of data in Kioku, but serve different purposes. 
+A **tag** is a label attached to saved items such as documents, stories, and code references.
 
-A **tag** is attached to entities in the knowledge graph. Documents, stories, code references, and diagrams refer to a tag by its stable tag ID. Tags answer: "Which entities are classified with this label?"
+A **term** records what a name means. It lets Kioku treat a current name, an older name, and other spellings as the same thing. This is useful when a project, package, feature, or API is renamed.
 
-A **term** is the governed concept behind one or more tags. It has a stable term ID, a kind such as `brand`, `project`, or `feature`, a canonical name, and registered alias or deprecated names. Terms answer: "What concept does this name refer to, and what should it be called now?"
-
-For example, before a project rename the graph might contain:
+For example, before a project rename Kioku might store:
 
 ```text
 Term:
-  ID:        term-company-name
-  type:      Brand
-  Canonical: AcmeCorp
+  ID:           term-company-name
+  Kind:         brand
+  Current name: AcmeCorp
 
 Tag:
   ID:        acme-corp
   Name:      AcmeCorp
   Term:      term-company-name
 
-Attachment:
-  doc-123 -> tag "AcmeCorp"
+Document:
+  doc-123 -> tag ID acme-corp
 ```
 
-After renaming the concept to AeroGraph:
+After renaming it to AeroGraph:
 
 ```text
 Term:
-  ID:        term-company-name
-  Canonical: AeroGraph
-  Names:
-    AeroGraph -> canonical
-    AcmeCorp     -> deprecated
+  ID:           term-company-name
+  Current name: AeroGraph
+  Older name:   AcmeCorp
 
 Tag:
   ID:        acme-corp
   Name:      AeroGraph
   Term:      term-company-name
 
-Attachment:
-  doc-123 -> tag "AcmeCorp"
+Document:
+  doc-123 -> tag ID acme-corp
 ```
 
-The term ID, tag ID, entity ID, and entity-to-tag attachment do not change. This preserves graph relationships while allowing canonical terminology to evolve. Queries can resolve canonical, alias, and deprecated names to the same governed concept.
+The document still points to the same tag. Only the displayed name changes. Searching for either `AcmeCorp` or `AeroGraph` finds the same material.
 
 ### Migrating Terms
 
-Use a term migration when a concept is renamed rather than replacing tag strings directly. A migration updates the governed term and matching tags while preserving stable IDs and entity attachments.
+Use a term migration when something is renamed. Kioku updates the name without disconnecting documents from their tags.
 
-Rename migrations do not create terms or infer tag ownership. The source term must already exist, and existing tags for that concept must be explicitly governed by it before migration. This preparation keeps semantic ownership separate from the rename itself.
+Kioku does not guess which tags belong to a name. Before running a rename, create the term and connect the existing tags to it.
 
 Always preview a migration first:
 
@@ -67,7 +63,7 @@ Always preview a migration first:
 kioku migrate brand AcmeCorp AeroGraph --dry-run
 ```
 
-The dry run reports the term, tags, and entities that would be affected without writing changes. Apply the migration with optional audit context after reviewing the plan:
+The dry run shows what would change without saving anything. After reviewing it, apply the rename:
 
 ```bash
 kioku migrate brand AcmeCorp AeroGraph \
@@ -76,11 +72,37 @@ kioku migrate brand AcmeCorp AeroGraph \
   --applied-by "your-name"
 ```
 
-Applying a rename performs the term, registered-name, tag, and migration-journal updates in one SQLite transaction. If any update fails, the complete migration is rolled back. Successful migrations record the old and new names, term ID, affected entity IDs, reason, actor, and application time in the durable migration journal.
+Kioku applies the rename as one operation: either everything succeeds or nothing changes. It also saves a record of what changed, why, and who applied it.
 
-### Governing Term Lifecycles
+### Preparing Existing Tags for a Rename
 
-Inspect governed terms and their history with human-readable output or `--json`:
+First, find tags that are not connected to a term:
+
+```bash
+kioku tag list --ungoverned
+```
+
+Then create the term, connect the existing tag, and check the result:
+
+```bash
+kioku term create Kioku --kind brand --alias "Kioku Project"
+kioku tag govern kioku --term Kioku --kind brand
+kioku tag show kioku
+```
+
+Kioku creates the term ID for you. Use `--id` only when an import or another tool requires a specific ID.
+
+If a tag is already connected to the wrong term, name its current term with `--replace`:
+
+```bash
+kioku tag govern kioku --term "Correct Name" --replace "Current Name"
+```
+
+Kioku refuses the change if `Current Name` is not the tag's current term. This prevents scripts or stale commands from overwriting a newer choice. Add `--json` to these commands when calling them from another tool.
+
+### Managing Terms Over Time
+
+List terms, view their names, or see their change history:
 
 ```bash
 kioku term list --kind api
@@ -89,7 +111,7 @@ kioku term audit term-package-client --json
 kioku term alias term-package-client "old-client"
 ```
 
-Deprecation preserves the term and its governed tags. An optional replacement is advisory: historical selectors still resolve the deprecated term while output recommends the active replacement.
+Deprecate a term when it should no longer be used for new work. Existing tags and searches keep working. You can also suggest a replacement:
 
 ```bash
 kioku term deprecate "Legacy Client" \
@@ -104,16 +126,16 @@ kioku term deprecate "Legacy Client" \
   --reason "Client sunset"
 ```
 
-Merge is for duplicate terms that represent the same concept. It redirects the source term to the active destination and reassigns governed tags without changing tag IDs, display names, aliases, entity attachments, or graph relationships.
+Merge two terms when they were created separately but mean the same thing. Kioku moves their tags under one term without changing the tags or their attached documents:
 
 ```bash
 kioku term merge "Duplicate API" "Canonical API" --kind api --dry-run
 kioku term merge "Duplicate API" "Canonical API" --kind api --apply
 ```
 
-Both destructive lifecycle commands require exactly one of `--dry-run` or `--apply`. Names are scoped by kind; omit `--kind` only when the name is unambiguous. Exact stable term IDs always take precedence.
+Both commands require `--dry-run` to preview the change or `--apply` to save it. Add `--kind` when the same name is used for more than one kind of term.
 
-Queries and context selection resolve canonical, alias, and deprecated term names to every tag governed by that term. Comma-separated selectors still intersect, while selectors that are not registered term names retain exact tag-ID behavior. Context can render governed tags using their current canonical names without rewriting entity titles or historical content:
+After a rename, searches for either the old or new name find the same saved material:
 
 ```bash
 kioku query --tags AcmeCorp

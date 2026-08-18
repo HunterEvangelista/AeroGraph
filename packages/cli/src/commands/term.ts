@@ -99,6 +99,14 @@ const printAffected = (plan: {
     for (const entity of plan.affectedEntities)
       yield* Console.log(`  Entity ${entity.id} [${entity._tag}] ${entity.title}`);
   });
+interface MutableCreateGovernedTermInput {
+  canonicalName: string;
+  kind: TermKind;
+  id?: string;
+  description?: string;
+  aliases?: ReadonlyArray<string>;
+}
+
 interface DeprecateInput {
   term: { id: TermId };
   replacement?: TermSelector;
@@ -178,6 +186,45 @@ const listCommand = Command.make(
         }
       }
     }).pipe((effect) => outputError(effect, "term list", asJson))
+);
+
+const createCommand = Command.make(
+  "create",
+  {
+    name: Argument.string("name"),
+    kind: Flag.string("kind").pipe(Flag.withDescription(`Term kind (${TERM_KINDS.join(", ")})`)),
+    id: Flag.string("id").pipe(Flag.optional),
+    description: Flag.string("description").pipe(Flag.optional),
+    alias: Flag.string("alias").pipe(Flag.atLeast(0)),
+    json: jsonFlag,
+  },
+  (args) =>
+    Effect.gen(function* () {
+      const kind = yield* parseKind(Option.some(args.kind));
+      if (kind === undefined)
+        return yield* new ValidationError({
+          field: "kind",
+          message: "Term kind is required",
+        });
+      const id = optional(args.id);
+      const description = optional(args.description);
+      const input: MutableCreateGovernedTermInput = { canonicalName: args.name, kind };
+      if (id !== undefined) input.id = id;
+      if (description !== undefined) input.description = description;
+      if (args.alias.length > 0) input.aliases = args.alias;
+      const term = yield* withCliServices(
+        Effect.gen(function* () {
+          return yield* (yield* TermGovernanceServiceTag).create(input);
+        })
+      );
+      if (args.json) yield* json({ ok: true, command: "term create", term });
+      else {
+        yield* Console.log(`Term created: ${term.term.id}`);
+        yield* Console.log(`Kind: ${term.term.kind}`);
+        yield* Console.log(`Canonical name: ${term.canonicalName}`);
+        if (input.aliases) yield* Console.log(`Aliases: ${input.aliases.join(", ")}`);
+      }
+    }).pipe((effect) => outputError(effect, "term create", args.json))
 );
 
 const showCommand = Command.make(
@@ -395,6 +442,7 @@ const mergeCommand = Command.make(
 export const termCommand = Command.make("term").pipe(
   Command.withDescription("Inspect and govern terminology"),
   Command.withSubcommands([
+    createCommand,
     listCommand,
     showCommand,
     auditCommand,
