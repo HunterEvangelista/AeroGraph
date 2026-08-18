@@ -13,12 +13,9 @@ const sleepSync = (milliseconds: number): void => {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
 };
 
-export const isSqliteLockedError = (error: unknown): boolean => {
-  const code =
-    typeof error === "object" && error !== null && "code" in error
-      ? String((error as { readonly code?: unknown }).code)
-      : "";
-  const message = error instanceof Error ? error.message : String(error);
+export const isSqliteLockedError = (cause: unknown): boolean => {
+  const code = cause instanceof Error && "code" in cause ? String(cause.code) : "";
+  const message = cause instanceof Error ? cause.message : String(cause);
   const haystack = `${code} ${message}`.toLowerCase();
 
   return SQLITE_LOCKED_ERROR_PATTERNS.some((pattern) => haystack.includes(pattern));

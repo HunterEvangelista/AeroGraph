@@ -28,6 +28,12 @@ class InvalidStoryStatusError extends Data.TaggedError("InvalidStoryStatusError"
   readonly status: string;
 }> {}
 
+interface StoryUpdates {
+  title?: string;
+  content?: string;
+  status?: StoryStatusEnum;
+}
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -214,9 +220,7 @@ const storyShowCommand = Command.make(
 
           for (const link of links) {
             const otherId = link.sourceId === entity.id ? link.targetId : link.sourceId;
-            const other = yield* entityService.getById(
-              otherId as Parameters<typeof entityService.getById>[0]
-            );
+            const other = yield* entityService.getById(otherId);
             linkedEntities.set(other.id, `[${other._tag}] ${other.title}`);
           }
 
@@ -368,26 +372,25 @@ const storyEditCommand = Command.make(
       }
 
       const { updated, displayIds } = yield* Effect.scoped(
+        // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Story updates must validate the entity kind before applying a partial mutation.
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const resolvedId = yield* resolveEntityId(id);
-          const existing = yield* entityService.getById(
-            resolvedId as Parameters<typeof entityService.getById>[0]
-          );
+          const existing = yield* entityService.getById(resolvedId);
 
           if (existing._tag !== EntityType.Story) {
             return yield* new NotAStoryError({ id: resolvedId });
           }
 
-          const updates: { title?: string; content?: string; status?: StoryStatusEnum } = {};
+          const updates: StoryUpdates = {};
+          if (titleValue !== undefined) updates.title = titleValue;
+          if (contentValue !== undefined) updates.content = contentValue;
+          if (statusValue !== undefined) updates.status = statusValue;
           if (titleValue !== undefined) updates.title = titleValue;
           if (contentValue !== undefined) updates.content = contentValue;
           if (statusValue !== undefined) updates.status = statusValue;
 
-          const updated = yield* entityService.update(
-            resolvedId as Parameters<typeof entityService.getById>[0],
-            updates
-          );
+          const updated = yield* entityService.update(resolvedId, updates);
           const displayIds = yield* loadFormattedEntityIds([updated.id]);
           return { updated, displayIds };
         }).pipe(Effect.provide(ServiceLayers))
@@ -432,9 +435,7 @@ const storyDeleteCommand = Command.make(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const resolvedId = yield* resolveEntityId(id);
-          const existing = yield* entityService.getById(
-            resolvedId as Parameters<typeof entityService.getById>[0]
-          );
+          const existing = yield* entityService.getById(resolvedId);
 
           if (existing._tag !== EntityType.Story) {
             return yield* new NotAStoryError({ id: resolvedId });
@@ -445,7 +446,7 @@ const storyDeleteCommand = Command.make(
             yield* Console.log("(Use --force to skip this confirmation in scripts)");
           }
 
-          yield* entityService.delete(resolvedId as Parameters<typeof entityService.getById>[0]);
+          yield* entityService.delete(resolvedId);
         }).pipe(Effect.provide(ServiceLayers))
       );
 

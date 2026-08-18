@@ -7,12 +7,13 @@ import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/bun-sqlite";
 import { migrate } from "drizzle-orm/bun-sqlite/migrator";
 
+type CountRow = { count: number };
+type MigrationJournalRow = { to_name: string; related_term_id: string | null };
+
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../drizzle");
 const legacyFolder = mkdtempSync(resolve(tmpdir(), "kioku-drizzle-v2-"));
 mkdirSync(resolve(legacyFolder, "meta"));
-const journal = JSON.parse(
-  readFileSync(resolve(migrationsFolder, "meta/_journal.json"), "utf8")
-) as { entries: Array<{ tag: string }> };
+const journal = JSON.parse(readFileSync(resolve(migrationsFolder, "meta/_journal.json"), "utf8"));
 const legacyJournal = { ...journal, entries: journal.entries.slice(0, 3) };
 writeFileSync(resolve(legacyFolder, "meta/_journal.json"), JSON.stringify(legacyJournal));
 for (const { tag } of legacyJournal.entries) {
@@ -46,28 +47,32 @@ try {
   migrate(database, { migrationsFolder });
   migrate(database, { migrationsFolder });
 
-  const applied = sqlite.query("SELECT count(*) AS count FROM __drizzle_migrations").get() as {
-    count: number;
-  };
+  const applied = sqlite
+    .query<CountRow, []>("SELECT count(*) AS count FROM __drizzle_migrations")
+    .get();
+  assert.ok(applied);
   assert.equal(applied.count, 5);
-  assert.equal(
-    (sqlite.query("SELECT count(*) AS count FROM term_names").get() as { count: number }).count,
-    1
-  );
-  assert.equal(
-    (sqlite.query("SELECT count(*) AS count FROM migration_journal").get() as { count: number })
-      .count,
-    3
-  );
+  const termNamesCount = sqlite
+    .query<CountRow, []>("SELECT count(*) AS count FROM term_names")
+    .get();
+  assert.ok(termNamesCount);
+  assert.equal(termNamesCount.count, 1);
+  const journalCount = sqlite
+    .query<CountRow, []>("SELECT count(*) AS count FROM migration_journal")
+    .get();
+  assert.ok(journalCount);
+  assert.equal(journalCount.count, 3);
   assert.deepEqual(
     sqlite
-      .query("SELECT to_name, related_term_id FROM migration_journal WHERE id = 'journal-2'")
+      .query<MigrationJournalRow, []>(
+        "SELECT to_name, related_term_id FROM migration_journal WHERE id = 'journal-2'"
+      )
       .get(),
     { to_name: "Current", related_term_id: "term-brand-target" }
   );
   assert.deepEqual(
     sqlite
-      .query(
+      .query<MigrationJournalRow, []>(
         "SELECT to_name, related_term_id FROM migration_journal WHERE id = 'journal-create-v4'"
       )
       .get(),
@@ -101,25 +106,21 @@ try {
   );
   for (const triggerName of ["custom_entities_trigger", "custom_terms_trigger"]) {
     assert.equal(
-      (
-        sqlite
-          .query(
-            `SELECT count(*) AS count FROM sqlite_master WHERE type = 'trigger' AND name = '${triggerName}'`
-          )
-          .get() as { count: number }
-      ).count,
+      sqlite
+        .query<CountRow, []>(
+          `SELECT count(*) AS count FROM sqlite_master WHERE type = 'trigger' AND name = '${triggerName}'`
+        )
+        .get()?.count,
       1,
       triggerName
     );
   }
   assert.equal(
-    (
-      sqlite
-        .query(
-          "SELECT count(*) AS count FROM sqlite_master WHERE type = 'trigger' AND name IN ('terms_canonical_name_insert_check', 'terms_canonical_name_update_check')"
-        )
-        .get() as { count: number }
-    ).count,
+    sqlite
+      .query<CountRow, []>(
+        "SELECT count(*) AS count FROM sqlite_master WHERE type = 'trigger' AND name IN ('terms_canonical_name_insert_check', 'terms_canonical_name_update_check')"
+      )
+      .get()?.count,
     0
   );
   assert.deepEqual(sqlite.query("PRAGMA foreign_key_check").all(), []);

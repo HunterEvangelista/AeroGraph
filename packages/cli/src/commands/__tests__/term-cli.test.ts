@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Schema } from "effect";
 import { afterEach, beforeEach, describe, test } from "vitest";
 import { type CliWorkspace, createCliWorkspace } from "../../__tests__/helpers/cli";
 
@@ -24,20 +25,56 @@ describe("term CLI (SQLite integration)", () => {
     assert.equal(result.status, 0, result.stderr);
     return result.stdout;
   };
-  const state = () =>
-    JSON.parse(runDbFixture("state")) as {
-      terms: Array<Record<string, unknown>>;
-      term_names: Array<Record<string, unknown>>;
-      tags: Array<Record<string, unknown>>;
-      entity_tags: Array<Record<string, unknown>>;
-      migration_journal: Array<Record<string, unknown>>;
-    };
+  const TermRow = Schema.Struct({
+    id: Schema.String,
+    status: Schema.String,
+    replacement_term_id: Schema.NullOr(Schema.String),
+    merged_into_id: Schema.NullOr(Schema.String),
+  });
+  const TermNameRow = Schema.Struct({
+    term_id: Schema.String,
+    kind: Schema.String,
+    name: Schema.String,
+    display_name: Schema.String,
+    name_kind: Schema.String,
+    created_at: Schema.String,
+  });
+  const TagRow = Schema.Struct({
+    id: Schema.String,
+    name: Schema.String,
+    aliases: Schema.NullOr(Schema.String),
+    term_id: Schema.NullOr(Schema.String),
+  });
+  const EntityTagRow = Schema.Struct({ entity_id: Schema.String, tag_id: Schema.String });
+  const JournalRow = Schema.Struct({
+    id: Schema.String,
+    operation: Schema.String,
+    term_id: Schema.String,
+    related_term_id: Schema.NullOr(Schema.String),
+    reason: Schema.NullOr(Schema.String),
+    applied_by: Schema.NullOr(Schema.String),
+    to_name: Schema.NullOr(Schema.String),
+    applied_at: Schema.String,
+  });
+  const DatabaseState = Schema.Struct({
+    terms: Schema.Array(TermRow),
+    term_names: Schema.Array(TermNameRow),
+    tags: Schema.Array(TagRow),
+    entity_tags: Schema.Array(EntityTagRow),
+    migration_journal: Schema.Array(JournalRow),
+  });
+  const JsonCommandError = Schema.Struct({
+    ok: Schema.Literal(false),
+    command: Schema.String,
+    error: Schema.Struct({ tag: Schema.String }),
+  });
+  const state = () => Schema.decodeUnknownSync(DatabaseState)(JSON.parse(runDbFixture("state")));
   const terms = () => state().terms;
   const names = () => state().term_names;
   const tags = () => state().tags;
   const entityTags = () => state().entity_tags;
   const journal = () => state().migration_journal;
-  const iso = (value: unknown) => assert.equal(typeof value, "string");
+  const iso = (value: string) => assert.match(value, /^\d{4}-\d{2}-\d{2}T/);
   test("help registers governance commands and does not create terms", () => {
     const result = workspace.run("term", "--help");
     assert.equal(result.status, 0);
@@ -164,7 +201,7 @@ describe("term CLI (SQLite integration)", () => {
     iso(body.result.journalEntry.appliedAt);
     assert.deepEqual(
       terms()
-        .filter((term) => ["term-old-api", "term-new-api"].includes(term.id as string))
+        .filter((term) => ["term-old-api", "term-new-api"].includes(term.id))
         .map(({ id, status, replacement_term_id }) => ({ id, status, replacement_term_id })),
       [
         { id: "term-new-api", status: "active", replacement_term_id: null },
@@ -261,9 +298,8 @@ describe("term CLI (SQLite integration)", () => {
     );
     assert.deepEqual(
       tags(),
-      beforeTags.map(
-        (tag: { id: string; name: string; aliases: string; term_id: string | null }) =>
-          tag.term_id === "term-old-api" ? { ...tag, term_id: "term-new-api" } : tag
+      beforeTags.map((tag) =>
+        tag.term_id === "term-old-api" ? { ...tag, term_id: "term-new-api" } : tag
       )
     );
     assert.deepEqual(entityTags(), beforeEntityTags);
@@ -353,8 +389,10 @@ describe("term CLI (SQLite integration)", () => {
       if (args[1] === "audit") assert.equal(body.audit.inspection.term.id, "term-old-api");
       for (const value of JSON.stringify(body).matchAll(
         /(?:createdAt|updatedAt|appliedAt)":"([^"]+)/g
-      ))
-        iso(value[1]);
+      )) {
+        const timestamp = value[1];
+        if (timestamp !== undefined) iso(timestamp);
+      }
     }
     for (const args of [
       ["term", "show", "Shared", "--json"],
@@ -364,10 +402,8 @@ describe("term CLI (SQLite integration)", () => {
     ] as const) {
       const result = workspace.run(...args);
       assert.notEqual(result.status, 0);
-      const error = JSON.parse(result.stdout);
+      const error = Schema.decodeUnknownSync(JsonCommandError)(JSON.parse(result.stdout));
       assert.equal(error.ok, false);
-      assert.equal(typeof error.command, "string");
-      assert.equal(typeof error.error.tag, "string");
     }
   });
 });

@@ -2,7 +2,9 @@ import {
   type ChangeType,
   type Entity,
   EntityNotFoundError,
+  EntitySchema,
   type EntityVersion,
+  EntityVersion as EntityVersionSchema,
   RepositoryError,
   type TypedEntityVersion,
   VersionNotFoundError,
@@ -13,7 +15,7 @@ import { and, desc, count as drizzleCount, eq, gte, lte } from "drizzle-orm";
 /**
  * SQLite Version Repository Implementation
  */
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { entities, entityVersions } from "./schema";
 import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
@@ -25,25 +27,38 @@ const generateId = (): string => crypto.randomUUID();
 
 const now = (): string => new Date().toISOString();
 
-interface VersionRow {
-  id: string;
-  entityId: string;
-  version: number;
-  data: string;
-  changeType: ChangeType;
-  changedFields: string | null;
-  createdAt: string;
-}
+const rowToVersion = (row: typeof entityVersions.$inferSelect): EntityVersion => {
+  const decoded = {
+    id: row.id,
+    entityId: row.entityId,
+    version: row.version,
+    data: JSON.parse(row.data),
+    changeType: row.changeType,
+    createdAt: row.createdAt,
+  };
+  if (row.changedFields !== null) {
+    Object.assign(decoded, { changedFields: JSON.parse(row.changedFields) });
+  }
+  return Schema.decodeUnknownSync(EntityVersionSchema)(decoded);
+};
 
-const rowToVersion = (row: VersionRow): EntityVersion => ({
-  id: row.id as EntityVersion["id"],
-  entityId: row.entityId,
-  version: row.version,
-  data: JSON.parse(row.data),
-  changeType: row.changeType,
-  changedFields: row.changedFields ? JSON.parse(row.changedFields) : undefined,
-  createdAt: new Date(row.createdAt),
-});
+const entitySnapshot = (version: EntityVersion): TypedEntityVersion => {
+  const snapshot: TypedEntityVersion = {
+    id: version.id,
+    entityId: version.entityId,
+    version: version.version,
+    data: Schema.decodeUnknownSync(EntitySchema)(version.data),
+    changeType: version.changeType,
+    createdAt: version.createdAt,
+  };
+  if (version.changedFields !== undefined) {
+    Object.assign(snapshot, { changedFields: version.changedFields });
+  }
+  if (version.authorId !== undefined) {
+    Object.assign(snapshot, { authorId: version.authorId });
+  }
+  return snapshot;
+};
 
 // ============================================================================
 // Repository Implementation
@@ -183,15 +198,8 @@ export const SqliteVersionRepositorySessionLive = Layer.effect(
         return rowToVersion(row);
       });
 
-    const getEntityAtVersion = <E extends Entity>(entityId: string, version: number) =>
-      Effect.gen(function* () {
-        const versionRecord = yield* getVersion(entityId, version);
-
-        return {
-          ...versionRecord,
-          data: versionRecord.data as E,
-        } as TypedEntityVersion<E>;
-      });
+    const getEntityAtVersion = (entityId: string, version: number) =>
+      Effect.map(getVersion(entityId, version), entitySnapshot);
 
     const countVersionsForEntity = (entityId: string) =>
       Effect.gen(function* () {

@@ -1,13 +1,12 @@
 import { join } from "node:path";
 import {
-  type TagId,
+  TagIdSchema,
   TagRepositoryTag,
-  TERM_KINDS,
-  type TermId,
-  type TermKind,
+  TermIdSchema,
+  TermKind,
   TermRepositoryTag,
 } from "@kioku/core";
-import { Effect } from "effect";
+import { Effect, Schema } from "effect";
 import { CliServicesLive } from "../../db/layers";
 
 const rootPath = process.argv[2];
@@ -17,15 +16,12 @@ if (!rootPath) {
 
 const canonicalName = process.argv[3] ?? "Kioku";
 const kindValue = process.argv[4] ?? "brand";
-if (!(TERM_KINDS as ReadonlyArray<string>).includes(kindValue)) {
-  throw new Error(`Invalid term kind: ${kindValue}`);
-}
-const kind = kindValue as TermKind;
-const termId = (process.argv[5] ?? "term-brand-kioku") as TermId;
+const kind = Schema.decodeUnknownSync(TermKind)(kindValue);
+const termId = TermIdSchema.make(process.argv[5] ?? "term-brand-kioku");
 const tagIds = (process.argv[6] ?? "kioku")
   .split(",")
   .filter(Boolean)
-  .map((tagId) => tagId as TagId);
+  .map((tagId) => TagIdSchema.make(tagId));
 
 const program = Effect.gen(function* () {
   const termRepo = yield* TermRepositoryTag;

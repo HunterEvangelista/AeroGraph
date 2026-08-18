@@ -1,19 +1,22 @@
 import {
+  type KiokuError,
   MigrationServiceTag,
   TERM_KINDS,
   TermGovernanceServiceTag,
   type TermId,
+  TermIdSchema,
   type TermInspection,
   type TermKind,
+  TermKind as TermKindSchema,
+  type TermNameCandidate,
   type TermSelector,
   ValidationError,
 } from "@kioku/core";
-import { Console, Effect, Option } from "effect";
+import { Console, Effect, Option, Schema } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { withCliServices } from "./workspace";
 
-const validKind = (value: string): value is TermKind =>
-  (TERM_KINDS as ReadonlyArray<string>).includes(value);
+const validKind = (value: string): value is TermKind => Schema.is(TermKindSchema)(value);
 const kindFlag = Flag.string("kind").pipe(
   Flag.withDescription(`Term kind (${TERM_KINDS.join(", ")})`),
   Flag.optional
@@ -23,9 +26,11 @@ const jsonFlag = Flag.boolean("json").pipe(
   Flag.withDefault(false)
 );
 
+const undefinedEffect: Effect.Effect<undefined> = Effect.succeed(null).pipe(Effect.as(undefined));
+
 const parseKind = (value: Option.Option<string>) => {
   const kind = Option.getOrUndefined(value);
-  if (kind === undefined) return Effect.succeed(undefined as TermKind | undefined);
+  if (kind === undefined) return undefinedEffect;
   return validKind(kind)
     ? Effect.succeed(kind)
     : Effect.fail(
@@ -46,11 +51,11 @@ const resolveInspection = (value: string, kind: TermKind | undefined) =>
     // resolution would incorrectly report an ambiguous duplicate name before
     // the kind-qualified fallback gets a chance.
     return yield* governance
-      .show({ id: value as TermId })
+      .show({ id: TermIdSchema.make(value) })
       .pipe(Effect.catchTag("TermNotFoundError", () => governance.show({ name: value, kind })));
   });
 
-const json = (value: unknown) => Console.log(JSON.stringify(value));
+const json = <A>(value: A) => Console.log(JSON.stringify(value));
 const text = (inspection: TermInspection) => {
   const term = inspection.term;
   const lines = [
@@ -94,34 +99,53 @@ const printAffected = (plan: {
     for (const entity of plan.affectedEntities)
       yield* Console.log(`  Entity ${entity.id} [${entity._tag}] ${entity.title}`);
   });
-const errorMessage = (error: unknown): string => {
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof error.message === "string"
-  )
-    return error.message;
-  return String(error);
-};
-const errorData = (error: unknown): Record<string, unknown> => {
-  if (typeof error !== "object" || error === null)
-    return { tag: "Error", message: errorMessage(error) };
-  const value = error as Record<string, unknown>;
-  const metadata: Record<string, unknown> = {};
-  for (const key of ["field", "name", "operation", "candidates", "candidateMetadata", "path"]) {
-    if (value[key] !== undefined) metadata[key] = value[key];
+interface DeprecateInput {
+  term: { id: TermId };
+  replacement?: TermSelector;
+  reason?: string;
+  appliedBy?: string;
+}
+
+interface MergeInput {
+  source: { id: TermId };
+  destination: { id: TermId };
+  reason?: string;
+  appliedBy?: string;
+}
+
+interface JsonErrorData {
+  tag: KiokuError["_tag"];
+  message: string;
+  field?: string;
+  name?: string;
+  operation?: string;
+  candidates?: ReadonlyArray<string>;
+  candidateMetadata?: ReadonlyArray<TermNameCandidate>;
+  path?: string;
+}
+
+const errorMessage = (error: KiokuError): string => error.message ?? String(error);
+const errorData = (error: KiokuError): JsonErrorData => {
+  const data: JsonErrorData = { tag: error._tag, message: errorMessage(error) };
+  if (error._tag === "ValidationError" && error.field !== undefined) data.field = error.field;
+  if ("name" in error && error.name !== undefined) data.name = error.name;
+  if (error._tag === "TermMigrationError" && error.operation !== undefined)
+    data.operation = error.operation;
+  if (error._tag === "AmbiguousTermNameError") {
+    data.candidates = error.candidates;
+    if (error.candidateMetadata !== undefined) data.candidateMetadata = error.candidateMetadata;
   }
-  return {
-    tag: typeof value["_tag"] === "string" ? value["_tag"] : "Error",
-    message: errorMessage(error),
-    ...metadata,
-  };
+  if (error._tag === "ConfigError" && error.path !== undefined) data.path = error.path;
+  return data;
 };
-const outputError = <A, E, R>(effect: Effect.Effect<A, E, R>, command: string, asJson: boolean) =>
+const outputError = <A, E extends KiokuError, R>(
+  effect: Effect.Effect<A, E, R>,
+  command: string,
+  asJson: boolean
+) =>
   asJson
     ? effect.pipe(
-        Effect.catch((error: unknown) =>
+        Effect.catch((error) =>
           Console.log(JSON.stringify({ ok: false, command, error: errorData(error) })).pipe(
             Effect.andThen(
               Effect.sync(() => {
@@ -279,12 +303,10 @@ const deprecateCommand = Command.make(
           }
           const reasonValue = optional(args.reason);
           const actorValue = optional(args.appliedBy);
-          const input = {
-            term: { id: source.term.id },
-            ...(replacement ? { replacement } : {}),
-            ...(reasonValue === undefined ? {} : { reason: reasonValue }),
-            ...(actorValue === undefined ? {} : { appliedBy: actorValue }),
-          };
+          const input: DeprecateInput = { term: { id: source.term.id } };
+          if (replacement) input.replacement = replacement;
+          if (reasonValue !== undefined) input.reason = reasonValue;
+          if (actorValue !== undefined) input.appliedBy = actorValue;
           const result =
             selectedMode === "dry-run"
               ? { mode: selectedMode, result: yield* migration.planDeprecate(input) }
@@ -334,12 +356,12 @@ const mergeCommand = Command.make(
           const destination = yield* resolveInspection(args.destination, source.term.kind);
           const reasonValue = optional(args.reason);
           const actorValue = optional(args.appliedBy);
-          const input = {
+          const input: MergeInput = {
             source: { id: source.term.id },
             destination: { id: destination.term.id },
-            ...(reasonValue === undefined ? {} : { reason: reasonValue }),
-            ...(actorValue === undefined ? {} : { appliedBy: actorValue }),
           };
+          if (reasonValue !== undefined) input.reason = reasonValue;
+          if (actorValue !== undefined) input.appliedBy = actorValue;
           return selectedMode === "dry-run"
             ? { mode: selectedMode, result: yield* migration.planMerge(input) }
             : { mode: selectedMode, result: yield* migration.applyMerge(input) };

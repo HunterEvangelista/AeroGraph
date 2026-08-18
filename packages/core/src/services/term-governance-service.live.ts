@@ -1,10 +1,11 @@
 import { Effect, Layer } from "effect";
 import { MigrationJournalRepositoryTag } from "../repository/migration-journal-repository";
 import { type TermGovernanceService, TermGovernanceServiceTag } from "./term-governance-service";
+import { isTermSelectorObject } from "./term-resolution";
 import { type TermSelector, TermServiceTag } from "./term-service";
 
 const selectorLabel = (selector: TermSelector): string =>
-  typeof selector === "string" ? selector : "id" in selector ? selector.id : selector.name;
+  isTermSelectorObject(selector) ? ("id" in selector ? selector.id : selector.name) : selector;
 
 const TermGovernanceServiceImplementation = Layer.effect(
   TermGovernanceServiceTag,

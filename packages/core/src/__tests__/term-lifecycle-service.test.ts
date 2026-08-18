@@ -1,10 +1,17 @@
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import type { Entity, EntityId } from "../domain/entity";
-import { EntityType } from "../domain/entity";
+import type { Entity } from "../domain/entity";
+import { BrandedId, EntityType } from "../domain/entity";
 import type { Tag, TagId } from "../domain/tag";
+import { TagIdSchema, Tag as TagSchema } from "../domain/tag";
 import type { JournalEntryId, Term, TermId, TermName } from "../domain/term";
-import { normalizeTermName } from "../domain/term";
+import {
+  JournalEntryIdSchema,
+  MigrationJournalEntry as MigrationJournalEntrySchema,
+  normalizeTermName,
+  TermIdSchema,
+  Term as TermSchema,
+} from "../domain/term";
 import {
   EntityNotFoundError,
   TagNotFoundError,
@@ -20,10 +27,7 @@ import type { TagRepository } from "../repository/tag-repository";
 import { TagRepositoryTag } from "../repository/tag-repository";
 import type { TermRepository } from "../repository/term-repository";
 import { TermRepositoryTag } from "../repository/term-repository";
-import type {
-  TransactionEngine,
-  TransactionRepositories,
-} from "../repository/transaction-engine";
+import type { TransactionEngine, TransactionRepositories } from "../repository/transaction-engine";
 import { TransactionEngineTag } from "../repository/transaction-engine";
 import { MigrationServiceTag } from "../services/migration-service";
 import { MigrationServiceLive } from "../services/migration-service.live";
@@ -31,13 +35,27 @@ import { TermServiceTag } from "../services/term-service";
 import { TermServiceLive } from "../services/term-service.live";
 
 const date = new Date("2025-01-01T00:00:00.000Z");
+const termId = (value: string): TermId => Schema.decodeUnknownSync(TermIdSchema)(value);
+const tagId = (value: string): TagId => Schema.decodeUnknownSync(TagIdSchema)(value);
+const journalEntryId = (value: string): JournalEntryId =>
+  Schema.decodeUnknownSync(JournalEntryIdSchema)(value);
+const entityId = (value: string) => Schema.decodeUnknownSync(BrandedId)(value);
+const decodeTerm = (value: Schema.Codec.Encoded<typeof TermSchema>): Term =>
+  Schema.decodeUnknownSync(TermSchema)(value);
+const decodeTag = (value: Schema.Codec.Encoded<typeof TagSchema>): Tag =>
+  Schema.decodeUnknownSync(TagSchema)(value);
+const decodeJournalEntry = (
+  value: Schema.Codec.Encoded<typeof MigrationJournalEntrySchema>
+): import("../domain/term").MigrationJournalEntry =>
+  Schema.decodeUnknownSync(MigrationJournalEntrySchema)(value);
+
 const term = (
   id: string,
   name: string,
   kind: Term["kind"],
   status: Term["status"] = "active"
 ): Term => ({
-  id: id as TermId,
+  id: termId(id),
   canonicalName: name,
   kind,
   status,
@@ -59,7 +77,7 @@ const name = (
 });
 const entity = (id: string): Entity => ({
   _tag: EntityType.Doc,
-  id: id as EntityId,
+  id: entityId(id),
   title: id,
   content: "",
   tags: [],
@@ -68,7 +86,7 @@ const entity = (id: string): Entity => ({
   version: 1,
 });
 const tag = (id: string, displayName: string, termId: TermId): Tag => ({
-  id: id as TagId,
+  id: tagId(id),
   name: displayName,
   aliases: [`legacy-${id}`],
   termId,
@@ -126,17 +144,20 @@ const layer = (state: State) => {
     update: (id, updates) =>
       Effect.gen(function* () {
         const current = yield* getTerm(id);
-        const next: Term = {
+        const next = decodeTerm({
           ...current,
-          ...(updates.status ? { status: updates.status } : {}),
-          ...(updates.mergedIntoId !== undefined
-            ? { mergedIntoId: updates.mergedIntoId ?? undefined }
-            : {}),
-          ...(updates.replacementTermId !== undefined
-            ? { replacementTermId: updates.replacementTermId ?? undefined }
-            : {}),
-          updatedAt: date,
-        };
+          createdAt: current.createdAt.toISOString(),
+          updatedAt: date.toISOString(),
+          status: updates.status ?? current.status,
+          mergedIntoId:
+            updates.mergedIntoId === undefined
+              ? current.mergedIntoId
+              : (updates.mergedIntoId ?? undefined),
+          replacementTermId:
+            updates.replacementTermId === undefined
+              ? current.replacementTermId
+              : (updates.replacementTermId ?? undefined),
+        });
         state.terms.set(id, next);
         return next;
       }),
@@ -157,7 +178,12 @@ const layer = (state: State) => {
       Effect.gen(function* () {
         const existing = state.tags.get(id);
         if (!existing) return yield* new TagNotFoundError({ tagId: id });
-        const next = { ...existing, ...updates };
+        const next = decodeTag({
+          ...existing,
+          ...updates,
+          name: updates.name ?? existing.name,
+          createdAt: existing.createdAt.toISOString(),
+        });
         state.tags.set(id, next);
         return next;
       }),
@@ -196,19 +222,21 @@ const layer = (state: State) => {
   const journal: MigrationJournalRepository = {
     record: (input) =>
       Effect.sync(() => {
-        const entry = {
-          id: input.id as JournalEntryId,
+        const entry = decodeJournalEntry({
+          id: journalEntryId(input.id),
           operation: input.operation,
-          ...(input.kind ? { kind: input.kind } : {}),
+          kind: input.kind,
           fromName: input.fromName,
-          ...(input.toName ? { toName: input.toName } : {}),
+          toName: input.toName,
           termId: input.termId,
-          ...(input.relatedTermId ? { relatedTermId: input.relatedTermId } : {}),
+          relatedTermId: input.relatedTermId,
           affectedEntityIds: input.affectedEntityIds,
           affectedCount: input.affectedEntityIds.length,
-          appliedAt: date,
+          appliedAt: date.toISOString(),
+          appliedBy: undefined,
+          reason: undefined,
           dryRun: input.dryRun,
-        };
+        });
         state.entries.push(entry);
         return entry;
       }),
@@ -222,8 +250,10 @@ const layer = (state: State) => {
     tags,
     entities,
     migrationJournal: journal,
-  } as TransactionRepositories;
-  const tx: TransactionEngine = { run: (operation) => operation(repositories) };
+  };
+  // SAFETY: This layer is only provided to term and migration services, whose transaction effects use these repositories.
+  const typedRepositories = repositories as TransactionRepositories;
+  const tx: TransactionEngine = { run: (operation) => operation(typedRepositories) };
   return Layer.provideMerge(
     Layer.mergeAll(TermServiceLive, MigrationServiceLive),
     Layer.mergeAll(
@@ -292,7 +322,7 @@ describe("governed term lifecycle", () => {
         Effect.gen(function* () {
           return yield* (yield* MigrationServiceTag).applyDeprecate({
             term: { id: source.id },
-            journalEntryId: "j" as JournalEntryId,
+            journalEntryId: journalEntryId("j"),
           });
         }),
         layer(s)
@@ -326,7 +356,7 @@ describe("governed term lifecycle", () => {
       return yield* (yield* MigrationServiceTag).applyDeprecate({
         term: { id: source.id },
         replacement: { id: replacement.id },
-        journalEntryId: "j" as JournalEntryId,
+        journalEntryId: journalEntryId("j"),
       });
     });
     const result = await Effect.runPromise(Effect.provide(service, layer(s)));
@@ -380,7 +410,7 @@ describe("governed term lifecycle", () => {
           return yield* (yield* MigrationServiceTag).applyMerge({
             source: { id: source.id },
             destination: { id: destination.id },
-            journalEntryId: "j" as JournalEntryId,
+            journalEntryId: journalEntryId("j"),
           });
         }),
         layer(s)
@@ -415,12 +445,12 @@ describe("governed term lifecycle", () => {
     const source = {
       ...term("source", "Legacy", "concept"),
       status: "merged" as const,
-      mergedIntoId: "middle" as TermId,
+      mergedIntoId: termId("middle"),
     };
     const middle = {
       ...term("middle", "Former", "concept"),
       status: "merged" as const,
-      mergedIntoId: "destination" as TermId,
+      mergedIntoId: termId("destination"),
     };
     const destination = term("destination", "Current", "concept");
     for (const value of [source, middle, destination]) s.terms.set(value.id, value);
@@ -452,12 +482,12 @@ describe("governed term lifecycle", () => {
     const source = {
       ...term("source", "Legacy", "concept"),
       status: "merged" as const,
-      mergedIntoId: "middle" as TermId,
+      mergedIntoId: termId("middle"),
     };
     const middle = {
       ...term("middle", "Former", "concept"),
       status: "merged" as const,
-      mergedIntoId: "destination" as TermId,
+      mergedIntoId: termId("destination"),
     };
     const destination = term("destination", "Current", "concept");
     for (const value of [source, middle, destination]) s.terms.set(value.id, value);
@@ -488,7 +518,7 @@ describe("governed term lifecycle", () => {
     const source = {
       ...term("source", "Legacy", "concept"),
       status: "merged" as const,
-      mergedIntoId: "missing" as TermId,
+      mergedIntoId: termId("missing"),
     };
     s.terms.set(source.id, source);
     s.names.push(name(source.id, "concept", "Legacy", "canonical"));
@@ -513,13 +543,14 @@ describe("governed term lifecycle", () => {
     const s = base();
     const source = {
       ...term("source", "Legacy", "concept", "deprecated"),
-      mergedIntoId: target as TermId,
+      mergedIntoId: termId(target),
     };
     s.terms.set(source.id, source);
     s.names.push(name(source.id, "concept", "Legacy", "canonical"));
     if (target === "destination") {
-      s.terms.set(target, term(target, "Current", "concept"));
-      s.names.push(name(target, "concept", "Current", "canonical"));
+      const destination = term(target, "Current", "concept");
+      s.terms.set(destination.id, destination);
+      s.names.push(name(destination.id, "concept", "Current", "canonical"));
     }
 
     const error = await Effect.runPromise(
@@ -540,7 +571,7 @@ describe("governed term lifecycle", () => {
     const s = base();
     const source = {
       ...term("source", "Legacy", "concept", "deprecated"),
-      replacementTermId: "replacement" as TermId,
+      replacementTermId: termId("replacement"),
     };
     const replacement = term("replacement", "Recommended", "concept");
     const destination = term("destination", "Current", "concept");
@@ -556,7 +587,7 @@ describe("governed term lifecycle", () => {
           return yield* (yield* MigrationServiceTag).applyMerge({
             source: { id: source.id },
             destination: { id: destination.id },
-            journalEntryId: "merge-deprecated" as JournalEntryId,
+            journalEntryId: journalEntryId("merge-deprecated"),
           });
         }),
         layer(s)
@@ -571,7 +602,7 @@ describe("governed term lifecycle", () => {
     const s = base();
     const source = {
       ...term("source", "Legacy", "concept", "deprecated"),
-      replacementTermId: "first" as TermId,
+      replacementTermId: termId("first"),
     };
     const first = term("first", "First", "concept");
     const second = term("second", "Second", "concept");
@@ -581,9 +612,7 @@ describe("governed term lifecycle", () => {
       name(first.id, "concept", "First", "canonical"),
       name(second.id, "concept", "Second", "canonical")
     );
-    const service = Effect.gen(function* () {
-      return yield* MigrationServiceTag;
-    });
+    const service = MigrationServiceTag;
     const noOp = await Effect.runPromise(
       Effect.flip(
         Effect.provide(
@@ -606,7 +635,7 @@ describe("governed term lifecycle", () => {
           return yield* (yield* MigrationServiceTag).applyDeprecate({
             term: { id: source.id },
             replacement: { id: second.id },
-            journalEntryId: "change" as JournalEntryId,
+            journalEntryId: journalEntryId("change"),
           });
         }),
         layer(s)
@@ -619,7 +648,7 @@ describe("governed term lifecycle", () => {
         Effect.gen(function* () {
           return yield* (yield* MigrationServiceTag).applyDeprecate({
             term: { id: source.id },
-            journalEntryId: "clear" as JournalEntryId,
+            journalEntryId: journalEntryId("clear"),
           });
         }),
         layer(s)
@@ -657,7 +686,7 @@ describe("governed term lifecycle", () => {
     const s = base();
     const malformed = {
       ...term("malformed", "Malformed", "concept"),
-      replacementTermId: "target" as TermId,
+      replacementTermId: termId("target"),
     };
     const target = term("target", "Target", "concept");
     s.terms.set(malformed.id, malformed);
@@ -684,7 +713,7 @@ describe("governed term lifecycle", () => {
   it("rejects multi-hop replacement cycles instead of shallowly accepting them", async () => {
     const s = base();
     const source = term("source", "Old", "concept");
-    const first = { ...term("first", "First", "concept"), replacementTermId: "second" as TermId };
+    const first = { ...term("first", "First", "concept"), replacementTermId: termId("second") };
     const second = { ...term("second", "Second", "concept"), replacementTermId: first.id };
     s.terms.set(source.id, source);
     s.terms.set(first.id, first);

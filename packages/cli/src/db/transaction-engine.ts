@@ -17,11 +17,7 @@ import { SqliteEntityRepositorySessionLive } from "./entity-repository";
 import { SqliteLinkRepositorySessionLive } from "./link-repository";
 import { SqliteMigrationJournalRepositorySessionLive } from "./migration-journal-repository";
 import { SqliteNextRepositorySessionLive } from "./next-repository";
-import {
-  type DatabaseSession,
-  DatabaseSessionTag,
-  makeTransactionDatabaseSession,
-} from "./session";
+import { type DatabaseSession, DatabaseSessionTag } from "./session";
 import { withSqliteWriteRetry } from "./sqlite-retry";
 import { SqliteTagRepositorySessionLive } from "./tag-repository";
 import { SqliteTermRepositorySessionLive } from "./term-repository";
@@ -38,10 +34,10 @@ const transactionRepositoriesLive = (session: DatabaseSession) =>
     SqliteVersionRepositorySessionLive
   ).pipe(Layer.provide(Layer.succeed(DatabaseSessionTag, session)));
 
-const repositoryError = (action: string, error: unknown) =>
+const repositoryError = (action: string, cause: unknown) =>
   new RepositoryError({
-    message: `Failed to ${action} database transaction: ${error instanceof Error ? error.message : String(error)}`,
-    cause: error,
+    message: `Failed to ${action} database transaction: ${cause instanceof Error ? cause.message : String(cause)}`,
+    cause,
   });
 
 const runWithRepositories = <A, E>(
@@ -85,9 +81,13 @@ const runTransaction = <A, E>(
       const value = withSqliteWriteRetry(() =>
         client.drizzle.transaction(
           (tx) => {
-            const operationExit = Effect.runSyncExit(
-              runWithRepositories(makeTransactionDatabaseSession(client, tx), operation)
-            );
+            const session: DatabaseSession = {
+              db: client.db,
+              drizzle: tx,
+              write: (writeOperation) => writeOperation(),
+              transaction: (transactionOperation) => tx.transaction(transactionOperation),
+            };
+            const operationExit = Effect.runSyncExit(runWithRepositories(session, operation));
 
             if (Exit.isFailure(operationExit)) {
               operationCause = operationExit.cause;

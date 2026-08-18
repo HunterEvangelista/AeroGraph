@@ -1,10 +1,10 @@
 import { join } from "node:path";
-import { type JournalEntryId, MigrationJournalRepositoryTag } from "@kioku/core";
+import { JournalEntryIdSchema, MigrationJournalRepositoryTag } from "@kioku/core";
 import { Effect } from "effect";
 import { CliServicesLive } from "../../db/layers";
 
 const rootPath = process.argv[2];
-const journalId = process.argv[3] as JournalEntryId | undefined;
+const journalId = process.argv[3] ? JournalEntryIdSchema.make(process.argv[3]) : undefined;
 if (!rootPath || !journalId) {
   throw new Error("Expected workspace root path and journal ID");
 }

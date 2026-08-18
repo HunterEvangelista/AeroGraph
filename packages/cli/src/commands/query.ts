@@ -103,6 +103,22 @@ const recordDisplayedEntities = (entityIds: ReadonlyArray<string>) =>
     );
   });
 
+const runPathSelection = (pathValue: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    if (pathValue.length !== 2) {
+      return yield* new InvalidQueryError({ message: "--path requires <fromId> and <toId>." });
+    }
+    const fromId = pathValue[0];
+    const toId = pathValue[1];
+    if (fromId === undefined || toId === undefined) {
+      return yield* new InvalidQueryError({ message: "--path requires <fromId> and <toId>." });
+    }
+    const resolvedFromId = yield* resolveEntityId(fromId);
+    const resolvedToId = yield* resolveEntityId(toId);
+    const result = yield* runPathQuery(resolvedFromId, resolvedToId);
+    yield* recordDisplayedEntities(result.displayedEntityIds);
+  });
+
 const runStructuredQuery = (selection: QuerySelection) =>
   Effect.gen(function* () {
     if (selection.tagValue) {
@@ -129,16 +145,7 @@ const runStructuredQuery = (selection: QuerySelection) =>
       return;
     }
 
-    if (selection.pathValue) {
-      if (selection.pathValue.length !== 2) {
-        return yield* new InvalidQueryError({ message: "--path requires <fromId> and <toId>." });
-      }
-      const [fromId, toId] = selection.pathValue as readonly [string, string];
-      const resolvedFromId = yield* resolveEntityId(fromId);
-      const resolvedToId = yield* resolveEntityId(toId);
-      const result = yield* runPathQuery(resolvedFromId, resolvedToId);
-      yield* recordDisplayedEntities(result.displayedEntityIds);
-    }
+    if (selection.pathValue) yield* runPathSelection(selection.pathValue);
   });
 
 // ============================================================================

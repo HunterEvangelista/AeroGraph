@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "rootDir": "./anti-slop"
+  },
+  "include": ["anti-slop/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

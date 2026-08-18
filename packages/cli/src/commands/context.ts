@@ -110,9 +110,7 @@ const loadEntitySelection = (query: ReadonlyArray<string>, depth: number) =>
     const entityService = yield* EntityServiceTag;
     const graphService = yield* GraphServiceTag;
     const resolvedId = yield* resolveEntityId(query[0] ?? "");
-    const root = yield* entityService.getById(
-      resolvedId as Parameters<typeof entityService.getById>[0]
-    );
+    const root = yield* entityService.getById(resolvedId);
     const traversal =
       depth > 0 ? yield* graphService.traverse(resolvedId, depth) : { entities: [] };
     return {

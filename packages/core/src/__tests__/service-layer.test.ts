@@ -4,9 +4,10 @@ import { describe, expect, it } from "vitest";
 import type { CodeRef, Diagram, Doc, Entity, EntityId, Story } from "../domain/entity";
 import { BrandedId, DiagramTypeEnum, EntityType, StoryStatusEnum } from "../domain/entity";
 import type { Link, LinkId, LinkType } from "../domain/link";
-import type { Tag, TagId } from "../domain/tag";
-import type { Term, TermId, TermName } from "../domain/term";
-import { normalizeTermName } from "../domain/term";
+import type { Tag } from "../domain/tag";
+import { TagIdSchema } from "../domain/tag";
+import type { Term, TermName } from "../domain/term";
+import { normalizeTermName, TermIdSchema } from "../domain/term";
 import {
   EntityNotFoundError,
   RepositoryError,
@@ -35,10 +36,14 @@ import { FIXED_TIMESTAMP_ISO } from "./helpers/index";
 const FIXED_DATE = new Date(FIXED_TIMESTAMP_ISO);
 
 const testEntityId = (id: string): EntityId => Schema.decodeUnknownSync(BrandedId)(id);
+const testTagId = (id: string): Tag["id"] => Schema.decodeUnknownSync(TagIdSchema)(id);
+const testTermId = (id: string): Term["id"] => Schema.decodeUnknownSync(TermIdSchema)(id);
+const LinkIdSchema = Schema.String.pipe(Schema.brand("LinkId"));
+const testLinkId = (id: string): LinkId => Schema.decodeUnknownSync(LinkIdSchema)(id);
 
 const createTestDoc = (id: string): Doc => ({
   _tag: EntityType.Doc,
-  id: id as EntityId,
+  id: testEntityId(id),
   title: `Entity ${id}`,
   content: `Content for ${id}`,
   tags: [],
@@ -49,7 +54,7 @@ const createTestDoc = (id: string): Doc => ({
 
 const createTestCodeRef = (id: string): CodeRef => ({
   _tag: EntityType.CodeRef,
-  id: id as EntityId,
+  id: testEntityId(id),
   title: `Entity ${id}`,
   content: `Content for ${id}`,
   tags: [],
@@ -62,7 +67,7 @@ const createTestCodeRef = (id: string): CodeRef => ({
 
 const createTestStory = (id: string): Story => ({
   _tag: EntityType.Story,
-  id: id as EntityId,
+  id: testEntityId(id),
   title: `Entity ${id}`,
   content: `Content for ${id}`,
   tags: [],
@@ -74,7 +79,7 @@ const createTestStory = (id: string): Story => ({
 
 const createTestDiagram = (id: string): Diagram => ({
   _tag: EntityType.Diagram,
-  id: id as EntityId,
+  id: testEntityId(id),
   title: `Entity ${id}`,
   content: `Content for ${id}`,
   tags: [],
@@ -99,14 +104,14 @@ const createTestEntity = (id: string, type: EntityType = EntityType.Doc): Entity
 };
 
 const createTestTag = (id: string, name: string, parentId?: string): Tag => ({
-  id: id as TagId,
+  id: testTagId(id),
   name,
   parentId,
   createdAt: FIXED_DATE,
 });
 
 const createTestLink = (id: string, sourceId: string, targetId: string, type: LinkType): Link => ({
-  id: id as LinkId,
+  id: testLinkId(id),
   sourceId: testEntityId(sourceId),
   targetId: testEntityId(targetId),
   type,
@@ -132,7 +137,7 @@ const createMockTagRepository = (config: MockTagRepositoryConfig = {}): TagRepos
           return yield* new RepositoryError({ message: "Create failed" });
         }
         const tag: Tag = {
-          id: input.id as TagId,
+          id: testTagId(input.id),
           name: input.name,
           description: input.description,
           parentId: input.parentId,
@@ -208,7 +213,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
     createDoc: (input) =>
       Effect.succeed({
         _tag: EntityType.Doc,
-        id: `doc-${Date.now()}` as EntityId,
+        id: testEntityId(`doc-${Date.now()}`),
         title: input.title,
         content: input.content,
         tags: input.tags ?? [],
@@ -219,7 +224,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
     createCodeRef: (input) =>
       Effect.succeed({
         _tag: EntityType.CodeRef,
-        id: `code-${Date.now()}` as EntityId,
+        id: testEntityId(`code-${Date.now()}`),
         title: input.title,
         content: input.content,
         tags: input.tags ?? [],
@@ -235,7 +240,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
     createStory: (input) =>
       Effect.succeed({
         _tag: EntityType.Story,
-        id: `story-${Date.now()}` as EntityId,
+        id: testEntityId(`story-${Date.now()}`),
         title: input.title,
         content: input.content,
         tags: input.tags ?? [],
@@ -249,7 +254,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
     createDiagram: (input) =>
       Effect.succeed({
         _tag: EntityType.Diagram,
-        id: `diagram-${Date.now()}` as EntityId,
+        id: testEntityId(`diagram-${Date.now()}`),
         title: input.title,
         content: input.content,
         tags: input.tags ?? [],
@@ -294,7 +299,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
         return entity;
       }),
 
-    delete: () => Effect.succeed(undefined),
+    delete: () => Effect.void,
 
     count: (type) =>
       Effect.succeed(Array.from(entities.values()).filter((e) => !type || e._tag === type).length),
@@ -318,7 +323,7 @@ const createMockLinkRepository = (config: MockLinkRepositoryConfig = {}): LinkRe
   return {
     create: (input) =>
       Effect.succeed({
-        id: `link-${Date.now()}` as LinkId,
+        id: testLinkId(`link-${Date.now()}`),
         sourceId: input.sourceId,
         targetId: input.targetId,
         type: input.type,
@@ -327,14 +332,14 @@ const createMockLinkRepository = (config: MockLinkRepositoryConfig = {}): LinkRe
     createBidirectional: (input) =>
       Effect.succeed([
         {
-          id: `link-${Date.now()}-fwd` as LinkId,
+          id: testLinkId(`link-${Date.now()}-fwd`),
           sourceId: input.sourceId,
           targetId: input.targetId,
           type: input.type,
           createdAt: FIXED_DATE,
         },
         {
-          id: `link-${Date.now()}-rev` as LinkId,
+          id: testLinkId(`link-${Date.now()}-rev`),
           sourceId: input.targetId,
           targetId: input.sourceId,
           type: input.type,
@@ -405,7 +410,7 @@ describe("TagService", () => {
   describe("ensureHierarchy()", () => {
     it("reuses a single stable tag when an attachment uses a governed term name", async () => {
       const term: Term = {
-        id: "term-brand-aerograph" as TermId,
+        id: testTermId("term-brand-aerograph"),
         canonicalName: "AeroGraph",
         kind: "brand",
         status: "active",
@@ -424,7 +429,7 @@ describe("TagService", () => {
         [
           "kioku",
           {
-            id: "kioku" as TagId,
+            id: testTagId("kioku"),
             name: "AeroGraph",
             termId: term.id,
             createdAt: FIXED_DATE,
@@ -452,7 +457,7 @@ describe("TagService", () => {
 
     it("resolves slash-bearing governed names before applying hierarchy semantics", async () => {
       const term: Term = {
-        id: "term-feature-editor-indexer" as TermId,
+        id: testTermId("term-feature-editor-indexer"),
         canonicalName: "editor/indexer",
         kind: "feature",
         status: "active",
@@ -471,7 +476,7 @@ describe("TagService", () => {
         [
           "editor-indexer",
           {
-            id: "editor-indexer" as TagId,
+            id: testTagId("editor-indexer"),
             name: "editor/indexer",
             termId: term.id,
             createdAt: FIXED_DATE,
@@ -499,7 +504,7 @@ describe("TagService", () => {
 
     it("rejects governed attachment names with multiple possible physical tags", async () => {
       const term: Term = {
-        id: "term-concept-auth" as TermId,
+        id: testTermId("term-concept-auth"),
         canonicalName: "Authentication",
         kind: "concept",
         status: "active",
@@ -515,8 +520,11 @@ describe("TagService", () => {
         createdAt: FIXED_DATE,
       };
       const tags = new Map<string, Tag>([
-        ["auth", { id: "auth" as TagId, name: "Auth", termId: term.id, createdAt: FIXED_DATE }],
-        ["login", { id: "login" as TagId, name: "Login", termId: term.id, createdAt: FIXED_DATE }],
+        ["auth", { id: testTagId("auth"), name: "Auth", termId: term.id, createdAt: FIXED_DATE }],
+        [
+          "login",
+          { id: testTagId("login"), name: "Login", termId: term.id, createdAt: FIXED_DATE },
+        ],
       ]);
       const layer = createTestLayer({
         tagRepo: createMockTagRepository({ tags }),

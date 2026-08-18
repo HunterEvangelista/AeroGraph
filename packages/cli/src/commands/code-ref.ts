@@ -195,9 +195,7 @@ const codeRefShowCommand = Command.make(
 
           for (const link of links) {
             const otherId = link.sourceId === entity.id ? link.targetId : link.sourceId;
-            const other = yield* entityService.getById(
-              otherId as Parameters<typeof entityService.getById>[0]
-            );
+            const other = yield* entityService.getById(otherId);
             linkedEntities.set(other.id, `[${other._tag}] ${other.title}`);
           }
 
@@ -337,9 +335,7 @@ const codeRefDeleteCommand = Command.make(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
           const resolvedId = yield* resolveEntityId(id);
-          const existing = yield* entityService.getById(
-            resolvedId as Parameters<typeof entityService.getById>[0]
-          );
+          const existing = yield* entityService.getById(resolvedId);
 
           if (existing._tag !== EntityType.CodeRef) {
             return yield* new NotACodeRefError({ id: resolvedId });
@@ -350,7 +346,7 @@ const codeRefDeleteCommand = Command.make(
             yield* Console.log("(Use --force to skip this confirmation in scripts)");
           }
 
-          yield* entityService.delete(resolvedId as Parameters<typeof entityService.getById>[0]);
+          yield* entityService.delete(resolvedId);
         }).pipe(Effect.provide(ServiceLayers))
       );
 

@@ -48,10 +48,10 @@ export interface VersionRepository {
   /**
    * Get entity data at a specific version
    */
-  readonly getEntityAtVersion: <E extends Entity>(
+  readonly getEntityAtVersion: (
     entityId: string,
     version: number
-  ) => Effect.Effect<TypedEntityVersion<E>, VersionNotFoundError | RepositoryError>;
+  ) => Effect.Effect<TypedEntityVersion, VersionNotFoundError | RepositoryError>;
 
   /**
    * Get version count for an entity

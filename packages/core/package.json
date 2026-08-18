@@ -29,9 +29,9 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "lint": "biome check src/",
-    "lint:fix": "biome check --write src/",
-    "typecheck": "tsc --noEmit",
+    "lint": "biome check src/; biome_status=$?; oxlint src/; oxlint_status=$?; [ $biome_status -eq 0 ] && [ $oxlint_status -eq 0 ]",
+    "lint:fix": "biome check --write src/; biome_status=$?; oxlint src/; oxlint_status=$?; [ $biome_status -eq 0 ] && [ $oxlint_status -eq 0 ]",
+    "typecheck": "tsc -p tsconfig.tests.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf dist"

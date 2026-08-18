@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import { EntityType } from "../domain/entity";
+import { DiagramTypeEnum, EntityType, PriorityEnum, StoryStatusEnum } from "../domain/entity";
 import {
   CodeRefSchema,
   CreateTagInput,
@@ -32,8 +32,10 @@ import { FIXED_TIMESTAMP_ISO } from "./helpers/index";
 
 const FIXED_DATE_ISO = FIXED_TIMESTAMP_ISO;
 
-const decodeSync = <A, I>(schema: Schema.Schema<A, I, never>, input: unknown): A =>
-  Schema.decodeUnknownSync(schema)(input);
+const decodeSync = <S extends Schema.ConstraintDecoder<Schema.Schema.Type<S>>>(
+  schema: S,
+  input: S["Encoded"]
+): S["Type"] => Schema.decodeSync(schema)(input);
 
 describe("domain schema unit tests", () => {
   describe("entity.ts", () => {
@@ -92,8 +94,8 @@ describe("domain schema unit tests", () => {
         createdAt: FIXED_DATE_ISO,
         updatedAt: FIXED_DATE_ISO,
         version: 1,
-        status: "in_progress",
-        priority: "high",
+        status: StoryStatusEnum.InProgress,
+        priority: PriorityEnum.High,
         parentId: "story-epic-1",
       });
 
@@ -116,7 +118,7 @@ describe("domain schema unit tests", () => {
         createdAt: FIXED_DATE_ISO,
         updatedAt: FIXED_DATE_ISO,
         version: 3,
-        diagramType: "erd",
+        diagramType: DiagramTypeEnum.Erd,
         source: "entity -> link -> tag",
         generatedFrom: ["entity-0001", "entity-0002"],
       });
@@ -130,7 +132,7 @@ describe("domain schema unit tests", () => {
     });
 
     it("decodes all supported entity variants through the union", () => {
-      const variants = [
+      const variants: ReadonlyArray<Schema.Codec.Encoded<typeof EntitySchema>> = [
         {
           id: "entity-doc",
           _tag: EntityType.Doc,
@@ -162,7 +164,7 @@ describe("domain schema unit tests", () => {
           createdAt: FIXED_DATE_ISO,
           updatedAt: FIXED_DATE_ISO,
           version: 1,
-          status: "todo",
+          status: StoryStatusEnum.Todo,
         },
         {
           id: "entity-diagram",
@@ -173,7 +175,7 @@ describe("domain schema unit tests", () => {
           createdAt: FIXED_DATE_ISO,
           updatedAt: FIXED_DATE_ISO,
           version: 1,
-          diagramType: "flowchart",
+          diagramType: DiagramTypeEnum.Flowchart,
           source: "A -> B",
         },
       ];
@@ -185,7 +187,7 @@ describe("domain schema unit tests", () => {
 
     it("rejects invalid entity shapes", () => {
       expect(() =>
-        decodeSync(DocSchema, {
+        Schema.decodeUnknownSync(DocSchema)({
           id: "entity-invalid",
           title: "",
           content: "Missing non-empty title",
@@ -197,7 +199,7 @@ describe("domain schema unit tests", () => {
       ).toThrow();
 
       expect(() =>
-        decodeSync(CodeRefSchema, {
+        Schema.decodeUnknownSync(CodeRefSchema)({
           id: "entity-invalid",
           title: "Broken code ref",
           content: "Missing filePath",
@@ -211,7 +213,7 @@ describe("domain schema unit tests", () => {
       ).toThrow();
 
       expect(() =>
-        decodeSync(StorySchema, {
+        Schema.decodeUnknownSync(StorySchema)({
           id: "entity-invalid",
           title: "Broken story",
           content: "Invalid status",
@@ -224,7 +226,7 @@ describe("domain schema unit tests", () => {
       ).toThrow();
 
       expect(() =>
-        decodeSync(DiagramSchema, {
+        Schema.decodeUnknownSync(DiagramSchema)({
           id: "entity-invalid",
           title: "Broken diagram",
           content: "Invalid type",
@@ -319,7 +321,7 @@ describe("domain schema unit tests", () => {
     });
 
     it("rejects invalid link types", () => {
-      expect(() => decodeSync(LinkType, "depends_on")).toThrow();
+      expect(() => Schema.decodeUnknownSync(LinkType)("depends_on")).toThrow();
     });
   });
 
@@ -359,7 +361,7 @@ describe("domain schema unit tests", () => {
         })
       ).toThrow();
 
-      expect(() => decodeSync(ChangeType, "restore")).toThrow();
+      expect(() => Schema.decodeUnknownSync(ChangeType)("restore")).toThrow();
     });
   });
 

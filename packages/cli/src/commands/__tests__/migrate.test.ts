@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Schema } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type CliWorkspace, createCliWorkspace } from "../../__tests__/helpers/cli";
 
@@ -18,6 +19,13 @@ const queryEntityIds = (stdout: string): ReadonlyArray<string> =>
 
 const contextEntityIds = (stdout: string): ReadonlyArray<string> =>
   [...stdout.matchAll(/^- ID: (.+)$/gm)].map((match) => match[1] ?? "");
+
+const MigrationJournalOutput = Schema.Struct({
+  id: Schema.String,
+  termId: Schema.String,
+  fromName: Schema.String,
+  toName: Schema.String,
+});
 
 const governTags = (workspace: CliWorkspace, ...args: ReadonlyArray<string>) => {
   const result = spawnSync("bun", ["run", governTagFixture, workspace.rootPath, ...args], {
@@ -160,12 +168,9 @@ describe("migrate command", () => {
       { encoding: "utf8", shell: false }
     );
     expect(reopenedJournal.status, `${reopenedJournal.stderr}\n${reopenedJournal.stdout}`).toBe(0);
-    const journal = JSON.parse(reopenedJournal.stdout) as {
-      readonly id: string;
-      readonly termId: string;
-      readonly fromName: string;
-      readonly toName: string;
-    };
+    const journal = Schema.decodeUnknownSync(MigrationJournalOutput)(
+      JSON.parse(reopenedJournal.stdout)
+    );
     expect(journal).toMatchObject({
       id: journalId,
       termId: "term-brand-kioku",

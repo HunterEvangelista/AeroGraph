@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { Effect } from "effect";
-import { makeDatabaseClient } from "../../db/client";
+import { DatabaseClientLive, DatabaseClientTag } from "../../db/client";
 import { entities, entityTags, links, tags } from "../../db/schema";
 
 const workspacePath = process.argv[2];
@@ -27,7 +27,7 @@ const metadata = {
 await Effect.runPromise(
   Effect.scoped(
     Effect.gen(function* () {
-      const client = yield* makeDatabaseClient(dbPath);
+      const client = yield* DatabaseClientTag;
       const { drizzle } = client;
 
       drizzle
@@ -126,6 +126,6 @@ await Effect.runPromise(
           },
         ])
         .run();
-    })
+    }).pipe(Effect.provide(DatabaseClientLive(dbPath)))
   )
 );

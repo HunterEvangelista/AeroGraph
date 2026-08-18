@@ -19,6 +19,11 @@ class NotADocError extends Data.TaggedError("NotADocError")<{
 
 class NoUpdatesError extends Data.TaggedError("NoUpdatesError")<object> {}
 
+interface DocUpdates {
+  title?: string;
+  content?: string;
+}
+
 interface DocCommandError {
   readonly _tag: string;
   readonly matches?: Parameters<typeof formatEntityIdMatches>[0];
@@ -119,9 +124,7 @@ const docShowCommand = Command.make(
           const tagService = yield* TagServiceTag;
 
           const resolvedId = yield* resolveEntityId(id);
-          const entity = yield* entityService.getById(
-            resolvedId as Parameters<typeof entityService.getById>[0]
-          );
+          const entity = yield* entityService.getById(resolvedId);
 
           if (entity._tag !== EntityType.Doc) {
             return yield* new NotADocError({ id: resolvedId });
@@ -133,9 +136,7 @@ const docShowCommand = Command.make(
 
           for (const link of links) {
             const otherId = link.sourceId === entity.id ? link.targetId : link.sourceId;
-            const other = yield* entityService.getById(
-              otherId as Parameters<typeof entityService.getById>[0]
-            );
+            const other = yield* entityService.getById(otherId);
             linkedEntities.set(other.id, `[${other._tag}] ${other.title}`);
           }
 
@@ -296,22 +297,17 @@ const docEditCommand = Command.make(
 
           // Verify it exists and is a doc
           const resolvedId = yield* resolveEntityId(id);
-          const existing = yield* entityService.getById(
-            resolvedId as Parameters<typeof entityService.getById>[0]
-          );
+          const existing = yield* entityService.getById(resolvedId);
 
           if (existing._tag !== EntityType.Doc) {
             return yield* new NotADocError({ id: resolvedId });
           }
 
-          const updates: { title?: string; content?: string } = {};
+          const updates: DocUpdates = {};
           if (titleValue) updates.title = titleValue;
           if (contentValue) updates.content = contentValue;
 
-          return yield* entityService.update(
-            resolvedId as Parameters<typeof entityService.getById>[0],
-            updates
-          );
+          return yield* entityService.update(resolvedId, updates);
         })
       );
 
@@ -356,9 +352,7 @@ const docDeleteCommand = Command.make(
 
           // Verify it exists and is a doc
           const resolvedId = yield* resolveEntityId(id);
-          const existing = yield* entityService.getById(
-            resolvedId as Parameters<typeof entityService.getById>[0]
-          );
+          const existing = yield* entityService.getById(resolvedId);
 
           if (existing._tag !== EntityType.Doc) {
             return yield* new NotADocError({ id: resolvedId });
@@ -369,7 +363,7 @@ const docDeleteCommand = Command.make(
             yield* Console.log("(Use --force to skip this confirmation in scripts)");
           }
 
-          yield* entityService.delete(resolvedId as Parameters<typeof entityService.getById>[0]);
+          yield* entityService.delete(resolvedId);
           return existing.id;
         })
       );

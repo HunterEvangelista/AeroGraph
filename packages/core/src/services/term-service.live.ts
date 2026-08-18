@@ -24,19 +24,20 @@ const inspectionFor = (
 ): TermInspection => {
   const mergedInto = term.mergedIntoId ? relatedTerms.get(term.mergedIntoId) : undefined;
   const replacement = term.replacementTermId ? relatedTerms.get(term.replacementTermId) : undefined;
-  return {
+  let inspection: TermInspection = {
     term,
     canonicalName: term.canonicalName,
     aliases: names.filter(({ nameKind }) => nameKind === "alias"),
     deprecatedNames: names.filter(({ nameKind }) => nameKind === "deprecated"),
     names,
-    ...(mergedInto ? { mergedInto } : {}),
-    ...(replacement ? { replacement } : {}),
     resolutionNotes: resolution?.resolutionNotes ?? [],
-    ...(resolution?.resolutionMetadata
-      ? { resolutionMetadata: resolution.resolutionMetadata }
-      : {}),
   };
+  if (mergedInto) inspection = { ...inspection, mergedInto };
+  if (replacement) inspection = { ...inspection, replacement };
+  if (resolution?.resolutionMetadata) {
+    inspection = { ...inspection, resolutionMetadata: resolution.resolutionMetadata };
+  }
+  return inspection;
 };
 
 export const TermServiceLive = Layer.effect(

@@ -42,10 +42,7 @@ export const historyCommand = Command.make(
         const resolvedId = yield* resolveEntityId(entityId);
 
         if (versionValue !== undefined) {
-          const record = yield* versionRepository.getEntityAtVersion<Entity>(
-            resolvedId,
-            versionValue
-          );
+          const record = yield* versionRepository.getEntityAtVersion(resolvedId, versionValue);
           const entity = record.data;
 
           yield* Console.log("");
@@ -76,7 +73,8 @@ export const historyCommand = Command.make(
         }
 
         for (const record of [...versions].sort((a, b) => a.version - b.version)) {
-          const entity = record.data as Entity;
+          const entity = (yield* versionRepository.getEntityAtVersion(resolvedId, record.version))
+            .data;
           yield* Console.log(
             `v${record.version}  ${record.changeType}  ${record.createdAt.toLocaleString()}  ${formatChangedFields(record.changedFields)}`
           );
