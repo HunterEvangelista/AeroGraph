@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import { EntityPrefixIndexTag, formatEntityIdWithBoldPrefix } from "./db/entity-prefix-index.js";
+import { EntityPrefixIndexTag, formatEntityIdWithBoldPrefix } from "./db/entity-prefix-index";
 
 export const loadFormattedEntityIds = (entityIds: ReadonlyArray<string>) =>
   Effect.gen(function* () {

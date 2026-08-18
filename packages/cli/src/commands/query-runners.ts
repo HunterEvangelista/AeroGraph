@@ -6,7 +6,7 @@ import {
   resolveTagSelectors,
 } from "@kioku/core";
 import { Console, Effect } from "effect";
-import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
+import { formattedEntityId, loadFormattedEntityIds } from "../entity-display";
 
 export interface QueryRunResult {
   readonly displayedEntityIds: ReadonlyArray<string>;

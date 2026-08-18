@@ -1,2 +1,2 @@
-export * from "./deterministic.js";
-export * from "./effect.js";
+export * from "./deterministic";
+export * from "./effect";

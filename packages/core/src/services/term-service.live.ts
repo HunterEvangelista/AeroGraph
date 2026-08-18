@@ -2,11 +2,11 @@
  * Term Service live implementation
  */
 import { Effect, Layer } from "effect";
-import type { CreateTermNameInput, Term, TermKind, TermName } from "../domain/term.js";
-import { AmbiguousTermNameError, TermAlreadyExistsError, TermNotFoundError } from "../errors.js";
-import type { ResolvedTermName } from "../repository/term-repository.js";
-import { TermRepositoryTag } from "../repository/term-repository.js";
-import { type TermResolution, type TermService, TermServiceTag } from "./term-service.js";
+import type { CreateTermNameInput, Term, TermKind, TermName } from "../domain/term";
+import { AmbiguousTermNameError, TermAlreadyExistsError, TermNotFoundError } from "../errors";
+import type { ResolvedTermName } from "../repository/term-repository";
+import { TermRepositoryTag } from "../repository/term-repository";
+import { type TermResolution, type TermService, TermServiceTag } from "./term-service";
 
 const candidateLabel = ({ term, termName }: ResolvedTermName): string =>
   `${term.kind}:${term.canonicalName} (${termName.nameKind})`;

@@ -9,31 +9,31 @@ import type {
   EntityId,
   EntityType,
   Story,
-} from "../domain/entity.js";
-import { DiagramTypeEnum, EntityTypeEnum, StoryStatusEnum } from "../domain/entity.js";
-import type { Link, LinkId, LinkType } from "../domain/link.js";
-import type { Tag, TagId } from "../domain/tag.js";
-import type { Term, TermId, TermName } from "../domain/term.js";
-import { normalizeTermName } from "../domain/term.js";
+} from "../domain/entity";
+import { DiagramTypeEnum, EntityTypeEnum, StoryStatusEnum } from "../domain/entity";
+import type { Link, LinkId, LinkType } from "../domain/link";
+import type { Tag, TagId } from "../domain/tag";
+import type { Term, TermId, TermName } from "../domain/term";
+import { normalizeTermName } from "../domain/term";
 import {
   EntityNotFoundError,
   RepositoryError,
   TagNotFoundError,
   ValidationError,
-} from "../errors.js";
-import type { EntityRepository } from "../repository/entity-repository.js";
-import { EntityRepositoryTag } from "../repository/entity-repository.js";
-import type { LinkRepository } from "../repository/link-repository.js";
-import { LinkRepositoryTag } from "../repository/link-repository.js";
-import type { TagRepository } from "../repository/tag-repository.js";
-import { TagRepositoryTag } from "../repository/tag-repository.js";
-import type { ResolvedTermName, TermRepository } from "../repository/term-repository.js";
-import { TermRepositoryTag } from "../repository/term-repository.js";
-import { GraphServiceTag } from "../services/graph-service.js";
-import { GraphServiceLive } from "../services/graph-service.live.js";
-import { TagServiceTag } from "../services/tag-service.js";
-import { TagServiceLive } from "../services/tag-service.live.js";
-import { FIXED_TIMESTAMP_ISO } from "./helpers/index.js";
+} from "../errors";
+import type { EntityRepository } from "../repository/entity-repository";
+import { EntityRepositoryTag } from "../repository/entity-repository";
+import type { LinkRepository } from "../repository/link-repository";
+import { LinkRepositoryTag } from "../repository/link-repository";
+import type { TagRepository } from "../repository/tag-repository";
+import { TagRepositoryTag } from "../repository/tag-repository";
+import type { ResolvedTermName, TermRepository } from "../repository/term-repository";
+import { TermRepositoryTag } from "../repository/term-repository";
+import { GraphServiceTag } from "../services/graph-service";
+import { GraphServiceLive } from "../services/graph-service.live";
+import { TagServiceTag } from "../services/tag-service";
+import { TagServiceLive } from "../services/tag-service.live";
+import { FIXED_TIMESTAMP_ISO } from "./helpers/index";
 
 // ============================================================================
 // Test Fixtures

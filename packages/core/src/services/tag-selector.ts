@@ -1,9 +1,9 @@
 import { Effect } from "effect";
-import type { TagId } from "../domain/tag.js";
-import type { TermId } from "../domain/term.js";
-import type { AmbiguousTermNameError, RepositoryError } from "../errors.js";
-import { TagRepositoryTag } from "../repository/tag-repository.js";
-import { TermServiceTag } from "./term-service.js";
+import type { TagId } from "../domain/tag";
+import type { TermId } from "../domain/term";
+import type { AmbiguousTermNameError, RepositoryError } from "../errors";
+import { TagRepositoryTag } from "../repository/tag-repository";
+import { TermServiceTag } from "./term-service";
 
 export interface ResolvedTagSelector {
   readonly selector: string;

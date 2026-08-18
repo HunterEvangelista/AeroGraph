@@ -7,7 +7,7 @@
  * `term_names.displayName` preserves original casing/spelling for UI output.
  */
 import { Schema } from "effect";
-import { NonNegativeInteger } from "./scalars.js";
+import { NonNegativeInteger } from "./scalars";
 
 export const TERM_KINDS = [
   "brand",

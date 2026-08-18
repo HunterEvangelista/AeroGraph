@@ -1,7 +1,7 @@
 import { Effect, Layer } from "effect";
-import type { CreateNextCommandInput, NextCommandType } from "../domain/next-command.js";
-import { NextRepositoryTag } from "../repository/next-repository.js";
-import { type NextService, NextServiceTag } from "./next-service.js";
+import type { CreateNextCommandInput, NextCommandType } from "../domain/next-command";
+import { NextRepositoryTag } from "../repository/next-repository";
+import { type NextService, NextServiceTag } from "./next-service";
 
 const defaultCommandTypes = [
   "related_to",

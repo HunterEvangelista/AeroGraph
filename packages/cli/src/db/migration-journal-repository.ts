@@ -10,8 +10,8 @@ import {
 } from "@kioku/core";
 import { desc, eq } from "drizzle-orm";
 import { Effect, Layer } from "effect";
-import { migrationJournal } from "./schema.js";
-import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session.js";
+import { migrationJournal } from "./schema";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
 const now = (): string => new Date().toISOString();
 

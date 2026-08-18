@@ -49,6 +49,9 @@
           "autoUseWorkspaceTsdk": true
         },
         "typescript": {
+          "preferences": {
+            "importModuleSpecifierEnding": "minimal"
+          },
           "tsserver": {
             "pluginPaths": ["./node_modules"]
           }

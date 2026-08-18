@@ -15,8 +15,8 @@ import { and, count as drizzleCount, eq, like, or } from "drizzle-orm";
  * SQLite Tag Repository Implementation
  */
 import { Effect, Layer } from "effect";
-import { entities, entityTags, tags } from "./schema.js";
-import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session.js";
+import { entities, entityTags, tags } from "./schema";
+import { DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
 // ============================================================================
 // Helper Functions

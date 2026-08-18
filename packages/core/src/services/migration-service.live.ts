@@ -2,24 +2,24 @@
  * Migration Service live implementation
  */
 import { Effect, Layer } from "effect";
-import type { Entity } from "../domain/entity.js";
-import type { Tag } from "../domain/tag.js";
-import { type JournalEntryId, normalizeTermName, type Term } from "../domain/term.js";
-import { type RepositoryError, TermMigrationError, ValidationError } from "../errors.js";
-import { EntityRepositoryTag } from "../repository/entity-repository.js";
-import { MigrationJournalRepositoryTag } from "../repository/migration-journal-repository.js";
-import type { TagRepository } from "../repository/tag-repository.js";
-import { TagRepositoryTag } from "../repository/tag-repository.js";
-import type { TermRepository } from "../repository/term-repository.js";
-import { TermRepositoryTag } from "../repository/term-repository.js";
-import type { TransactionRepositories } from "../repository/transaction-engine.js";
-import { TransactionEngineTag } from "../repository/transaction-engine.js";
+import type { Entity } from "../domain/entity";
+import type { Tag } from "../domain/tag";
+import { type JournalEntryId, normalizeTermName, type Term } from "../domain/term";
+import { type RepositoryError, TermMigrationError, ValidationError } from "../errors";
+import { EntityRepositoryTag } from "../repository/entity-repository";
+import { MigrationJournalRepositoryTag } from "../repository/migration-journal-repository";
+import type { TagRepository } from "../repository/tag-repository";
+import { TagRepositoryTag } from "../repository/tag-repository";
+import type { TermRepository } from "../repository/term-repository";
+import { TermRepositoryTag } from "../repository/term-repository";
+import type { TransactionRepositories } from "../repository/transaction-engine";
+import { TransactionEngineTag } from "../repository/transaction-engine";
 import {
   type MigrationService,
   MigrationServiceTag,
   type RenameMigrationPlan,
   type RenameTermInput,
-} from "./migration-service.js";
+} from "./migration-service";
 
 interface NormalizedRenameInput extends RenameTermInput {
   readonly normalizedFromName: string;

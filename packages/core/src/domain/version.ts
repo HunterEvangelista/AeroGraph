@@ -3,8 +3,8 @@
  * Entity version history for append-only versioning
  */
 import { Schema } from "effect";
-import type { Entity } from "./entity.js";
-import { PositiveInteger } from "./scalars.js";
+import type { Entity } from "./entity";
+import { PositiveInteger } from "./scalars";
 
 // ============================================================================
 // Change Types

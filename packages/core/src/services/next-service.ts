@@ -1,6 +1,6 @@
 import { Context, type Effect } from "effect";
-import type { NextCommand, NextCommandType } from "../domain/next-command.js";
-import type { EntityNotFoundError, RepositoryError } from "../errors.js";
+import type { NextCommand, NextCommandType } from "../domain/next-command";
+import type { EntityNotFoundError, RepositoryError } from "../errors";
 
 export interface NextSuggestedEntity {
   readonly entityId: string;

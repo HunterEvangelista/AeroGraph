@@ -5,12 +5,12 @@ import { Console, Data, Effect, Option } from "effect";
  * Retrieval operations for project memory graph context.
  */
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { ConfigServiceTag } from "../config.js";
-import { EntityPrefixIndexTag } from "../db/entity-prefix-index.js";
-import { CliServicesLive } from "../db/index.js";
-import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
-import { runPathQuery, runRelatedQuery, runTagsQuery, runTraverseQuery } from "./query-runners.js";
-import { isPositiveInteger } from "./validation.js";
+import { ConfigServiceTag } from "../config";
+import { EntityPrefixIndexTag } from "../db/entity-prefix-index";
+import { CliServicesLive } from "../db/index";
+import { formatEntityIdMatches, resolveEntityId } from "../entity-id";
+import { runPathQuery, runRelatedQuery, runTagsQuery, runTraverseQuery } from "./query-runners";
+import { isPositiveInteger } from "./validation";
 
 // ============================================================================
 // Custom Error Types

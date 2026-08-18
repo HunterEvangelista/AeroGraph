@@ -3,8 +3,8 @@
  * Command-line interface for the Kioku knowledge platform
  */
 
-export type { ConfigService, KiokuConfig, WorkspaceInfo } from "./config.js";
+export type { ConfigService, KiokuConfig, WorkspaceInfo } from "./config";
 // Re-export for programmatic usage
-export { ConfigServiceLive, ConfigServiceTag } from "./config.js";
+export { ConfigServiceLive, ConfigServiceTag } from "./config";
 
-export * from "./db/index.js";
+export * from "./db/index";

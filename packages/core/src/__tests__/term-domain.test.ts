@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { describe, expect, it } from "vitest";
-import { CreateTermInput, normalizeTermName } from "../domain/term.js";
+import { CreateTermInput, normalizeTermName } from "../domain/term";
 
 describe("term domain helpers", () => {
   it("normalizes term lookup names for case-insensitive alias resolution", () => {

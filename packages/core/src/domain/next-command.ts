@@ -3,7 +3,7 @@
  * Runnable follow-up suggestions emitted by prior commands
  */
 import { Schema } from "effect";
-import { PositiveInteger } from "./scalars.js";
+import { PositiveInteger } from "./scalars";
 
 // ============================================================================
 // Command Types

@@ -10,7 +10,7 @@ import {
   TransactionEngineTag,
 } from "@kioku/core";
 import { Effect } from "effect";
-import { CliServicesLive } from "../../layers.js";
+import { CliServicesLive } from "../../layers";
 
 const program = Effect.gen(function* () {
   const entityRepo = yield* EntityRepositoryTag;

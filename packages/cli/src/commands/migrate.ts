@@ -1,7 +1,7 @@
 import { MigrationServiceTag, TERM_KINDS, type TermKind, ValidationError } from "@kioku/core";
 import { Console, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { withCliServices } from "./workspace.js";
+import { withCliServices } from "./workspace";
 
 const isTermKind = (kind: string): kind is TermKind =>
   (TERM_KINDS as ReadonlyArray<string>).includes(kind);

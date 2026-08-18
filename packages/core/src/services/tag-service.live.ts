@@ -2,13 +2,13 @@
  * Tag Service live implementation
  */
 import { Effect, Layer, Result } from "effect";
-import { type Tag, type TagId, TagIdSchema } from "../domain/tag.js";
-import { TagNotFoundError, ValidationError } from "../errors.js";
-import type { TagRepository } from "../repository/tag-repository.js";
-import { TagRepositoryTag } from "../repository/tag-repository.js";
-import type { ResolvedTermName } from "../repository/term-repository.js";
-import { TermRepositoryTag } from "../repository/term-repository.js";
-import { type TagService, TagServiceTag } from "./tag-service.js";
+import { type Tag, type TagId, TagIdSchema } from "../domain/tag";
+import { TagNotFoundError, ValidationError } from "../errors";
+import type { TagRepository } from "../repository/tag-repository";
+import { TagRepositoryTag } from "../repository/tag-repository";
+import type { ResolvedTermName } from "../repository/term-repository";
+import { TermRepositoryTag } from "../repository/term-repository";
+import { type TagService, TagServiceTag } from "./tag-service";
 
 const parseTagPath = (tagPath: string): Effect.Effect<ReadonlyArray<string>, ValidationError> => {
   const parts = tagPath

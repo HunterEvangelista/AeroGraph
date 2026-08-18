@@ -14,7 +14,7 @@ export type {
   Priority,
   Story,
   StoryStatus,
-} from "./entity.js";
+} from "./entity";
 // Entity types and schemas
 export {
   BaseEntitySchema,
@@ -35,28 +35,28 @@ export {
   StorySchema,
   StoryStatusEnum,
   StoryStatusSchema,
-} from "./entity.js";
-export type { LinkId } from "./link.js";
+} from "./entity";
+export type { LinkId } from "./link";
 // Link types and schemas
-export { CreateLinkInput, getInverseLinkType, Link, LinkType } from "./link.js";
+export { CreateLinkInput, getInverseLinkType, Link, LinkType } from "./link";
 export type {
   CreateNextCommandInput,
   NextCommand,
   NextCommandId,
   NextCommandType,
-} from "./next-command.js";
+} from "./next-command";
 export {
   CreateNextCommandInputSchema,
   NextCommandIdSchema,
   NextCommandSchema,
   NextCommandTypeSchema,
-} from "./next-command.js";
-export { NonNegativeInteger, PositiveInteger } from "./scalars.js";
-export type { TagId } from "./tag.js";
+} from "./next-command";
+export { NonNegativeInteger, PositiveInteger } from "./scalars";
+export type { TagId } from "./tag";
 // Tag types and schemas
-export { CreateTagInput, Tag, TagIdSchema, UpdateTagInput } from "./tag.js";
+export { CreateTagInput, Tag, TagIdSchema, UpdateTagInput } from "./tag";
 // Term registry pure types
-export type { JournalEntryId, TermId } from "./term.js";
+export type { JournalEntryId, TermId } from "./term";
 // Term registry types and schemas
 export {
   CreateTermInput,
@@ -78,7 +78,7 @@ export {
   TermStatus,
   UpdateTermInput,
   UpdateTermNameInput,
-} from "./term.js";
-export type { TypedEntityVersion, VersionId } from "./version.js";
+} from "./term";
+export type { TypedEntityVersion, VersionId } from "./version";
 // Version types and schemas
-export { ChangeType, EntityVersion } from "./version.js";
+export { ChangeType, EntityVersion } from "./version";
