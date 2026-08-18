@@ -1,9 +1,9 @@
 import { type Entity, VersionRepositoryTag } from "@kioku/core";
 import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
-import { parsePositiveInteger } from "./validation.js";
-import { withCliServices } from "./workspace.js";
+import { formatEntityIdMatches, resolveEntityId } from "../entity-id";
+import { parsePositiveInteger } from "./validation";
+import { withCliServices } from "./workspace";
 
 const entitySummary = (entity: Entity): string => `[${entity._tag}] ${entity.title}`;
 

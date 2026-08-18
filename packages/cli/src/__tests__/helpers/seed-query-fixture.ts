@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { Effect } from "effect";
-import { makeDatabaseClient } from "../../db/client.js";
-import { entities, entityTags, links, tags } from "../../db/schema.js";
+import { makeDatabaseClient } from "../../db/client";
+import { entities, entityTags, links, tags } from "../../db/schema";
 
 const workspacePath = process.argv[2];
 

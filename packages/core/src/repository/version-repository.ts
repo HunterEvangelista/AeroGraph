@@ -3,9 +3,9 @@
  * Storage-agnostic interface for version history operations
  */
 import { Context, type Effect } from "effect";
-import type { Entity } from "../domain/entity.js";
-import type { ChangeType, EntityVersion, TypedEntityVersion } from "../domain/version.js";
-import type { EntityNotFoundError, RepositoryError, VersionNotFoundError } from "../errors.js";
+import type { Entity } from "../domain/entity";
+import type { ChangeType, EntityVersion, TypedEntityVersion } from "../domain/version";
+import type { EntityNotFoundError, RepositoryError, VersionNotFoundError } from "../errors";
 
 // ============================================================================
 // Version Repository Interface

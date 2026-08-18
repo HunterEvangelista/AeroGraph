@@ -1,6 +1,6 @@
 import { EntityNotFoundError, EntityServiceTag } from "@kioku/core";
 import { Data, Effect, Result } from "effect";
-import { EntityPrefixIndexTag } from "./db/entity-prefix-index.js";
+import { EntityPrefixIndexTag } from "./db/entity-prefix-index";
 
 export interface EntityIdMatch {
   readonly id: string;

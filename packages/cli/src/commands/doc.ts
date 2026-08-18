@@ -5,9 +5,9 @@ import { Console, Data, Effect, Option } from "effect";
  * CRUD operations for document entities
  */
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { formattedEntityId, loadFormattedEntityIds } from "../entity-display.js";
-import { formatEntityIdMatches, resolveEntityId } from "../entity-id.js";
-import { withCliServices } from "./workspace.js";
+import { formattedEntityId, loadFormattedEntityIds } from "../entity-display";
+import { formatEntityIdMatches, resolveEntityId } from "../entity-id";
+import { withCliServices } from "./workspace";
 
 // ============================================================================
 // Custom Error Types

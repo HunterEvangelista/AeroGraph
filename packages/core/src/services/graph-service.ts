@@ -3,9 +3,9 @@
  * Graph traversal algorithms and relationship queries contract
  */
 import { Context, type Effect } from "effect";
-import type { Entity } from "../domain/entity.js";
-import type { Link, LinkType } from "../domain/link.js";
-import type { EntityNotFoundError, RepositoryError } from "../errors.js";
+import type { Entity } from "../domain/entity";
+import type { Link, LinkType } from "../domain/link";
+import type { EntityNotFoundError, RepositoryError } from "../errors";
 
 // ============================================================================
 // Graph Query Result Types

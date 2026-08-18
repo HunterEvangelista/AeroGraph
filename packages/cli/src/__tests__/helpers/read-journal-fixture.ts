@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { type JournalEntryId, MigrationJournalRepositoryTag } from "@kioku/core";
 import { Effect } from "effect";
-import { CliServicesLive } from "../../db/layers.js";
+import { CliServicesLive } from "../../db/layers";
 
 const rootPath = process.argv[2];
 const journalId = process.argv[3] as JournalEntryId | undefined;

@@ -15,8 +15,8 @@ import type {
   EntityId,
   EntityType,
   Story,
-} from "../domain/entity.js";
-import type { EntityNotFoundError, RepositoryError, ValidationError } from "../errors.js";
+} from "../domain/entity";
+import type { EntityNotFoundError, RepositoryError, ValidationError } from "../errors";
 
 // ============================================================================
 // Entity Service Interface

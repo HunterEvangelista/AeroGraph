@@ -3,7 +3,7 @@ import {
   calculateEntityIdPrefixes,
   DEFAULT_ENTITY_ID_PREFIX_SCOPE,
   formatEntityIdWithBoldPrefix,
-} from "../entity-prefix-format.js";
+} from "../entity-prefix-format";
 
 describe("entity prefix index", () => {
   it("calculates shortest unique prefixes by local scope", () => {

@@ -2,10 +2,10 @@
  * Entity Service live implementation
  */
 import { Effect, Layer } from "effect";
-import type { Entity } from "../domain/entity.js";
-import { EntityRepositoryTag } from "../repository/entity-repository.js";
-import { VersionRepositoryTag } from "../repository/version-repository.js";
-import { type EntityService, EntityServiceTag } from "./entity-service.js";
+import type { Entity } from "../domain/entity";
+import { EntityRepositoryTag } from "../repository/entity-repository";
+import { VersionRepositoryTag } from "../repository/version-repository";
+import { type EntityService, EntityServiceTag } from "./entity-service";
 
 export const EntityServiceLive = Layer.effect(
   EntityServiceTag,

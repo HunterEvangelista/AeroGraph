@@ -1,12 +1,12 @@
 import { Context, type Effect } from "effect";
-import type { RepositoryError } from "../errors.js";
-import type { EntityRepository } from "./entity-repository.js";
-import type { LinkRepository } from "./link-repository.js";
-import type { MigrationJournalRepository } from "./migration-journal-repository.js";
-import type { NextRepository } from "./next-repository.js";
-import type { TagRepository } from "./tag-repository.js";
-import type { TermRepository } from "./term-repository.js";
-import type { VersionRepository } from "./version-repository.js";
+import type { RepositoryError } from "../errors";
+import type { EntityRepository } from "./entity-repository";
+import type { LinkRepository } from "./link-repository";
+import type { MigrationJournalRepository } from "./migration-journal-repository";
+import type { NextRepository } from "./next-repository";
+import type { TagRepository } from "./tag-repository";
+import type { TermRepository } from "./term-repository";
+import type { VersionRepository } from "./version-repository";
 
 export interface TransactionRepositories {
   readonly entities: EntityRepository;

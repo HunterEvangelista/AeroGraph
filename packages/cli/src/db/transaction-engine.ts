@@ -12,20 +12,20 @@ import {
   VersionRepositoryTag,
 } from "@kioku/core";
 import { type Cause, Effect, Exit, Layer } from "effect";
-import { type DatabaseClient, DatabaseClientTag } from "./client.js";
-import { SqliteEntityRepositorySessionLive } from "./entity-repository.js";
-import { SqliteLinkRepositorySessionLive } from "./link-repository.js";
-import { SqliteMigrationJournalRepositorySessionLive } from "./migration-journal-repository.js";
-import { SqliteNextRepositorySessionLive } from "./next-repository.js";
+import { type DatabaseClient, DatabaseClientTag } from "./client";
+import { SqliteEntityRepositorySessionLive } from "./entity-repository";
+import { SqliteLinkRepositorySessionLive } from "./link-repository";
+import { SqliteMigrationJournalRepositorySessionLive } from "./migration-journal-repository";
+import { SqliteNextRepositorySessionLive } from "./next-repository";
 import {
   type DatabaseSession,
   DatabaseSessionTag,
   makeTransactionDatabaseSession,
-} from "./session.js";
-import { withSqliteWriteRetry } from "./sqlite-retry.js";
-import { SqliteTagRepositorySessionLive } from "./tag-repository.js";
-import { SqliteTermRepositorySessionLive } from "./term-repository.js";
-import { SqliteVersionRepositorySessionLive } from "./version-repository.js";
+} from "./session";
+import { withSqliteWriteRetry } from "./sqlite-retry";
+import { SqliteTagRepositorySessionLive } from "./tag-repository";
+import { SqliteTermRepositorySessionLive } from "./term-repository";
+import { SqliteVersionRepositorySessionLive } from "./version-repository";
 
 const transactionRepositoriesLive = (session: DatabaseSession) =>
   Layer.mergeAll(

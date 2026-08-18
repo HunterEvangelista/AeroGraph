@@ -3,7 +3,7 @@
  * Hierarchical tags for connecting entities
  */
 import { Schema } from "effect";
-import { TermIdSchema } from "./term.js";
+import { TermIdSchema } from "./term";
 
 // ============================================================================
 // Tag Schema

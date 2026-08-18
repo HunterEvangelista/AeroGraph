@@ -2,18 +2,18 @@ import { RepositoryError } from "@kioku/core";
 import { and, eq, inArray, like } from "drizzle-orm";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { Context, Effect, Layer } from "effect";
-import { DatabaseClientTag } from "./client.js";
+import { DatabaseClientTag } from "./client";
 
 export {
   calculateEntityIdPrefixes,
   DEFAULT_ENTITY_ID_PREFIX_SCOPE,
   formatEntityIdWithBoldPrefix,
-} from "./entity-prefix-format.js";
+} from "./entity-prefix-format";
 
 import { calculateEntityIdPrefixes, DEFAULT_ENTITY_ID_PREFIX_SCOPE } from "./entity-prefix-format";
 import type * as schema from "./schema";
 import { entities, entityIdPrefixes } from "./schema";
-import type { DatabaseSession } from "./session.js";
+import type { DatabaseSession } from "./session";
 import { withSqliteWriteRetry } from "./sqlite-retry";
 
 export interface EntityPrefixMatch {

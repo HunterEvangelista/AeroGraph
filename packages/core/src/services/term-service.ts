@@ -10,14 +10,14 @@ import type {
   TermId,
   TermKind,
   TermName,
-} from "../domain/term.js";
+} from "../domain/term";
 import type {
   AmbiguousTermNameError,
   RepositoryError,
   TermAlreadyExistsError,
   TermNotFoundError,
   ValidationError,
-} from "../errors.js";
+} from "../errors";
 
 export interface TermResolution {
   readonly term: Term;

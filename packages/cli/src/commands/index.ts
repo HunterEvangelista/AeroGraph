@@ -2,15 +2,15 @@
  * Commands module exports
  */
 
-export { codeRefCommand } from "./code-ref.js";
-export { contextCommand } from "./context.js";
-export { docCommand } from "./doc.js";
-export { historyCommand } from "./history.js";
-export { initCommand } from "./init.js";
-export { linkCommand, unlinkCommand } from "./link.js";
-export { migrateCommand } from "./migrate.js";
-export { nextCommand } from "./next.js";
-export { queryCommand } from "./query.js";
-export { statusCommand } from "./status.js";
-export { storyCommand } from "./story.js";
-export { tagCommand } from "./tag.js";
+export { codeRefCommand } from "./code-ref";
+export { contextCommand } from "./context";
+export { docCommand } from "./doc";
+export { historyCommand } from "./history";
+export { initCommand } from "./init";
+export { linkCommand, unlinkCommand } from "./link";
+export { migrateCommand } from "./migrate";
+export { nextCommand } from "./next";
+export { queryCommand } from "./query";
+export { statusCommand } from "./status";
+export { storyCommand } from "./story";
+export { tagCommand } from "./tag";

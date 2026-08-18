@@ -18,8 +18,8 @@ import {
 } from "@kioku/core";
 import { and, eq } from "drizzle-orm";
 import { Effect, Layer } from "effect";
-import { termNames, terms } from "./schema.js";
-import { type DatabaseExecutor, DatabaseSessionTag, RootDatabaseSessionLive } from "./session.js";
+import { termNames, terms } from "./schema";
+import { type DatabaseExecutor, DatabaseSessionTag, RootDatabaseSessionLive } from "./session";
 
 const now = (): string => new Date().toISOString();
 

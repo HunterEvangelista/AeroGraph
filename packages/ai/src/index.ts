@@ -16,7 +16,7 @@ export {
   formatTagSuggestion,
   ONBOARDING_SYSTEM_PROMPT,
   QUERY_SYSTEM_PROMPT,
-} from "./prompts/index.js";
+} from "./prompts/index";
 export type {
   AIProvider,
   GenerateOptions,
@@ -24,13 +24,13 @@ export type {
   Message,
   ProviderConfig,
   ProviderType,
-} from "./providers/index.js";
+} from "./providers/index";
 // Provider abstraction
 export {
   AIProviderError,
   AIProviderLive,
   AIProviderTag,
-} from "./providers/index.js";
+} from "./providers/index";
 
 // Structured output schemas
 export {
@@ -39,4 +39,4 @@ export {
   SuggestedCodeRef,
   SuggestedDoc,
   SuggestedTag,
-} from "./structured/index.js";
+} from "./structured/index";

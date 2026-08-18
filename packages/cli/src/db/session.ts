@@ -3,9 +3,9 @@ import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import type { SQLiteBunTransaction } from "drizzle-orm/bun-sqlite/session";
 import type { ExtractTablesWithRelations } from "drizzle-orm/relations";
 import { Context, Effect, Layer } from "effect";
-import { type DatabaseClient, DatabaseClientTag } from "./client.js";
-import type * as schema from "./schema.js";
-import { withSqliteWriteRetry } from "./sqlite-retry.js";
+import { type DatabaseClient, DatabaseClientTag } from "./client";
+import type * as schema from "./schema";
+import { withSqliteWriteRetry } from "./sqlite-retry";
 
 type DatabaseTransaction = SQLiteBunTransaction<
   typeof schema,

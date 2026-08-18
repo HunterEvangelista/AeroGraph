@@ -8,7 +8,7 @@ import {
   TermRepositoryTag,
 } from "@kioku/core";
 import { Effect } from "effect";
-import { CliServicesLive } from "../../db/layers.js";
+import { CliServicesLive } from "../../db/layers";
 
 const rootPath = process.argv[2];
 if (!rootPath) {
