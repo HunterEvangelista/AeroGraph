@@ -1,7 +1,7 @@
 /**
  * SQLite repository and application layer bundles
  */
-import { CoreServicesLive } from "@kioku/core";
+import { CoreServicesLive } from "@aerograph/core";
 import { Layer } from "effect";
 import { DatabaseClientLive } from "./client";
 import { EntityPrefixIndexLive } from "./entity-prefix-index";

@@ -10,7 +10,7 @@ import {
   LinkRepositoryTag,
   type LinkType,
   RepositoryError,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { and, desc, count as drizzleCount, eq, or } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 import { entities, links } from "./schema";

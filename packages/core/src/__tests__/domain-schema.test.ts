@@ -391,13 +391,13 @@ describe("domain schema unit tests", () => {
       });
       const configError = new ConfigError({
         message: "Missing config",
-        path: "/tmp/kioku.json",
+        path: "/tmp/aerograph.json",
       });
       const workspaceNotFoundError = new WorkspaceNotFoundError({
-        path: "/workspace/kioku",
+        path: "/workspace/aerograph",
       });
       const workspaceAlreadyExistsError = new WorkspaceAlreadyExistsError({
-        path: "/workspace/kioku",
+        path: "/workspace/aerograph",
       });
       const databaseError = new DatabaseError({
         message: "SQLite failure",
@@ -426,13 +426,13 @@ describe("domain schema unit tests", () => {
       expect(versionNotFoundError.version).toBe(7);
 
       expect(configError._tag).toBe("ConfigError");
-      expect(configError.path).toBe("/tmp/kioku.json");
+      expect(configError.path).toBe("/tmp/aerograph.json");
 
       expect(workspaceNotFoundError._tag).toBe("WorkspaceNotFoundError");
-      expect(workspaceNotFoundError.path).toBe("/workspace/kioku");
+      expect(workspaceNotFoundError.path).toBe("/workspace/aerograph");
 
       expect(workspaceAlreadyExistsError._tag).toBe("WorkspaceAlreadyExistsError");
-      expect(workspaceAlreadyExistsError.path).toBe("/workspace/kioku");
+      expect(workspaceAlreadyExistsError.path).toBe("/workspace/aerograph");
 
       expect(databaseError._tag).toBe("DatabaseError");
       expect(databaseError.message).toBe("SQLite failure");

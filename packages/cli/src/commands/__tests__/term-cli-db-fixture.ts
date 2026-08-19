@@ -5,7 +5,7 @@ const operation = process.argv[3];
 if (!root || !operation) throw new Error("Workspace path and operation are required");
 
 const database = new Database(
-  `${root}/.kioku/kioku.db`,
+  `${root}/.aerograph/aerograph.db`,
   operation === "state" ? { readonly: true } : undefined
 );
 try {

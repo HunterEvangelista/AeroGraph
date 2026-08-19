@@ -11,7 +11,7 @@ type CountRow = { count: number };
 type MigrationJournalRow = { to_name: string; related_term_id: string | null };
 
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../drizzle");
-const legacyFolder = mkdtempSync(resolve(tmpdir(), "kioku-drizzle-v2-"));
+const legacyFolder = mkdtempSync(resolve(tmpdir(), "aerograph-drizzle-v2-"));
 mkdirSync(resolve(legacyFolder, "meta"));
 const journal = JSON.parse(readFileSync(resolve(migrationsFolder, "meta/_journal.json"), "utf8"));
 const legacyJournal = { ...journal, entries: journal.entries.slice(0, 3) };

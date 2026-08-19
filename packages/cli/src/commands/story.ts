@@ -6,7 +6,7 @@ import {
   type Story,
   StoryStatusEnum,
   TagServiceTag,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config";
@@ -325,7 +325,7 @@ const storyListCommand = Command.make(
       if (stories.length === 0) {
         yield* Console.log("No stories found.");
         yield* Console.log("");
-        yield* Console.log('Create one with: kioku story create --title "User can sign in"');
+        yield* Console.log('Create one with: aerograph story create --title "User can sign in"');
       } else {
         for (const story of stories) {
           const preview = story.content.slice(0, 50).replace(/\n/g, " ");

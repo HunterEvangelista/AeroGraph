@@ -9,7 +9,7 @@ import {
   type Tag,
   TagServiceTag,
   TermServiceTag,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id";
@@ -126,8 +126,8 @@ const printTaskStub = (task: string) =>
     yield* Console.log("");
     yield* Console.log(`Requested task: ${task}`);
     yield* Console.log("Use structured context modes for now:");
-    yield* Console.log("  kioku context <entityId> --depth 2");
-    yield* Console.log("  kioku context --tags auth,middleware");
+    yield* Console.log("  aerograph context <entityId> --depth 2");
+    yield* Console.log("  aerograph context --tags auth,middleware");
     yield* Console.log("");
   });
 

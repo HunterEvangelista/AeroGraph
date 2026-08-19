@@ -250,8 +250,8 @@ export const entityIdPrefixes = sqliteTable(
 // if you're shown entity `39` then you get a next --related-to
 // or a next --traverse
 // I think now it may be better to do something like next 39 --related
-// or in plain terms kioku next <id> [--related, --traverse]
-// we could also expose an index: `kioku next --index 1`
+// or in plain terms aerograph next <id> [--related, --traverse]
+// we could also expose an index: `aerograph next --index 1`
 export const nextCommands = sqliteTable(
   "next_commands",
   {

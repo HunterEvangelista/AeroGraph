@@ -4,7 +4,7 @@ import {
   EntityType,
   GraphServiceTag,
   TagServiceTag,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Console, Data, Effect, Option } from "effect";
 /**
  * Code Ref Commands
@@ -299,7 +299,7 @@ const codeRefListCommand = Command.make(
         yield* Console.log("No code refs found.");
         yield* Console.log("");
         yield* Console.log(
-          'Create one with: kioku code-ref add --title "Auth middleware" --file src/middleware/auth.ts'
+          'Create one with: aerograph code-ref add --title "Auth middleware" --file src/middleware/auth.ts'
         );
       } else {
         for (const codeRef of codeRefs) {

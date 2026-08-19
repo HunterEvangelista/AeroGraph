@@ -5,7 +5,7 @@ import {
   type Link,
   LinkRepositoryTag,
   type LinkType,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Console, Data, Effect, Option } from "effect";
 /**
  * Link Commands

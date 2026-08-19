@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { Effect, Exit } from "effect";
 import { type DatabaseClient, DatabaseClientLive, DatabaseClientTag } from "../../client";
 
-const root = mkdtempSync(join(tmpdir(), "kioku-upgrade-"));
+const root = mkdtempSync(join(tmpdir(), "aerograph-upgrade-"));
 const getRequired = <T>(row: T | null): T => {
   assert.ok(row);
   return row;

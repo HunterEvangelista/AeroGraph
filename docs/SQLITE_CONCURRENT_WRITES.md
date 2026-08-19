@@ -4,7 +4,7 @@
 
 KIOKU-29 tracks failures where parallel CLI write commands can hit SQLite `database is locked` errors. This is most visible when multiple `doc create` commands run at the same time, especially with tags.
 
-Kioku v1 is local-first and CLI-first. Parallel writes can still come from separate CLI processes, agent workflows, and future editor or indexer processes sharing the same workspace database.
+AeroGraph v1 is local-first and CLI-first. Parallel writes can still come from separate CLI processes, agent workflows, and future editor or indexer processes sharing the same workspace database.
 
 ## Selected Approach
 

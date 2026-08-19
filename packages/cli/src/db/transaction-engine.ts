@@ -10,7 +10,7 @@ import {
   TransactionEngineTag,
   type TransactionRepositories,
   VersionRepositoryTag,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { type Cause, Effect, Exit, Layer } from "effect";
 import { type DatabaseClient, DatabaseClientTag } from "./client";
 import { SqliteEntityRepositorySessionLive } from "./entity-repository";

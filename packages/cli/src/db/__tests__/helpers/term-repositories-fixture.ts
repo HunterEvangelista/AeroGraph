@@ -6,7 +6,7 @@ import {
   TermIdSchema,
   TermRepositoryTag,
   ValidationError,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Effect, Layer, Schema } from "effect";
 import { DatabaseClientLive } from "../../client";
 import { SqliteMigrationJournalRepositoryLive } from "../../migration-journal-repository";

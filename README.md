@@ -1,6 +1,6 @@
-# Kioku
+# AeroGraph
 
-Kioku is a local-first knowledge platform for codebases. It models docs, stories, code references, diagrams, tags, and links as a shared graph so humans and AI agents can retrieve the right context quickly.
+AeroGraph is a local-first knowledge platform for codebases. It models docs, stories, code references, diagrams, tags, and links as a shared graph so humans and AI agents can retrieve the right context quickly.
 
 ## What It Is
 
@@ -13,9 +13,9 @@ Kioku is a local-first knowledge platform for codebases. It models docs, stories
 
 A **tag** is a label attached to saved items such as documents, stories, and code references.
 
-A **term** records what a name means. It lets Kioku treat a current name, an older name, and other spellings as the same thing. This is useful when a project, package, feature, or API is renamed.
+A **term** records what a name means. It lets AeroGraph treat a current name, an older name, and other spellings as the same thing. This is useful when a project, package, feature, or API is renamed.
 
-For example, before a project rename Kioku might store:
+For example, before a project rename AeroGraph might store:
 
 ```text
 Term:
@@ -53,84 +53,84 @@ The document still points to the same tag. Only the displayed name changes. Sear
 
 ### Migrating Terms
 
-Use a term migration when something is renamed. Kioku updates the name without disconnecting documents from their tags.
+Use a term migration when something is renamed. AeroGraph updates the name without disconnecting documents from their tags.
 
-Kioku does not guess which tags belong to a name. Before running a rename, create the term and connect the existing tags to it.
+AeroGraph does not guess which tags belong to a name. Before running a rename, create the term and connect the existing tags to it.
 
 Always preview a migration first:
 
 ```bash
-kioku migrate brand AcmeCorp AeroGraph --dry-run
+aerograph migrate brand AcmeCorp AeroGraph --dry-run
 ```
 
 The dry run shows what would change without saving anything. After reviewing it, apply the rename:
 
 ```bash
-kioku migrate brand AcmeCorp AeroGraph \
+aerograph migrate brand AcmeCorp AeroGraph \
   --apply \
   --reason "Project rename" \
   --applied-by "your-name"
 ```
 
-Kioku applies the rename as one operation: either everything succeeds or nothing changes. It also saves a record of what changed, why, and who applied it.
+AeroGraph applies the rename as one operation: either everything succeeds or nothing changes. It also saves a record of what changed, why, and who applied it.
 
 ### Preparing Existing Tags for a Rename
 
 First, find tags that are not connected to a term:
 
 ```bash
-kioku tag list --ungoverned
+aerograph tag list --ungoverned
 ```
 
 Then create the term, connect the existing tag, and check the result:
 
 ```bash
-kioku term create Kioku --kind brand --alias "Kioku Project"
-kioku tag govern kioku --term Kioku --kind brand
-kioku tag show kioku
+aerograph term create AcmeCorp --kind brand --alias "Acme Corp"
+aerograph tag govern acme-corp --term AcmeCorp --kind brand
+aerograph tag show acme-corp
 ```
 
-Kioku creates the term ID for you. Use `--id` only when an import or another tool requires a specific ID.
+AeroGraph creates the term ID for you. Use `--id` only when an import or another tool requires a specific ID.
 
 If a tag is already connected to the wrong term, name its current term with `--replace`:
 
 ```bash
-kioku tag govern kioku --term "Correct Name" --replace "Current Name"
+aerograph tag govern acme-corp --term "Correct Name" --replace "Current Name"
 ```
 
-Kioku refuses the change if `Current Name` is not the tag's current term. This prevents scripts or stale commands from overwriting a newer choice. Add `--json` to these commands when calling them from another tool.
+AeroGraph refuses the change if `Current Name` is not the tag's current term. This prevents scripts or stale commands from overwriting a newer choice. Add `--json` to these commands when calling them from another tool.
 
 ### Managing Terms Over Time
 
 List terms, view their names, or see their change history:
 
 ```bash
-kioku term list --kind api
-kioku term show "Legacy Client" --kind package
-kioku term audit term-package-client --json
-kioku term alias term-package-client "old-client"
+aerograph term list --kind api
+aerograph term show "Legacy Client" --kind package
+aerograph term audit term-package-client --json
+aerograph term alias term-package-client "old-client"
 ```
 
 Deprecate a term when it should no longer be used for new work. Existing tags and searches keep working. You can also suggest a replacement:
 
 ```bash
-kioku term deprecate "Legacy Client" \
+aerograph term deprecate "Legacy Client" \
   --kind package \
   --replacement "Platform Client" \
   --dry-run
 
-kioku term deprecate "Legacy Client" \
+aerograph term deprecate "Legacy Client" \
   --kind package \
   --replacement "Platform Client" \
   --apply \
   --reason "Client sunset"
 ```
 
-Merge two terms when they were created separately but mean the same thing. Kioku moves their tags under one term without changing the tags or their attached documents:
+Merge two terms when they were created separately but mean the same thing. AeroGraph moves their tags under one term without changing the tags or their attached documents:
 
 ```bash
-kioku term merge "Duplicate API" "Canonical API" --kind api --dry-run
-kioku term merge "Duplicate API" "Canonical API" --kind api --apply
+aerograph term merge "Duplicate API" "Canonical API" --kind api --dry-run
+aerograph term merge "Duplicate API" "Canonical API" --kind api --apply
 ```
 
 Both commands require `--dry-run` to preview the change or `--apply` to save it. Add `--kind` when the same name is used for more than one kind of term.
@@ -138,15 +138,15 @@ Both commands require `--dry-run` to preview the change or `--apply` to save it.
 After a rename, searches for either the old or new name find the same saved material:
 
 ```bash
-kioku query --tags AcmeCorp
-kioku query --tags AeroGraph
-kioku context --tags AcmeCorp --canonical-terms
+aerograph query --tags AcmeCorp
+aerograph query --tags AeroGraph
+aerograph context --tags AcmeCorp --canonical-terms
 ```
 
 ## Repo Layout
 
 - `packages/core`: shared domain models, repositories, services, and graph logic
-- `packages/cli`: the `kioku` CLI and SQLite-backed implementations
+- `packages/cli`: the `aerograph` CLI and SQLite-backed implementations
 - `packages/ai`: AI integration package built on top of the core model
 - `apps`: future desktop and web clients
 - `docs`: product and project documentation, including `docs/DESIGN_DOC.md`

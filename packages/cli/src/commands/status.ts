@@ -1,4 +1,4 @@
-import { EntityType, GraphServiceTag } from "@kioku/core";
+import { EntityType, GraphServiceTag } from "@aerograph/core";
 import { Console, Effect } from "effect";
 /**
  * Status Command
@@ -15,7 +15,7 @@ export const statusCommand = Command.make("status", {}, () =>
     const workspace = yield* configService.load();
 
     yield* Console.log("");
-    yield* Console.log("Kioku Workspace Status");
+    yield* Console.log("AeroGraph Workspace Status");
     yield* Console.log("=".repeat(40));
     yield* Console.log("");
     yield* Console.log(`Root:     ${workspace.rootPath}`);

@@ -1,4 +1,4 @@
-import { type NextCommandType, NextServiceTag } from "@kioku/core";
+import { type NextCommandType, NextServiceTag } from "@aerograph/core";
 import { Console, Data, Effect } from "effect";
 /**
  * Next Command

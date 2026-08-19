@@ -1,7 +1,7 @@
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Effect, Layer } from "effect";
 /**
- * Kioku CLI
+ * AeroGraph CLI
  * Main entry point for the command-line interface
  */
 import { Command } from "effect/unstable/cli";
@@ -27,11 +27,11 @@ import { ConfigServiceLive } from "./config";
 // CLI Application
 // ============================================================================
 
-const kioku = Command.make("kioku").pipe(
+const aerograph = Command.make("aerograph").pipe(
   Command.withDescription("A version-controlled knowledge platform for codebases")
 );
 
-const command = kioku.pipe(
+const command = aerograph.pipe(
   Command.withSubcommands([
     initCommand,
     statusCommand,

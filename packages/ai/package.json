@@ -1,5 +1,5 @@
 {
-  "name": "@kioku/ai",
+  "name": "@aerograph/ai",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,7 +25,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@kioku/core": "workspace:*",
+    "@aerograph/core": "workspace:*",
     "ai": "^4.0.27",
     "effect": "^4.0.0-beta.102"
   },

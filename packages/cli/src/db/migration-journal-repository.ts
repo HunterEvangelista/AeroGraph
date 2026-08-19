@@ -9,7 +9,7 @@ import {
   RepositoryError,
   type TermId,
   TermIdSchema,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { desc, eq, or } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 import { migrationJournal } from "./schema";

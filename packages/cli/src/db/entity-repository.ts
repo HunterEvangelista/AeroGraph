@@ -20,7 +20,7 @@ import {
   type Story,
   StorySchema,
   StoryStatusEnum,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { desc, count as drizzleCount, eq, inArray, sql } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 import { rebuildEntityIdPrefixes } from "./entity-prefix-index";

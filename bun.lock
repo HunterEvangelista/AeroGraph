@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "kioku",
+      "name": "aerograph",
       "devDependencies": {
         "@biomejs/biome": "^2.4.16",
         "@effect/tsgo": "^0.24.3",
@@ -14,10 +14,10 @@
       },
     },
     "packages/ai": {
-      "name": "@kioku/ai",
+      "name": "@aerograph/ai",
       "version": "0.1.0",
       "dependencies": {
-        "@kioku/core": "workspace:*",
+        "@aerograph/core": "workspace:*",
         "ai": "^4.0.27",
         "effect": "^4.0.0-beta.102",
       },
@@ -28,14 +28,14 @@
       },
     },
     "packages/cli": {
-      "name": "@kioku/cli",
+      "name": "@aerograph/cli",
       "version": "0.1.0",
       "bin": {
-        "kioku": "./bin/kioku",
+        "aerograph": "./bin/aerograph",
       },
       "dependencies": {
+        "@aerograph/core": "workspace:*",
         "@effect/platform-bun": "^4.0.0-beta.102",
-        "@kioku/core": "workspace:*",
         "drizzle-orm": "^0.45.2",
         "effect": "^4.0.0-beta.102",
       },
@@ -47,7 +47,7 @@
       },
     },
     "packages/core": {
-      "name": "@kioku/core",
+      "name": "@aerograph/core",
       "version": "0.1.0",
       "dependencies": {
         "effect": "^4.0.0-beta.102",
@@ -60,6 +60,12 @@
     },
   },
   "packages": {
+    "@aerograph/ai": ["@aerograph/ai@workspace:packages/ai"],
+
+    "@aerograph/cli": ["@aerograph/cli@workspace:packages/cli"],
+
+    "@aerograph/core": ["@aerograph/core@workspace:packages/core"],
+
     "@ai-sdk/provider": ["@ai-sdk/provider@1.1.3", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-qZMxYJ0qqX/RfnuIaab+zp8UAeJn/ygXXAffR5I4N0n1IrvA6qBsjc8hXLmBiMV2zoXlifkacF7sEFnYnjBcqg=="],
 
     "@ai-sdk/provider-utils": ["@ai-sdk/provider-utils@2.2.8", "", { "dependencies": { "@ai-sdk/provider": "1.1.3", "nanoid": "^3.3.8", "secure-json-parse": "^2.7.0" }, "peerDependencies": { "zod": "^3.23.8" } }, "sha512-fqhG+4sCVv8x7nFzYnFo19ryhAa3w096Kmc3hWxMQfW/TubPOmt3A6tYZhl4mUfQWWQMsuSkLrtjlWuXBVSGQA=="],
@@ -165,12 +171,6 @@
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.12", "", { "os": "win32", "cpu": "x64" }, "sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA=="],
 
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
-
-    "@kioku/ai": ["@kioku/ai@workspace:packages/ai"],
-
-    "@kioku/cli": ["@kioku/cli@workspace:packages/cli"],
-
-    "@kioku/core": ["@kioku/core@workspace:packages/core"],
 
     "@libsql/client": ["@libsql/client@0.17.3", "", { "dependencies": { "@libsql/core": "^0.17.3", "@libsql/hrana-client": "^0.10.0", "js-base64": "^3.7.5", "libsql": "^0.5.28", "promise-limit": "^2.7.0" } }, "sha512-HXk9wiAoJbKFbyBH4O+aEhN6ir5ERXuXvwE5OD2eR4/5RUa3Pw/8L9zrnVdU+iNJitRvisPWaIwmhkO3bH7giA=="],
 

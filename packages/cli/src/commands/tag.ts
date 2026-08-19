@@ -1,6 +1,6 @@
 import {
+  type AeroGraphError,
   type GovernTagInput,
-  type KiokuError,
   type TagGovernanceInspection,
   TagIdSchema,
   TagServiceTag,
@@ -9,7 +9,7 @@ import {
   TermIdSchema,
   TermKind as TermKindSchema,
   ValidationError,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Console, Effect, Option, Schema } from "effect";
 /**
  * Tag Commands
@@ -119,7 +119,7 @@ interface TagJsonError {
   readonly name?: string;
 }
 
-const errorMessage = (error: KiokuError): string => {
+const errorMessage = (error: AeroGraphError): string => {
   if (error.message) return error.message;
   if (error._tag === "TagNotFoundError") return `Tag not found: #${error.tagId}`;
   if (error._tag === "TermNotFoundError") return `Term not found: ${error.name}`;
@@ -127,14 +127,14 @@ const errorMessage = (error: KiokuError): string => {
   return error._tag;
 };
 
-const errorData = (error: KiokuError): TagJsonError => {
+const errorData = (error: AeroGraphError): TagJsonError => {
   const data: TagJsonError = { tag: error._tag, message: errorMessage(error) };
   if ("field" in error && error.field !== undefined) return { ...data, field: error.field };
   if ("name" in error && error.name !== undefined) return { ...data, name: error.name };
   return data;
 };
 
-const outputError = <A, E extends KiokuError, R>(
+const outputError = <A, E extends AeroGraphError, R>(
   effect: Effect.Effect<A, E, R>,
   command: string,
   asJson: boolean
@@ -201,7 +201,7 @@ const tagListCommand = Command.make(
       if (tags.length === 0) {
         yield* Console.log("No tags found.");
         yield* Console.log("");
-        yield* Console.log("Create one with: kioku tag create <name>");
+        yield* Console.log("Create one with: aerograph tag create <name>");
       } else {
         const render = (inspection: TagGovernanceInspection, depth: number) => {
           const tag = inspectionTag(inspection);

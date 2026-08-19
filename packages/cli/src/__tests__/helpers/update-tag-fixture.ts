@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { TagIdSchema, TagRepositoryTag } from "@kioku/core";
+import { TagIdSchema, TagRepositoryTag } from "@aerograph/core";
 import { Effect } from "effect";
 import { CliServicesLive } from "../../db/layers";
 
@@ -17,7 +17,7 @@ await Effect.runPromise(
         const repository = yield* TagRepositoryTag;
         yield* repository.update(tagId, { name });
       }),
-      CliServicesLive(join(rootPath, ".kioku", "kioku.db"))
+      CliServicesLive(join(rootPath, ".aerograph", "aerograph.db"))
     )
   )
 );

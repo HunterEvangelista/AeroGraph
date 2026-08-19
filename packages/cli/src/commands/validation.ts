@@ -1,4 +1,4 @@
-import { NonNegativeInteger, PositiveInteger } from "@kioku/core";
+import { NonNegativeInteger, PositiveInteger } from "@aerograph/core";
 import { Schema } from "effect";
 
 export const decodePositiveInteger = (value: number): number =>

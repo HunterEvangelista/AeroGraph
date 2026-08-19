@@ -9,7 +9,7 @@ export default defineConfig({
     ".continue/**",
     ".cursor/**",
     ".gemini/**",
-    ".kioku/**",
+    ".aerograph/**",
     ".opencode/**",
     ".pi/**",
     ".roo/**",

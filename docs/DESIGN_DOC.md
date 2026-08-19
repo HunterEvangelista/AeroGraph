@@ -1,4 +1,4 @@
-# Design Document: KIOKU
+# Design Document: AEROGRAPH
 
 ## 1. Problem Statement & Vision
 
@@ -158,7 +158,7 @@ For v1, everything runs locally:
 
 ### 3.3 Shared Core Library
 
-A TypeScript library (`@kioku/core`) containing:
+A TypeScript library (`@aerograph/core`) containing:
 
 - Domain models (Entity types, Tag, Version)
 - Repository interfaces (storage-agnostic)
@@ -518,66 +518,66 @@ For integration with external AI agents (Cursor, Claude, etc.):
 ### 8.1 Proposed Interface
 
 ```bash
-# Initialize a new kioku workspace in current directory
-kioku init
+# Initialize a new aerograph workspace in current directory
+aerograph init
 
 # Onboarding: guided interview to build initial graph
-kioku onboard [--repo <path>]
+aerograph onboard [--repo <path>]
 
 # Entity operations
-kioku doc create "My Document"
-kioku doc edit <id>
-kioku doc show <id>
-kioku doc list [--tag <tag>]
+aerograph doc create "My Document"
+aerograph doc edit <id>
+aerograph doc show <id>
+aerograph doc list [--tag <tag>]
 
-kioku code-ref add <file-path> [--lines <start>-<end>]
-kioku code-ref list [--tag <tag>]
+aerograph code-ref add <file-path> [--lines <start>-<end>]
+aerograph code-ref list [--tag <tag>]
 
-kioku story create "Story title"
-kioku story edit <id>
-kioku story list [--status <status>] [--tag <tag>]
+aerograph story create "Story title"
+aerograph story edit <id>
+aerograph story list [--status <status>] [--tag <tag>]
 
 # Tagging
-kioku tag create <name> [--parent <parent-tag>] [--description "..."]
-kioku tag list
-kioku tag apply <entity-id> <tag>
-kioku tag remove <entity-id> <tag>
+aerograph tag create <name> [--parent <parent-tag>] [--description "..."]
+aerograph tag list
+aerograph tag apply <entity-id> <tag>
+aerograph tag remove <entity-id> <tag>
 
 # Linking
-kioku link <source-id> <target-id> [--type <type>]
-kioku unlink <source-id> <target-id>
+aerograph link <source-id> <target-id> [--type <type>]
+aerograph unlink <source-id> <target-id>
 
 # Querying
-kioku query "What do I need to know about checkout?"
-kioku query --tags checkout,payments
-kioku query --related-to <entity-id>
+aerograph query "What do I need to know about checkout?"
+aerograph query --tags checkout,payments
+aerograph query --related-to <entity-id>
 
 # Context export (for LLM)
-kioku context "Add rate limiting to checkout" --format markdown
-kioku context --tags checkout --max-tokens 8000
+aerograph context "Add rate limiting to checkout" --format markdown
+aerograph context --tags checkout --max-tokens 8000
 
 # Diagrams
-kioku diagram generate --tags checkout --type flowchart
-kioku diagram show <id>
+aerograph diagram generate --tags checkout --type flowchart
+aerograph diagram show <id>
 
 # History
-kioku history <entity-id>
-kioku history <entity-id> --version <n>
+aerograph history <entity-id>
+aerograph history <entity-id> --version <n>
 
 # Import
-kioku import markdown <file-or-dir> [--tags <tags>]
-kioku import obsidian <vault-path>
+aerograph import markdown <file-or-dir> [--tags <tags>]
+aerograph import obsidian <vault-path>
 
 # Info
-kioku status                   # Show graph stats
-kioku graph                    # ASCII visualization of tag relationships
+aerograph status                   # Show graph stats
+aerograph graph                    # ASCII visualization of tag relationships
 ```
 
 ### 8.2 Interactive Mode
 
 ```bash
 # Start interactive REPL
-kioku interactive
+aerograph interactive
 
 # In REPL:
 > query "how does auth work?"
@@ -591,7 +591,7 @@ kioku interactive
 ## 9. Project Structure
 
 ```
-kioku/
+aerograph/
 ├── packages/
 │   ├── core/                    # Shared domain logic
 │   │   ├── src/
@@ -637,7 +637,7 @@ kioku/
 ### Phase 1: Foundation (Week 1)
 
 - [ ] Initialize monorepo (Turborepo + Bun workspaces)
-- [ ] Set up `@kioku/core` with Effect
+- [ ] Set up `@aerograph/core` with Effect
 - [ ] Define domain models (Entity, Tag, Link, Version)
 - [ ] Implement SQLite repository
 - [ ] Basic CLI scaffolding (init, status)
@@ -656,7 +656,7 @@ kioku/
 
 ### Phase 3: AI Integration (Week 3)
 
-- [ ] Set up `@kioku/ai` with Vercel AI SDK
+- [ ] Set up `@aerograph/ai` with Vercel AI SDK
 - [ ] Implement onboarding/interview agent
   - Repo scanning
   - Ambiguity detection
@@ -711,7 +711,7 @@ The PoC is successful if:
 3. **Queries are precise**: Ask "What should an agent know before changing X?" and get relevant results (not a wall of text)
 4. **Agent context is useful**: Export context, paste into Claude/GPT/Codex, and get a better plan or patch than without it
 5. **It feels fast**: CLI commands respond in <500ms for typical operations
-6. **The wedge is obvious**: A demo can show an agent avoiding a mistake because Kioku surfaced architecture, rationale, or constraints
+6. **The wedge is obvious**: A demo can show an agent avoiding a mistake because AeroGraph surfaced architecture, rationale, or constraints
 7. **You actually use it**: The tool provides enough value that you use it on a real project
 
 ---

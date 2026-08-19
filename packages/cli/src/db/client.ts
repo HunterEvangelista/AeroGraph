@@ -3,7 +3,7 @@
  * Manages database connection and initialization
  */
 import { Database, type SQLQueryBindings } from "bun:sqlite";
-import { DatabaseError, MigrationError, normalizeTermName } from "@kioku/core";
+import { DatabaseError, MigrationError, normalizeTermName } from "@aerograph/core";
 import { type BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
 import { Context, Effect, Layer } from "effect";
 import { rebuildEntityIdPrefixes } from "./entity-prefix-index";

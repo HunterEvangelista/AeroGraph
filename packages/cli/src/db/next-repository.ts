@@ -6,7 +6,7 @@ import {
   type NextRepository,
   NextRepositoryTag,
   RepositoryError,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { asc, eq } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 import { entities, nextCommands } from "./schema";
