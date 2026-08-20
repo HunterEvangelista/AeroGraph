@@ -274,7 +274,7 @@ export const schemaMeta = sqliteTable("schema_meta", {
   value: text("value").notNull(),
 });
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 export const CREATE_SCHEMA_META_SQL = `
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -436,16 +436,20 @@ CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(
 
 -- Triggers to keep FTS in sync
 CREATE TRIGGER IF NOT EXISTS entities_ai AFTER INSERT ON entities BEGIN
-  INSERT INTO entities_fts(id, title, content) VALUES (new.id, new.title, new.content);
+  INSERT INTO entities_fts(rowid, id, title, content)
+  VALUES (new.rowid, new.id, new.title, new.content);
 END;
 
 CREATE TRIGGER IF NOT EXISTS entities_ad AFTER DELETE ON entities BEGIN
-  INSERT INTO entities_fts(entities_fts, id, title, content) VALUES('delete', old.id, old.title, old.content);
+  INSERT INTO entities_fts(entities_fts, rowid, id, title, content)
+  VALUES('delete', old.rowid, old.id, old.title, old.content);
 END;
 
 CREATE TRIGGER IF NOT EXISTS entities_au AFTER UPDATE ON entities BEGIN
-  INSERT INTO entities_fts(entities_fts, id, title, content) VALUES('delete', old.id, old.title, old.content);
-  INSERT INTO entities_fts(id, title, content) VALUES (new.id, new.title, new.content);
+  INSERT INTO entities_fts(entities_fts, rowid, id, title, content)
+  VALUES('delete', old.rowid, old.id, old.title, old.content);
+  INSERT INTO entities_fts(rowid, id, title, content)
+  VALUES(new.rowid, new.id, new.title, new.content);
 END;
 `;
 

@@ -249,6 +249,15 @@ const rebuildTermsV5 = (db: Database): void => {
   db.run("CREATE INDEX idx_terms_merged_into_id ON terms(merged_into_id);");
 };
 
+const rebuildEntitiesFts = (db: Database): void => {
+  db.run("DROP TRIGGER IF EXISTS entities_ai;");
+  db.run("DROP TRIGGER IF EXISTS entities_ad;");
+  db.run("DROP TRIGGER IF EXISTS entities_au;");
+  db.run("DROP TABLE IF EXISTS entities_fts;");
+  db.run(CREATE_TABLES_SQL);
+  db.run("INSERT INTO entities_fts(entities_fts) VALUES ('rebuild');");
+};
+
 const legacyJournalRows = (db: Database): LegacyJournalRow[] =>
   tableExists(db, "migration_journal")
     ? db
@@ -481,6 +490,12 @@ const runMigrations = (db: Database, fromVersion: number): void => {
     restoreUnmanagedTriggers(db, triggerSql);
     db.run("DROP TRIGGER IF EXISTS terms_canonical_name_insert_check;");
     db.run("DROP TRIGGER IF EXISTS terms_canonical_name_update_check;");
+  }
+  if (fromVersion < 6 && tableExists(db, "entities")) {
+    // v5 -> v6: FTS5 external-content tables must be written and joined by
+    // entities.rowid. Recreate the derived index from its authoritative source
+    // so malformed or stale entries cannot survive the trigger correction.
+    rebuildEntitiesFts(db);
   }
 };
 

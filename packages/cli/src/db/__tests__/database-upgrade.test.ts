@@ -9,7 +9,7 @@ const fixturePath = join(
 );
 
 describe("database upgrades", () => {
-  it("preserves v4 create journal names while stamping v5 constraints", () => {
+  it("preserves v4 create journal names while stamping v6 constraints", () => {
     const result = spawnSync("bun", ["run", fixturePath], {
       encoding: "utf8",
       shell: false,

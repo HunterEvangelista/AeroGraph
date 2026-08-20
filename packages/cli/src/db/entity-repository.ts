@@ -176,7 +176,7 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
 
     const searchFts = db.prepare<RawEntityRow, SQLQueryBindings[]>(`
       SELECT e.* FROM entities e
-      JOIN entities_fts fts ON e.id = fts.id
+      JOIN entities_fts fts ON e.rowid = fts.rowid
       WHERE entities_fts MATCH ?
       ORDER BY rank
       LIMIT 50
