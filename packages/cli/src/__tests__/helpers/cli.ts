@@ -68,11 +68,11 @@ const runBunAsync = (args: ReadonlyArray<string>, cwd: string): Promise<CliResul
   });
 
 export const createCliWorkspace = (options: CliWorkspaceOptions = {}): CliWorkspace => {
-  const rootPath = mkdtempSync(join(tmpdir(), "kioku-cli-test-"));
-  const kiokuPath = join(rootPath, ".kioku");
-  mkdirSync(kiokuPath);
+  const rootPath = mkdtempSync(join(tmpdir(), "aerograph-cli-test-"));
+  const aerographPath = join(rootPath, ".aerograph");
+  mkdirSync(aerographPath);
   writeFileSync(
-    join(kiokuPath, "config.json"),
+    join(aerographPath, "config.json"),
     JSON.stringify(
       {
         version: 1,

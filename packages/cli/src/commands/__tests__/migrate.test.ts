@@ -149,7 +149,7 @@ describe("migrate command", () => {
     expect(contextEntityIds(oldNameContext.stdout)).toEqual(
       contextEntityIds(canonicalContext.stdout)
     );
-    expect(canonicalContext.stdout).toContain("# Kioku Context: Tags #AeroGraph");
+    expect(canonicalContext.stdout).toContain("# AeroGraph Context: Tags #AeroGraph");
     expect(canonicalContext.stdout).toContain("- Tags: #AeroGraph");
     expect(canonicalContext.stdout).toContain("Existing Kioku rename context.");
 
@@ -191,7 +191,7 @@ describe("migrate command", () => {
     );
     expect(dryRun.status, `${dryRun.stderr}\n${dryRun.stdout}`).toBe(0);
     expect(dryRun.stdout).toContain(
-      "Apply with: kioku migrate package 'Legacy Client' 'Platform Client' --apply"
+      "Apply with: aerograph migrate package 'Legacy Client' 'Platform Client' --apply"
     );
 
     const apply = workspace.run(

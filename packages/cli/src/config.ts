@@ -1,25 +1,26 @@
 /**
  * CLI Configuration
- * Manages .kioku workspace configuration
+ * Manages .aerograph workspace configuration
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { ConfigError, WorkspaceAlreadyExistsError, WorkspaceNotFoundError } from "@kioku/core";
+import { ConfigError, WorkspaceAlreadyExistsError, WorkspaceNotFoundError } from "@aerograph/core";
 import { Context, Effect, Layer, Schema } from "effect";
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-export const KIOKU_DIR = ".kioku";
+export const AEROGRAPH_DIR = ".aerograph";
+export const LEGACY_WORKSPACE_DIR = ".kioku";
 export const CONFIG_FILE = "config.json";
-export const DB_FILE = "kioku.db";
+export const DB_FILE = "aerograph.db";
 
 // ============================================================================
 // Config Types
 // ============================================================================
 
-export interface KiokuConfig {
+export interface AeroGraphConfig {
   version: number;
   createdAt: string;
   repoPath?: string;
@@ -29,7 +30,7 @@ export interface WorkspaceInfo {
   rootPath: string;
   configPath: string;
   dbPath: string;
-  config: KiokuConfig;
+  config: AeroGraphConfig;
 }
 
 // ============================================================================
@@ -38,21 +39,21 @@ export interface WorkspaceInfo {
 
 export interface ConfigService {
   /**
-   * Initialize a new kioku workspace
+   * Initialize a new AeroGraph workspace
    */
   readonly init: (
     path?: string
   ) => Effect.Effect<WorkspaceInfo, WorkspaceAlreadyExistsError | ConfigError>;
 
   /**
-   * Find and load the nearest kioku workspace
+   * Find and load the nearest AeroGraph workspace
    */
   readonly load: (
     startPath?: string
   ) => Effect.Effect<WorkspaceInfo, WorkspaceNotFoundError | ConfigError>;
 
   /**
-   * Check if a kioku workspace exists
+   * Check if an AeroGraph workspace exists
    */
   readonly exists: (path?: string) => Effect.Effect<boolean, never>;
 
@@ -65,8 +66,8 @@ export interface ConfigService {
    * Update workspace configuration
    */
   readonly update: (
-    updates: Partial<KiokuConfig>
-  ) => Effect.Effect<KiokuConfig, WorkspaceNotFoundError | ConfigError>;
+    updates: Partial<AeroGraphConfig>
+  ) => Effect.Effect<AeroGraphConfig, WorkspaceNotFoundError | ConfigError>;
 }
 
 export class ConfigServiceTag extends Context.Service<ConfigServiceTag, ConfigService>()(
@@ -77,14 +78,14 @@ export class ConfigServiceTag extends Context.Service<ConfigServiceTag, ConfigSe
 // Config Servpice Implementation
 // ============================================================================
 
-const KiokuConfigSchema = Schema.Struct({
+const AeroGraphConfigSchema = Schema.Struct({
   version: Schema.Finite,
   createdAt: Schema.String,
   repoPath: Schema.optional(Schema.String),
 });
 
-const decodeConfig = (content: string): KiokuConfig => {
-  const config = Schema.decodeUnknownSync(KiokuConfigSchema)(JSON.parse(content));
+const decodeConfig = (content: string): AeroGraphConfig => {
+  const config = Schema.decodeUnknownSync(AeroGraphConfigSchema)(JSON.parse(content));
   if (Schema.is(Schema.String)(config.repoPath)) {
     return { version: config.version, createdAt: config.createdAt, repoPath: config.repoPath };
   }
@@ -95,8 +96,8 @@ const findWorkspaceRoot = (startPath: string): string | null => {
   let current = resolve(startPath);
 
   while (current !== dirname(current)) {
-    const kiokuPath = join(current, KIOKU_DIR);
-    if (existsSync(kiokuPath)) {
+    const aerographPath = join(current, AEROGRAPH_DIR);
+    if (existsSync(aerographPath)) {
       return current;
     }
     current = dirname(current);
@@ -109,31 +110,40 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
   init: (path?: string) =>
     Effect.gen(function* () {
       const rootPath = resolve(path ?? process.cwd());
-      const kiokuPath = join(rootPath, KIOKU_DIR);
-      const configPath = join(kiokuPath, CONFIG_FILE);
-      const dbPath = join(kiokuPath, DB_FILE);
+      const aerographPath = join(rootPath, AEROGRAPH_DIR);
+      const legacyWorkspacePath = join(rootPath, LEGACY_WORKSPACE_DIR);
+      const configPath = join(aerographPath, CONFIG_FILE);
+      const dbPath = join(aerographPath, DB_FILE);
 
-      // Check if workspace already exists
-      if (existsSync(kiokuPath)) {
+      if (existsSync(aerographPath)) {
         return yield* new WorkspaceAlreadyExistsError({
           path: rootPath,
-          message: `Kioku workspace already exists at ${kiokuPath}`,
+          message: `AeroGraph workspace already exists at ${aerographPath}`,
         });
       }
 
-      // Create .kioku directory
+      // AeroGraph never opens legacy storage. Refusing initialization prevents a second graph from
+      // diverging beside data that still requires the one-time verified storage cutover.
+      if (existsSync(legacyWorkspacePath)) {
+        return yield* new ConfigError({
+          path: legacyWorkspacePath,
+          message: `Legacy Kioku workspace found at ${legacyWorkspacePath}. Preserve and migrate it to ${aerographPath} before initializing AeroGraph.`,
+        });
+      }
+
+      // Create .aerograph directory
       yield* Effect.try({
-        try: () => mkdirSync(kiokuPath, { recursive: true }),
+        try: () => mkdirSync(aerographPath, { recursive: true }),
         catch: (error) =>
           new ConfigError({
             message: `Failed to create workspace directory: ${error instanceof Error ? error.message : String(error)}`,
-            path: kiokuPath,
+            path: aerographPath,
             cause: error,
           }),
       });
 
       // Create config file
-      const config: KiokuConfig = {
+      const config: AeroGraphConfig = {
         version: 1,
         createdAt: new Date().toISOString(),
         repoPath: rootPath,
@@ -165,13 +175,13 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
       if (!rootPath) {
         return yield* new WorkspaceNotFoundError({
           path: searchPath,
-          message: `No kioku workspace found. Run 'kioku init' to create one.`,
+          message: `No AeroGraph workspace found. Run 'aerograph init' to create one.`,
         });
       }
 
-      const kiokuPath = join(rootPath, KIOKU_DIR);
-      const configPath = join(kiokuPath, CONFIG_FILE);
-      const dbPath = join(kiokuPath, DB_FILE);
+      const aerographPath = join(rootPath, AEROGRAPH_DIR);
+      const configPath = join(aerographPath, CONFIG_FILE);
+      const dbPath = join(aerographPath, DB_FILE);
 
       const config = yield* Effect.try({
         try: () => {
@@ -208,14 +218,14 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
       if (!rootPath) {
         return yield* new WorkspaceNotFoundError({
           path: searchPath,
-          message: `No kioku workspace found. Run 'kioku init' to create one.`,
+          message: `No AeroGraph workspace found. Run 'aerograph init' to create one.`,
         });
       }
 
       return rootPath;
     }),
 
-  update: (updates: Partial<KiokuConfig>) =>
+  update: (updates: Partial<AeroGraphConfig>) =>
     Effect.gen(function* () {
       const searchPath = resolve(process.cwd());
       const rootPath = findWorkspaceRoot(searchPath);
@@ -223,11 +233,11 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
       if (!rootPath) {
         return yield* new WorkspaceNotFoundError({
           path: searchPath,
-          message: `No kioku workspace found. Run 'kioku init' to create one.`,
+          message: `No AeroGraph workspace found. Run 'aerograph init' to create one.`,
         });
       }
 
-      const configPath = join(rootPath, KIOKU_DIR, CONFIG_FILE);
+      const configPath = join(rootPath, AEROGRAPH_DIR, CONFIG_FILE);
 
       const existingConfig = yield* Effect.try({
         try: () => {

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { EntityRepositoryTag, TagRepositoryTag, TermRepositoryTag } from "@kioku/core";
+import { EntityRepositoryTag, TagRepositoryTag, TermRepositoryTag } from "@aerograph/core";
 import { Effect } from "effect";
 import { CliServicesLive } from "../../db/layers";
 
@@ -43,5 +43,5 @@ const program = Effect.gen(function* () {
 });
 
 await Effect.runPromise(
-  Effect.scoped(Effect.provide(program, CliServicesLive(join(root, ".kioku", "kioku.db"))))
+  Effect.scoped(Effect.provide(program, CliServicesLive(join(root, ".aerograph", "aerograph.db"))))
 );

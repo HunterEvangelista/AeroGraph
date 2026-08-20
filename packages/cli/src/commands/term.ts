@@ -1,5 +1,5 @@
 import {
-  type KiokuError,
+  type AeroGraphError,
   MigrationServiceTag,
   TERM_KINDS,
   TermGovernanceServiceTag,
@@ -11,7 +11,7 @@ import {
   type TermNameCandidate,
   type TermSelector,
   ValidationError,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Console, Effect, Option, Schema } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { withCliServices } from "./workspace";
@@ -122,7 +122,7 @@ interface MergeInput {
 }
 
 interface JsonErrorData {
-  tag: KiokuError["_tag"];
+  tag: AeroGraphError["_tag"];
   message: string;
   field?: string;
   name?: string;
@@ -132,8 +132,8 @@ interface JsonErrorData {
   path?: string;
 }
 
-const errorMessage = (error: KiokuError): string => error.message ?? String(error);
-const errorData = (error: KiokuError): JsonErrorData => {
+const errorMessage = (error: AeroGraphError): string => error.message ?? String(error);
+const errorData = (error: AeroGraphError): JsonErrorData => {
   const data: JsonErrorData = { tag: error._tag, message: errorMessage(error) };
   if (error._tag === "ValidationError" && error.field !== undefined) data.field = error.field;
   if ("name" in error && error.name !== undefined) data.name = error.name;
@@ -146,7 +146,7 @@ const errorData = (error: KiokuError): JsonErrorData => {
   if (error._tag === "ConfigError" && error.path !== undefined) data.path = error.path;
   return data;
 };
-const outputError = <A, E extends KiokuError, R>(
+const outputError = <A, E extends AeroGraphError, R>(
   effect: Effect.Effect<A, E, R>,
   command: string,
   asJson: boolean

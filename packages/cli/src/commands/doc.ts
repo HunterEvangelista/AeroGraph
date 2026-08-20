@@ -1,4 +1,4 @@
-import { EntityServiceTag, EntityType, LinkRepositoryTag, TagServiceTag } from "@kioku/core";
+import { EntityServiceTag, EntityType, LinkRepositoryTag, TagServiceTag } from "@aerograph/core";
 import { Console, Data, Effect, Option } from "effect";
 /**
  * Doc Commands
@@ -246,7 +246,7 @@ const docListCommand = Command.make(
       if (docs.length === 0) {
         yield* Console.log("No documents found.");
         yield* Console.log("");
-        yield* Console.log('Create one with: kioku doc create "My Document"');
+        yield* Console.log('Create one with: aerograph doc create "My Document"');
       } else {
         for (const doc of docs) {
           const preview = doc.content.slice(0, 50).replace(/\n/g, " ");

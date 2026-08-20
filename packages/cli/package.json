@@ -1,9 +1,9 @@
 {
-  "name": "@kioku/cli",
+  "name": "@aerograph/cli",
   "version": "0.1.0",
   "type": "module",
   "bin": {
-    "kioku": "./bin/kioku"
+    "aerograph": "./bin/aerograph"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,7 +26,7 @@
   },
   "dependencies": {
     "@effect/platform-bun": "^4.0.0-beta.102",
-    "@kioku/core": "workspace:*",
+    "@aerograph/core": "workspace:*",
     "drizzle-orm": "^0.45.2",
     "effect": "^4.0.0-beta.102"
   },

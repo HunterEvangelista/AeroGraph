@@ -5,7 +5,7 @@ import {
   TermIdSchema,
   TermKind,
   TermRepositoryTag,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Effect, Schema } from "effect";
 import { CliServicesLive } from "../../db/layers";
 
@@ -37,5 +37,7 @@ const program = Effect.gen(function* () {
 });
 
 await Effect.runPromise(
-  Effect.scoped(Effect.provide(program, CliServicesLive(join(rootPath, ".kioku", "kioku.db"))))
+  Effect.scoped(
+    Effect.provide(program, CliServicesLive(join(rootPath, ".aerograph", "aerograph.db")))
+  )
 );

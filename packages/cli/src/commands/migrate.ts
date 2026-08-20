@@ -4,7 +4,7 @@ import {
   type TermKind,
   TermKind as TermKindSchema,
   ValidationError,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Console, Effect, Option, Schema } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { withCliServices } from "./workspace";
@@ -122,7 +122,7 @@ const migrateCommand = Command.make(
         yield* Console.log("");
         yield* Console.log("No changes were applied.");
         yield* Console.log(
-          `Apply with: kioku migrate ${kind} ${shellArgument(fromName)} ${shellArgument(toName)} --apply`
+          `Apply with: aerograph migrate ${kind} ${shellArgument(fromName)} ${shellArgument(toName)} --apply`
         );
         yield* Console.log("");
         return;

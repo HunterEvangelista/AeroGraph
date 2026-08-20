@@ -5,7 +5,7 @@ import {
   GraphServiceTag,
   type Link,
   resolveTagSelectors,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Console, Effect } from "effect";
 import { formattedEntityId, loadFormattedEntityIds } from "../entity-display";
 

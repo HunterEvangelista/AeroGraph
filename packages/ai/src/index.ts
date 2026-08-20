@@ -1,6 +1,6 @@
 /**
- * @kioku/ai
- * AI integration for the Kioku knowledge platform
+ * @aerograph/ai
+ * AI integration for the AeroGraph knowledge platform
  *
  * This package provides:
  * - LLM provider abstraction (OpenAI, Anthropic, Ollama)

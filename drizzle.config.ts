@@ -5,6 +5,6 @@ export default defineConfig({
   out: "./packages/cli/drizzle",
   dialect: "sqlite",
   dbCredentials: {
-    url: ".kioku/kioku.db",
+    url: ".aerograph/aerograph.db",
   },
 });

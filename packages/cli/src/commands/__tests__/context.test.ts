@@ -37,7 +37,7 @@ describe("context command", () => {
     const result = workspace.run("context", "doc-auth-ov", "--depth", "1");
 
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("# Kioku Context: Auth Overview");
+    expect(result.stdout).toContain("# AeroGraph Context: Auth Overview");
     expect(result.stdout).toContain("## Code References");
     expect(result.stdout).toContain("### Auth Middleware");
     expect(result.stdout).toContain("- Location: src/auth.ts:10-20");
@@ -56,7 +56,7 @@ describe("context command", () => {
     expect(result.stdout).toContain(`Context written to ${outputPath}`);
 
     const markdown = readFileSync(outputPath, "utf8");
-    expect(markdown).toContain("# Kioku Context: Tags #auth, #middleware");
+    expect(markdown).toContain("# AeroGraph Context: Tags #auth, #middleware");
     expect(markdown).toContain("### Auth Overview");
     expect(markdown).toContain("### Auth Middleware");
     expect(markdown).not.toContain("Auth Only Doc");
@@ -67,7 +67,7 @@ describe("context command", () => {
 
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Task-shaped context export is not available yet.");
-    expect(result.stdout).toContain("kioku context <entityId> --depth 2");
+    expect(result.stdout).toContain("aerograph context <entityId> --depth 2");
   });
 
   it("does not duplicate multi-role entities across semantic sections", () => {

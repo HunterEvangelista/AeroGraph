@@ -536,36 +536,36 @@ describe("governed term lifecycle", () => {
     expect(error).not.toBeInstanceOf(TermNotFoundError);
   });
 
-  it.each([
-    "destination",
-    "missing",
-  ] as const)("rejects deprecated terms with merge destinations during resolution (%s target)", async (target) => {
-    const s = base();
-    const source = {
-      ...term("source", "Legacy", "concept", "deprecated"),
-      mergedIntoId: termId(target),
-    };
-    s.terms.set(source.id, source);
-    s.names.push(name(source.id, "concept", "Legacy", "canonical"));
-    if (target === "destination") {
-      const destination = term(target, "Current", "concept");
-      s.terms.set(destination.id, destination);
-      s.names.push(name(destination.id, "concept", "Current", "canonical"));
-    }
+  it.each(["destination", "missing"] as const)(
+    "rejects deprecated terms with merge destinations during resolution (%s target)",
+    async (target) => {
+      const s = base();
+      const source = {
+        ...term("source", "Legacy", "concept", "deprecated"),
+        mergedIntoId: termId(target),
+      };
+      s.terms.set(source.id, source);
+      s.names.push(name(source.id, "concept", "Legacy", "canonical"));
+      if (target === "destination") {
+        const destination = term(target, "Current", "concept");
+        s.terms.set(destination.id, destination);
+        s.names.push(name(destination.id, "concept", "Current", "canonical"));
+      }
 
-    const error = await Effect.runPromise(
-      Effect.flip(
-        Effect.provide(
-          Effect.gen(function* () {
-            return yield* (yield* TermServiceTag).resolveName("Legacy", "concept");
-          }),
-          layer(s)
+      const error = await Effect.runPromise(
+        Effect.flip(
+          Effect.provide(
+            Effect.gen(function* () {
+              return yield* (yield* TermServiceTag).resolveName("Legacy", "concept");
+            }),
+            layer(s)
+          )
         )
-      )
-    );
-    expect(error._tag).toBe("TermMigrationError");
-    expect(error.message).toBe("Deprecated term 'Legacy' must not have a merge destination.");
-  });
+      );
+      expect(error._tag).toBe("TermMigrationError");
+      expect(error.message).toBe("Deprecated term 'Legacy' must not have a merge destination.");
+    }
+  );
 
   it("merges a deprecated source and clears its advisory replacement", async () => {
     const s = base();

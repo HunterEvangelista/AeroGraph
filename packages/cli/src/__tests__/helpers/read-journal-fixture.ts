@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { JournalEntryIdSchema, MigrationJournalRepositoryTag } from "@kioku/core";
+import { JournalEntryIdSchema, MigrationJournalRepositoryTag } from "@aerograph/core";
 import { Effect } from "effect";
 import { CliServicesLive } from "../../db/layers";
 
@@ -16,7 +16,7 @@ const entry = await Effect.runPromise(
         const repository = yield* MigrationJournalRepositoryTag;
         return yield* repository.getById(journalId);
       }),
-      CliServicesLive(join(rootPath, ".kioku", "kioku.db"))
+      CliServicesLive(join(rootPath, ".aerograph", "aerograph.db"))
     )
   )
 );

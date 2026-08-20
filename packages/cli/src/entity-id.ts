@@ -1,4 +1,4 @@
-import { BrandedId, type EntityId, EntityNotFoundError, EntityServiceTag } from "@kioku/core";
+import { BrandedId, type EntityId, EntityNotFoundError, EntityServiceTag } from "@aerograph/core";
 import { Data, Effect, Option, Result, Schema } from "effect";
 import { EntityPrefixIndexTag } from "./db/entity-prefix-index";
 

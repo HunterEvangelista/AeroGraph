@@ -9,7 +9,7 @@ if (!workspacePath) {
   throw new Error("Workspace path is required");
 }
 
-const dbPath = join(workspacePath, ".kioku", "kioku.db");
+const dbPath = join(workspacePath, ".aerograph", "aerograph.db");
 const timestamp = "2026-01-01T00:00:00.000Z";
 
 const metadata = {

@@ -1,4 +1,4 @@
-import { BrandedId, type EntityId, RepositoryError } from "@kioku/core";
+import { BrandedId, type EntityId, RepositoryError } from "@aerograph/core";
 import { and, eq, inArray, like } from "drizzle-orm";
 import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { Context, Effect, Layer, Option, Schema } from "effect";

@@ -8,7 +8,7 @@ import {
   TagRepositoryTag,
   TermRepositoryTag,
   TransactionEngineTag,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Effect } from "effect";
 import { CliServicesLive } from "../../layers";
 

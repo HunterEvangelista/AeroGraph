@@ -1,4 +1,4 @@
-import { type Entity, EntityType, type Link } from "@kioku/core";
+import { type Entity, EntityType, type Link } from "@aerograph/core";
 
 export interface ContextEntity {
   readonly entity: Entity;
@@ -69,9 +69,9 @@ const appendSection = (
 
 export const formatContextMarkdown = ({ title, entities, links }: ContextMarkdownInput): string => {
   const lines = [
-    `# Kioku Context: ${title}`,
+    `# AeroGraph Context: ${title}`,
     "",
-    "Agent-ready project memory exported from Kioku.",
+    "Agent-ready project memory exported from AeroGraph.",
     "",
   ];
   const used = new Set<string>();

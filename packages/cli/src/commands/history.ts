@@ -1,4 +1,4 @@
-import { type Entity, VersionRepositoryTag } from "@kioku/core";
+import { type Entity, VersionRepositoryTag } from "@aerograph/core";
 import { Console, Data, Effect, Option } from "effect";
 import { Argument, Command, Flag } from "effect/unstable/cli";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id";
@@ -81,7 +81,9 @@ export const historyCommand = Command.make(
           yield* Console.log(`     ${entitySummary(entity)}`);
           const text = preview(entity.content);
           if (text) yield* Console.log(`     ${text}`);
-          yield* Console.log(`     next: kioku history ${resolvedId} --version ${record.version}`);
+          yield* Console.log(
+            `     next: aerograph history ${resolvedId} --version ${record.version}`
+          );
           yield* Console.log("");
         }
       })

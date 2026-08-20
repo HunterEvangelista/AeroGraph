@@ -16,7 +16,7 @@ import {
   type UpdateTermInput,
   type UpdateTermNameInput,
   ValidationError,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { and, eq, inArray } from "drizzle-orm";
 import { Effect, Layer, Schema } from "effect";
 import { termNames, terms } from "./schema";

@@ -10,7 +10,7 @@ import {
   VersionNotFoundError,
   type VersionRepository,
   VersionRepositoryTag,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { and, desc, count as drizzleCount, eq, gte, lte } from "drizzle-orm";
 /**
  * SQLite Version Repository Implementation

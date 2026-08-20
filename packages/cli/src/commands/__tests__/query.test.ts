@@ -105,7 +105,7 @@ describe("query command", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("Natural-language query is not available in this edition yet.");
     expect(result.stdout).toContain("LLM-backed retrieval feature");
-    expect(result.stdout).toContain("kioku query --tags auth,middleware");
+    expect(result.stdout).toContain("aerograph query --tags auth,middleware");
   });
 
   it("rejects multiple simultaneous query modes", () => {

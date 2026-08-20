@@ -6,7 +6,7 @@ import {
   MigrationServiceTag,
   TagRepositoryTag,
   TermRepositoryTag,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { Effect, Exit } from "effect";
 import { CliServicesLive } from "../../layers";
 

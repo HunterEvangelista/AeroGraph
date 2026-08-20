@@ -10,7 +10,7 @@ import {
   TagRepositoryTag,
   TermIdSchema,
   type UpdateTagInput,
-} from "@kioku/core";
+} from "@aerograph/core";
 import { and, count as drizzleCount, eq, like, or } from "drizzle-orm";
 /**
  * SQLite Tag Repository Implementation

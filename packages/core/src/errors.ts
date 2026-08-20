@@ -123,7 +123,7 @@ export class MigrationError extends Data.TaggedError("MigrationError")<{
 // Error Type Union
 // ============================================================================
 
-export type KiokuError =
+export type AeroGraphError =
   | RepositoryError
   | ValidationError
   | EntityNotFoundError

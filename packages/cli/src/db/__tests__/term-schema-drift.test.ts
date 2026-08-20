@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { MIGRATION_OPERATIONS, TERM_KINDS, TERM_NAME_KINDS, TERM_STATUSES } from "@kioku/core";
+import { MIGRATION_OPERATIONS, TERM_KINDS, TERM_NAME_KINDS, TERM_STATUSES } from "@aerograph/core";
 import { getTableConfig } from "drizzle-orm/sqlite-core";
 import { describe, expect, it } from "vitest";
 import {

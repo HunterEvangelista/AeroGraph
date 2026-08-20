@@ -1,4 +1,4 @@
-import { NextServiceTag } from "@kioku/core";
+import { NextServiceTag } from "@aerograph/core";
 import { Console, Data, Effect, Option } from "effect";
 /**
  * Query Command
@@ -52,10 +52,10 @@ const printNaturalLanguageStub = () =>
     yield* Console.log("");
     yield* Console.log("This will be implemented later as an LLM-backed retrieval feature.");
     yield* Console.log("Use structured query modes for now:");
-    yield* Console.log("  kioku query --tags auth,middleware");
-    yield* Console.log("  kioku query --related-to <entityId>");
-    yield* Console.log("  kioku query --traverse <entityId> --depth 2");
-    yield* Console.log("  kioku query --path <fromId> <toId>");
+    yield* Console.log("  aerograph query --tags auth,middleware");
+    yield* Console.log("  aerograph query --related-to <entityId>");
+    yield* Console.log("  aerograph query --traverse <entityId> --depth 2");
+    yield* Console.log("  aerograph query --path <fromId> <toId>");
     yield* Console.log("");
   });
 

@@ -1,6 +1,6 @@
 /**
- * @kioku/core
- * Shared domain logic for the Kioku knowledge graph platform
+ * @aerograph/core
+ * Shared domain logic for the AeroGraph knowledge graph platform
  */
 
 // Domain models
