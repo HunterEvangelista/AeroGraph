@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 56" role="img" aria-labelledby="title desc">
+  <title id="title">AeroGraph optical ellipse</title>
+  <desc id="desc">A tilted liquid-metal ellipse in petrol green, chrome, mint, and amber.</desc>
+  <defs>
+    <linearGradient id="petrol" x1="8" y1="42" x2="112" y2="14" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0a1d19"/>
+      <stop offset="0.28" stop-color="#53f2cc"/>
+      <stop offset="0.45" stop-color="#e9fff6"/>
+      <stop offset="0.62" stop-color="#4c786e"/>
+      <stop offset="0.82" stop-color="#ff7645"/>
+      <stop offset="1" stop-color="#172724"/>
+    </linearGradient>
+    <radialGradient id="shine" cx="0" cy="0" r="1" gradientTransform="translate(74 15) rotate(145) scale(51 22)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff" stop-opacity="0.95"/>
+      <stop offset="0.22" stop-color="#dffff3" stop-opacity="0.34"/>
+      <stop offset="0.72" stop-color="#07110f" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g transform="rotate(-16 60 28)">
+    <ellipse cx="60" cy="28" rx="52" ry="18" fill="url(#petrol)" stroke="#eafff7" stroke-opacity="0.64"/>
+    <ellipse cx="60" cy="28" rx="47" ry="13" fill="url(#shine)" opacity="0.82"/>
+    <path d="M18 32c18 8 61 7 84-7" fill="none" stroke="#07110f" stroke-opacity="0.32" stroke-width="2"/>
+  </g>
+</svg>
