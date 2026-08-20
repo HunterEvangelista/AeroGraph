@@ -51,7 +51,7 @@ try {
     .query<CountRow, []>("SELECT count(*) AS count FROM __drizzle_migrations")
     .get();
   assert.ok(applied);
-  assert.equal(applied.count, 5);
+  assert.equal(applied.count, 6);
   const termNamesCount = sqlite
     .query<CountRow, []>("SELECT count(*) AS count FROM term_names")
     .get();

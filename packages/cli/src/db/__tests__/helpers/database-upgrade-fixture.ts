@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Effect, Exit } from "effect";
 import { type DatabaseClient, DatabaseClientLive, DatabaseClientTag } from "../../client";
+import { CREATE_TABLES_SQL } from "../../schema";
 
 const root = mkdtempSync(join(tmpdir(), "aerograph-upgrade-"));
 const getRequired = <T>(row: T | null): T => {
@@ -24,6 +25,8 @@ type SchemaMetaRow = { value: string };
 type TermNameRow = { kind: string; name: string };
 type TableInfoRow = { name: string; notnull: number };
 type MigrationJournalRow = { to_name: string; related_term_id: string | null };
+type FtsDocsizeRow = { id: number };
+type SearchRow = { id: string };
 
 const createV3Database = (
   path: string,
@@ -123,6 +126,53 @@ const createV3Database = (
   db.close();
 };
 
+const createV5DatabaseWithBrokenFts = (path: string): void => {
+  const db = new Database(path, { create: true });
+  db.run(CREATE_TABLES_SQL);
+  db.run("INSERT INTO schema_meta (key, value) VALUES ('version', '5');");
+  db.run("DROP TRIGGER entities_ai;");
+  db.run("DROP TRIGGER entities_ad;");
+  db.run("DROP TRIGGER entities_au;");
+  db.run(`
+    CREATE TRIGGER entities_ai AFTER INSERT ON entities BEGIN
+      INSERT INTO entities_fts(id, title, content) VALUES (new.id, new.title, new.content);
+    END;
+  `);
+  db.run(`
+    CREATE TRIGGER entities_ad AFTER DELETE ON entities BEGIN
+      INSERT INTO entities_fts(entities_fts, id, title, content)
+      VALUES('delete', old.id, old.title, old.content);
+    END;
+  `);
+  db.run(`
+    CREATE TRIGGER entities_au AFTER UPDATE ON entities BEGIN
+      INSERT INTO entities_fts(entities_fts, id, title, content)
+      VALUES('delete', old.id, old.title, old.content);
+      INSERT INTO entities_fts(id, title, content) VALUES (new.id, new.title, new.content);
+    END;
+  `);
+  db.run(`
+    INSERT INTO entities (
+      rowid, id, type, title, content, metadata, created_at, updated_at, version
+    ) VALUES
+      (10, 'entity-first', 'doc', 'First entity', 'legacy alpha', NULL, '2026-01-01', '2026-01-01', 1),
+      (20, 'entity-second', 'doc', 'Second entity', 'legacy beta', NULL, '2026-01-01', '2026-01-01', 1);
+  `);
+  db.close();
+};
+
+const searchEntityIds = (db: Database, query: string): string[] =>
+  db
+    .query<SearchRow, [string]>(`
+      SELECT e.id
+      FROM entities e
+      JOIN entities_fts fts ON e.rowid = fts.rowid
+      WHERE entities_fts MATCH ?
+      ORDER BY e.id
+    `)
+    .all(query)
+    .map(({ id }) => id);
+
 try {
   const validPath = join(root, "valid.db");
   createV3Database(
@@ -214,7 +264,7 @@ try {
             .query<SchemaMetaRow, []>("SELECT value FROM schema_meta WHERE key = 'version'")
             .get()
         ).value,
-        "5"
+        "6"
       );
     })
   );
@@ -236,6 +286,35 @@ try {
         ).to_name,
         "  Legacy Create  "
       );
+    })
+  );
+
+  const ftsPath = join(root, "fts-v5.db");
+  createV5DatabaseWithBrokenFts(ftsPath);
+  await Effect.runPromise(
+    withDatabase(ftsPath, (client) => {
+      assert.deepEqual(searchEntityIds(client.db, "legacy"), ["entity-first", "entity-second"]);
+      assert.deepEqual(
+        client.db
+          .query<FtsDocsizeRow, []>("SELECT id FROM entities_fts_docsize ORDER BY id")
+          .all()
+          .map(({ id }) => id),
+        [10, 20]
+      );
+
+      client.db.run("UPDATE entities SET content = 'current alpha' WHERE id = 'entity-first';");
+      assert.deepEqual(searchEntityIds(client.db, "legacy alpha"), []);
+      assert.deepEqual(searchEntityIds(client.db, "current alpha"), ["entity-first"]);
+
+      client.db.run(`
+        INSERT INTO entities (id, type, title, content, metadata, created_at, updated_at, version)
+        VALUES ('entity-third', 'doc', 'Third entity', 'current gamma', NULL, '2026-01-01', '2026-01-01', 1);
+      `);
+      assert.deepEqual(searchEntityIds(client.db, "current gamma"), ["entity-third"]);
+
+      client.db.run("DELETE FROM entities WHERE id = 'entity-second';");
+      assert.deepEqual(searchEntityIds(client.db, "legacy beta"), []);
+      client.db.run("INSERT INTO entities_fts(entities_fts) VALUES ('integrity-check');");
     })
   );
 

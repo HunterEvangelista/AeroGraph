@@ -36,6 +36,13 @@
       "when": 1787020153794,
       "tag": "0004_perpetual_dazzler",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787050000000,
+      "tag": "0005_repair_external_content_fts",
+      "breakpoints": true
     }
   ]
 }
