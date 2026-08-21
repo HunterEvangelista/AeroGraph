@@ -1,15 +1,14 @@
-import { join } from "node:path";
 import { Effect } from "effect";
 import { DatabaseClientLive, DatabaseClientTag } from "../../db/client";
 import { entities, entityTags, links, tags } from "../../db/schema";
 
-const workspacePath = process.argv[2];
+const dbPath = process.argv[2];
+const workspacePath = process.argv[3];
 
-if (!workspacePath) {
-  throw new Error("Workspace path is required");
+if (!dbPath || !workspacePath) {
+  throw new Error("Database and workspace paths are required");
 }
 
-const dbPath = join(workspacePath, ".aerograph", "aerograph.db");
 const timestamp = "2026-01-01T00:00:00.000Z";
 
 const metadata = {

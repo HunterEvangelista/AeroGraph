@@ -67,7 +67,7 @@ describe("pre-migration tag governance CLI", () => {
   });
 
   const state = () => {
-    const result = spawnSync("bun", ["run", dbFixture, workspace.rootPath], {
+    const result = spawnSync("bun", ["run", dbFixture, workspace.dbPath], {
       encoding: "utf8",
       shell: false,
     });

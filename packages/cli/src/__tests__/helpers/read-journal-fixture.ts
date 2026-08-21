@@ -1,12 +1,11 @@
-import { join } from "node:path";
 import { JournalEntryIdSchema, MigrationJournalRepositoryTag } from "@aerograph/core";
 import { Effect } from "effect";
 import { CliServicesLive } from "../../db/layers";
 
-const rootPath = process.argv[2];
+const dbPath = process.argv[2];
 const journalId = process.argv[3] ? JournalEntryIdSchema.make(process.argv[3]) : undefined;
-if (!rootPath || !journalId) {
-  throw new Error("Expected workspace root path and journal ID");
+if (!dbPath || !journalId) {
+  throw new Error("Expected database path and journal ID");
 }
 
 const entry = await Effect.runPromise(
@@ -16,7 +15,7 @@ const entry = await Effect.runPromise(
         const repository = yield* MigrationJournalRepositoryTag;
         return yield* repository.getById(journalId);
       }),
-      CliServicesLive(join(rootPath, ".aerograph", "aerograph.db"))
+      CliServicesLive(dbPath)
     )
   )
 );

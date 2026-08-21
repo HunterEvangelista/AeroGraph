@@ -28,7 +28,7 @@ const MigrationJournalOutput = Schema.Struct({
 });
 
 const governTags = (workspace: CliWorkspace, ...args: ReadonlyArray<string>) => {
-  const result = spawnSync("bun", ["run", governTagFixture, workspace.rootPath, ...args], {
+  const result = spawnSync("bun", ["run", governTagFixture, workspace.dbPath, ...args], {
     encoding: "utf8",
     shell: false,
   });
@@ -164,7 +164,7 @@ describe("migrate command", () => {
     expect(journalId).toBeDefined();
     const reopenedJournal = spawnSync(
       "bun",
-      ["run", readJournalFixture, workspace.rootPath, journalId ?? ""],
+      ["run", readJournalFixture, workspace.dbPath, journalId ?? ""],
       { encoding: "utf8", shell: false }
     );
     expect(reopenedJournal.status, `${reopenedJournal.stderr}\n${reopenedJournal.stdout}`).toBe(0);

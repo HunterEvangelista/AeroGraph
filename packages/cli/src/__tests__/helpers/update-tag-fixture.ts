@@ -1,13 +1,12 @@
-import { join } from "node:path";
 import { TagIdSchema, TagRepositoryTag } from "@aerograph/core";
 import { Effect } from "effect";
 import { CliServicesLive } from "../../db/layers";
 
-const rootPath = process.argv[2];
+const dbPath = process.argv[2];
 const tagId = process.argv[3] ? TagIdSchema.make(process.argv[3]) : undefined;
 const name = process.argv[4];
-if (!rootPath || !tagId || !name) {
-  throw new Error("Expected workspace root path, tag ID, and display name");
+if (!dbPath || !tagId || !name) {
+  throw new Error("Expected database path, tag ID, and display name");
 }
 
 await Effect.runPromise(
@@ -17,7 +16,7 @@ await Effect.runPromise(
         const repository = yield* TagRepositoryTag;
         yield* repository.update(tagId, { name });
       }),
-      CliServicesLive(join(rootPath, ".aerograph", "aerograph.db"))
+      CliServicesLive(dbPath)
     )
   )
 );

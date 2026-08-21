@@ -1,9 +1,9 @@
 import { Database } from "bun:sqlite";
 
-const root = process.argv[2];
-if (!root) throw new Error("Workspace path is required");
+const dbPath = process.argv[2];
+if (!dbPath) throw new Error("Database path is required");
 
-const database = new Database(`${root}/.aerograph/aerograph.db`, { readonly: true });
+const database = new Database(dbPath, { readonly: true });
 try {
   console.log(
     JSON.stringify({

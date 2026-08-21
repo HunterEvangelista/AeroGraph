@@ -15,7 +15,7 @@ const updateTagFixture = join(
 );
 
 const governTags = (workspace: CliWorkspace, ...args: ReadonlyArray<string>) => {
-  const result = spawnSync("bun", ["run", governTagFixture, workspace.rootPath, ...args], {
+  const result = spawnSync("bun", ["run", governTagFixture, workspace.dbPath, ...args], {
     encoding: "utf8",
     shell: false,
   });
@@ -114,7 +114,7 @@ describe("context command", () => {
   it("keeps ungoverned tag IDs round-trippable in canonical output", () => {
     const update = spawnSync(
       "bun",
-      ["run", updateTagFixture, workspace.rootPath, "auth", "Authentication Label"],
+      ["run", updateTagFixture, workspace.dbPath, "auth", "Authentication Label"],
       { encoding: "utf8", shell: false }
     );
     expect(update.status, `${update.stderr}\n${update.stdout}`).toBe(0);

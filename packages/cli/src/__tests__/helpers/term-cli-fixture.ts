@@ -1,10 +1,9 @@
-import { join } from "node:path";
 import { EntityRepositoryTag, TagRepositoryTag, TermRepositoryTag } from "@aerograph/core";
 import { Effect } from "effect";
 import { CliServicesLive } from "../../db/layers";
 
-const root = process.argv[2];
-if (!root) throw new Error("Workspace path is required");
+const dbPath = process.argv[2];
+if (!dbPath) throw new Error("Database path is required");
 
 const program = Effect.gen(function* () {
   const terms = yield* TermRepositoryTag;
@@ -42,6 +41,4 @@ const program = Effect.gen(function* () {
   yield* tags.applyToEntity(secondaryTag.id, entity.id);
 });
 
-await Effect.runPromise(
-  Effect.scoped(Effect.provide(program, CliServicesLive(join(root, ".aerograph", "aerograph.db"))))
-);
+await Effect.runPromise(Effect.scoped(Effect.provide(program, CliServicesLive(dbPath))));

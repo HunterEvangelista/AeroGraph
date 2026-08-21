@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import {
   TagIdSchema,
   TagRepositoryTag,
@@ -9,9 +8,9 @@ import {
 import { Effect, Schema } from "effect";
 import { CliServicesLive } from "../../db/layers";
 
-const rootPath = process.argv[2];
-if (!rootPath) {
-  throw new Error("Expected workspace root path");
+const dbPath = process.argv[2];
+if (!dbPath) {
+  throw new Error("Expected database path");
 }
 
 const canonicalName = process.argv[3] ?? "Kioku";
@@ -36,8 +35,4 @@ const program = Effect.gen(function* () {
   }
 });
 
-await Effect.runPromise(
-  Effect.scoped(
-    Effect.provide(program, CliServicesLive(join(rootPath, ".aerograph", "aerograph.db")))
-  )
-);
+await Effect.runPromise(Effect.scoped(Effect.provide(program, CliServicesLive(dbPath))));
