@@ -10,7 +10,7 @@ const governTagFixture = join(
 );
 
 const governTags = (workspace: CliWorkspace, ...args: ReadonlyArray<string>) => {
-  const result = spawnSync("bun", ["run", governTagFixture, workspace.rootPath, ...args], {
+  const result = spawnSync("bun", ["run", governTagFixture, workspace.dbPath, ...args], {
     encoding: "utf8",
     shell: false,
   });

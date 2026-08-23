@@ -4,7 +4,14 @@
  */
 
 export { termCommand } from "./commands/term";
-export type { AeroGraphConfig, ConfigService, WorkspaceInfo } from "./config";
+export type {
+  AeroGraphConfig,
+  AeroGraphProject,
+  AeroGraphRegistry,
+  ConfigService,
+  ProjectResolutionMethod,
+  WorkspaceInfo,
+} from "./config";
 // Re-export for programmatic usage
 export { ConfigServiceLive, ConfigServiceTag } from "./config";
 export * from "./db/index";

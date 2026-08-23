@@ -17,7 +17,7 @@ describe("term CLI (SQLite integration)", () => {
 
   const dbFixture = join(dirname(fileURLToPath(import.meta.url)), "term-cli-db-fixture.ts");
   const runDbFixture = (operation: "state" | "insert-unrelated-journal") => {
-    const result = spawnSync("bun", ["run", dbFixture, workspace.rootPath, operation], {
+    const result = spawnSync("bun", ["run", dbFixture, workspace.dbPath, operation], {
       encoding: "utf8",
       shell: false,
     });

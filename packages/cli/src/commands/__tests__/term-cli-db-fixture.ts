@@ -1,13 +1,10 @@
 import { Database } from "bun:sqlite";
 
-const root = process.argv[2];
+const dbPath = process.argv[2];
 const operation = process.argv[3];
-if (!root || !operation) throw new Error("Workspace path and operation are required");
+if (!dbPath || !operation) throw new Error("Database path and operation are required");
 
-const database = new Database(
-  `${root}/.aerograph/aerograph.db`,
-  operation === "state" ? { readonly: true } : undefined
-);
+const database = new Database(dbPath, operation === "state" ? { readonly: true } : undefined);
 try {
   if (operation === "state") {
     const state = {

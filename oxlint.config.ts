@@ -9,6 +9,7 @@ export default defineConfig({
     ".continue/**",
     ".cursor/**",
     ".gemini/**",
+    // Retained repository-local graph data is ignored through the verified cutover window.
     ".aerograph/**",
     ".opencode/**",
     ".pi/**",

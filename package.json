@@ -27,6 +27,7 @@
     "test:core": "turbo test --filter=@aerograph/core",
     "test:cli": "turbo test --filter=@aerograph/cli",
     "test:ai": "turbo test --filter=@aerograph/ai",
+    "cutover:aero-72": "bun run packages/cli/src/maintenance/aero-72-cutover.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
