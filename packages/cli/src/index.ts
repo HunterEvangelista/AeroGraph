@@ -9,6 +9,7 @@ export type {
   AeroGraphProject,
   AeroGraphRegistry,
   ConfigService,
+  ProjectResolutionMethod,
   WorkspaceInfo,
 } from "./config";
 // Re-export for programmatic usage

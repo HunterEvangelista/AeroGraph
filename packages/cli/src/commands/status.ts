@@ -2,53 +2,75 @@ import { EntityType, GraphServiceTag } from "@aerograph/core";
 import { Console, Effect } from "effect";
 /**
  * Status Command
- * Display workspace and graph statistics
+ * Display project and graph statistics
  */
-import { Command } from "effect/unstable/cli";
+import { Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config";
 import { CliCoreLive } from "../db/index";
 
-export const statusCommand = Command.make("status", {}, () =>
-  Effect.gen(function* () {
-    const configService = yield* ConfigServiceTag;
+export const statusCommand = Command.make(
+  "status",
+  {
+    verbose: Flag.boolean("verbose").pipe(
+      Flag.withDescription("Show registry, database, and resolution details"),
+      Flag.withDefault(false)
+    ),
+  },
+  ({ verbose }) =>
+    Effect.gen(function* () {
+      const configService = yield* ConfigServiceTag;
 
-    const workspace = yield* configService.load();
+      const workspace = yield* configService.load();
 
-    yield* Console.log("");
-    yield* Console.log("AeroGraph Workspace Status");
-    yield* Console.log("=".repeat(40));
-    yield* Console.log("");
-    yield* Console.log(`Root:     ${workspace.rootPath}`);
-    yield* Console.log(`Database: ${workspace.dbPath}`);
-    yield* Console.log(`Created:  ${workspace.config.createdAt}`);
-    yield* Console.log("");
+      yield* Console.log("");
+      yield* Console.log("AeroGraph Project Status");
+      yield* Console.log("=".repeat(40));
+      yield* Console.log("");
+      yield* Console.log(`Project: ${workspace.projectName}`);
+      yield* Console.log(`ID:      ${workspace.projectId}`);
+      yield* Console.log(`Root:    ${workspace.rootPath}`);
+      yield* Console.log(`Created: ${workspace.config.createdAt}`);
+      yield* Console.log("");
 
-    const ServiceLayer = CliCoreLive(workspace.dbPath);
+      if (verbose) {
+        yield* Console.log("Storage and Resolution");
+        yield* Console.log("-".repeat(40));
+        yield* Console.log(`Resolution: ${workspace.resolutionMethod}`);
+        yield* Console.log(`Registry:   ${workspace.configPath}`);
+        yield* Console.log(`Database:   ${workspace.dbPath}`);
+        if (workspace.gitCommonDir) {
+          yield* Console.log(`Git common: ${workspace.gitCommonDir}`);
+        }
+        yield* Console.log("");
+      }
 
-    const stats = yield* Effect.scoped(
-      Effect.gen(function* () {
-        const graphService = yield* GraphServiceTag;
-        return yield* graphService.getStats;
-      }).pipe(Effect.provide(ServiceLayer))
-    );
+      const ServiceLayer = CliCoreLive(workspace.dbPath);
 
-    yield* Console.log("Graph Statistics");
-    yield* Console.log("-".repeat(40));
-    yield* Console.log(`Entities: ${stats.totalEntities}`);
-    yield* Console.log(`  - Docs:      ${stats.entitiesByType[EntityType.Doc] ?? 0}`);
-    yield* Console.log(`  - Code Refs: ${stats.entitiesByType[EntityType.CodeRef] ?? 0}`);
-    yield* Console.log(`  - Stories:   ${stats.entitiesByType[EntityType.Story] ?? 0}`);
-    yield* Console.log(`  - Diagrams:  ${stats.entitiesByType[EntityType.Diagram] ?? 0}`);
-    yield* Console.log(`Tags:     ${stats.totalTags}`);
-    yield* Console.log(`Links:    ${stats.totalLinks}`);
-    yield* Console.log("");
-  }).pipe(
-    Effect.catchTags({
-      WorkspaceNotFoundError: (e) =>
-        Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
-      ConfigError: (e) => Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
-      RepositoryError: (e) =>
-        Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
-    })
-  )
+      const stats = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const graphService = yield* GraphServiceTag;
+          return yield* graphService.getStats;
+        }).pipe(Effect.provide(ServiceLayer))
+      );
+
+      yield* Console.log("Graph Statistics");
+      yield* Console.log("-".repeat(40));
+      yield* Console.log(`Entities: ${stats.totalEntities}`);
+      yield* Console.log(`  - Docs:      ${stats.entitiesByType[EntityType.Doc] ?? 0}`);
+      yield* Console.log(`  - Code Refs: ${stats.entitiesByType[EntityType.CodeRef] ?? 0}`);
+      yield* Console.log(`  - Stories:   ${stats.entitiesByType[EntityType.Story] ?? 0}`);
+      yield* Console.log(`  - Diagrams:  ${stats.entitiesByType[EntityType.Diagram] ?? 0}`);
+      yield* Console.log(`Tags:     ${stats.totalTags}`);
+      yield* Console.log(`Links:    ${stats.totalLinks}`);
+      yield* Console.log("");
+    }).pipe(
+      Effect.catchTags({
+        WorkspaceNotFoundError: (e) =>
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
+        ConfigError: (e) =>
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
+        RepositoryError: (e) =>
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
+      })
+    )
 );

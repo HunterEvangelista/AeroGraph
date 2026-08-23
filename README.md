@@ -7,7 +7,27 @@ AeroGraph is a local-first knowledge platform for codebases. It models docs, sto
 - A tagged knowledge graph for project knowledge
 - Local-first storage with SQLite
 - A shared core library for domain logic and graph operations
-- A CLI for creating and querying knowledge in a workspace
+- A CLI for creating and querying project knowledge
+
+## Getting Started
+
+Initialize AeroGraph from your project:
+
+```bash
+aerograph init
+```
+
+Check the active project and graph:
+
+```bash
+aerograph status
+```
+
+Show additional diagnostic details when needed:
+
+```bash
+aerograph status --verbose
+```
 
 ## Tags and Terms
 
@@ -149,7 +169,7 @@ aerograph context --tags AcmeCorp --canonical-terms
 - `packages/cli`: the `aerograph` CLI and SQLite-backed implementations
 - `packages/ai`: AI integration package built on top of the core model
 - `apps`: future desktop and web clients
-- `docs`: product and project documentation, including `docs/DESIGN_DOC.md`
+- `docs`: focused project documentation that remains useful outside AeroGraph memory
 
 
 Common workspace commands:

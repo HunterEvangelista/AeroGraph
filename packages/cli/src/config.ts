@@ -2,6 +2,7 @@
  * CLI Configuration
  * Manages global AeroGraph project configuration
  */
+import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   existsSync,
@@ -22,7 +23,6 @@ import { Context, Effect, Layer, Schema } from "effect";
 // ============================================================================
 
 export const AEROGRAPH_DIR = ".aerograph";
-export const LEGACY_WORKSPACE_DIR = ".kioku";
 export const CONFIG_FILE = "config.json";
 export const DB_FILE = "aerograph.db";
 export const PROJECTS_DIR = "projects";
@@ -44,6 +44,7 @@ export interface AeroGraphProject {
   name: string;
   rootPath: string;
   createdAt: string;
+  gitCommonDir?: string | undefined;
 }
 
 export interface AeroGraphRegistry {
@@ -51,12 +52,16 @@ export interface AeroGraphRegistry {
   projects: ReadonlyArray<AeroGraphProject>;
 }
 
+export type ProjectResolutionMethod = "registered_path" | "git_common_dir";
+
 export interface WorkspaceInfo {
   projectId: string;
   projectName: string;
   rootPath: string;
   configPath: string;
   dbPath: string;
+  resolutionMethod: ProjectResolutionMethod;
+  gitCommonDir?: string | undefined;
   config: AeroGraphConfig;
 }
 
@@ -66,26 +71,26 @@ export interface WorkspaceInfo {
 
 export interface ConfigService {
   /**
-   * Initialize a new AeroGraph workspace
+   * Initialize a new AeroGraph project
    */
   readonly init: (
     path?: string
   ) => Effect.Effect<WorkspaceInfo, WorkspaceAlreadyExistsError | ConfigError>;
 
   /**
-   * Find and load the nearest AeroGraph workspace
+   * Find and load the current AeroGraph project
    */
   readonly load: (
     startPath?: string
   ) => Effect.Effect<WorkspaceInfo, WorkspaceNotFoundError | ConfigError>;
 
   /**
-   * Check if an AeroGraph workspace exists
+   * Check if an AeroGraph project exists
    */
   readonly exists: (path?: string) => Effect.Effect<boolean, never>;
 
   /**
-   * Get the workspace root path (walks up directory tree)
+   * Get the active project checkout root
    */
   readonly findRoot: (
     startPath?: string
@@ -112,6 +117,7 @@ const AeroGraphProjectSchema = Schema.Struct({
   name: Schema.String,
   rootPath: Schema.String,
   createdAt: Schema.String,
+  gitCommonDir: Schema.optional(Schema.String),
 });
 
 const AeroGraphRegistrySchema = Schema.Struct({
@@ -161,27 +167,98 @@ const containsPath = (rootPath: string, candidatePath: string): boolean => {
   return childPath === "" || (!childPath.startsWith("..") && !isAbsolute(childPath));
 };
 
-const findProject = (
+interface GitIdentity {
+  rootPath: string;
+  commonDir: string;
+}
+
+interface ProjectResolution {
+  project: AeroGraphProject;
+  rootPath: string;
+  method: ProjectResolutionMethod;
+}
+
+const findGitIdentity = (path: string): GitIdentity | undefined => {
+  const result = spawnSync(
+    "git",
+    ["-C", path, "rev-parse", "--path-format=absolute", "--show-toplevel", "--git-common-dir"],
+    {
+      encoding: "utf8",
+      shell: false,
+      stdio: ["ignore", "pipe", "ignore"],
+    }
+  );
+  if (result.status !== 0) {
+    return undefined;
+  }
+
+  const [rootPath, commonDir] = result.stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (!rootPath || !commonDir) {
+    return undefined;
+  }
+
+  return {
+    rootPath: normalizeExistingPath(rootPath),
+    commonDir: normalizeExistingPath(commonDir),
+  };
+};
+
+const resolveProject = (
   registry: AeroGraphRegistry,
   startPath: string
-): AeroGraphProject | undefined =>
-  registry.projects
+): ProjectResolution | undefined => {
+  const pathMatch = registry.projects
     .filter((project) => containsPath(project.rootPath, startPath))
     .sort((left, right) => right.rootPath.length - left.rootPath.length)[0];
+  if (pathMatch) {
+    return {
+      project: pathMatch,
+      rootPath: pathMatch.rootPath,
+      method: "registered_path",
+    };
+  }
+
+  const gitIdentity = findGitIdentity(startPath);
+  if (!gitIdentity) {
+    return undefined;
+  }
+
+  const gitMatch = registry.projects.find(
+    (project) => project.gitCommonDir === gitIdentity.commonDir
+  );
+  if (!gitMatch) {
+    return undefined;
+  }
+
+  return {
+    project: gitMatch,
+    rootPath: gitIdentity.rootPath,
+    method: "git_common_dir",
+  };
+};
 
 const projectDbPath = (projectId: string): string =>
   join(getAeroGraphHome(), PROJECTS_DIR, projectId, DB_FILE);
 
-const toWorkspaceInfo = (project: AeroGraphProject): WorkspaceInfo => ({
+const toWorkspaceInfo = (
+  project: AeroGraphProject,
+  activeRootPath = project.rootPath,
+  resolutionMethod: ProjectResolutionMethod = "registered_path"
+): WorkspaceInfo => ({
   projectId: project.id,
   projectName: project.name,
-  rootPath: project.rootPath,
+  rootPath: activeRootPath,
   configPath: getConfigPath(),
   dbPath: projectDbPath(project.id),
+  resolutionMethod,
+  gitCommonDir: project.gitCommonDir,
   config: {
     version: REGISTRY_VERSION,
     createdAt: project.createdAt,
-    repoPath: project.rootPath,
+    repoPath: activeRootPath,
   },
 });
 
@@ -198,12 +275,17 @@ const readRegistryEffect = Effect.try({
 export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
   init: (path?: string) =>
     Effect.gen(function* () {
-      const rootPath = normalizeExistingPath(path ?? process.cwd());
-      const legacyAeroGraphPath = join(rootPath, AEROGRAPH_DIR);
-      const legacyWorkspacePath = join(rootPath, LEGACY_WORKSPACE_DIR);
+      const requestedPath = normalizeExistingPath(path ?? process.cwd());
+      const gitIdentity = findGitIdentity(requestedPath);
+      const rootPath = gitIdentity?.rootPath ?? requestedPath;
+      const repositoryDatabasePath = join(rootPath, AEROGRAPH_DIR, DB_FILE);
       const registry = yield* readRegistryEffect;
 
-      const existingProject = registry.projects.find((project) => project.rootPath === rootPath);
+      const existingProject = registry.projects.find(
+        (project) =>
+          project.rootPath === rootPath ||
+          (gitIdentity !== undefined && project.gitCommonDir === gitIdentity.commonDir)
+      );
       if (existingProject) {
         return yield* new WorkspaceAlreadyExistsError({
           path: rootPath,
@@ -212,18 +294,12 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
       }
 
       // Repository-local databases are never opened or migrated during normal initialization.
-      // Refusing initialization prevents a new global graph from diverging beside retained data.
-      if (existsSync(legacyAeroGraphPath)) {
+      // Refusing initialization prevents a new global graph from diverging beside retained data,
+      // while unrelated tool directories do not prevent a project from being registered.
+      if (existsSync(repositoryDatabasePath)) {
         return yield* new ConfigError({
-          path: legacyAeroGraphPath,
-          message: `Repository-local AeroGraph storage found at ${legacyAeroGraphPath}. Preserve it and run the verified AERO-72 cutover before registering this project.`,
-        });
-      }
-
-      if (existsSync(legacyWorkspacePath)) {
-        return yield* new ConfigError({
-          path: legacyWorkspacePath,
-          message: `Legacy Kioku workspace found at ${legacyWorkspacePath}. Preserve it and run the verified storage cutover before registering this project.`,
+          path: repositoryDatabasePath,
+          message: `Repository-local AeroGraph database found at ${repositoryDatabasePath}. Preserve it and run the verified AERO-72 cutover before registering this project.`,
         });
       }
 
@@ -233,6 +309,9 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
         rootPath,
         createdAt: new Date().toISOString(),
       };
+      if (gitIdentity) {
+        project.gitCommonDir = gitIdentity.commonDir;
+      }
 
       yield* Effect.try({
         try: () => {
@@ -257,23 +336,23 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
     Effect.gen(function* () {
       const searchPath = normalizeExistingPath(startPath ?? process.cwd());
       const registry = yield* readRegistryEffect;
-      const project = findProject(registry, searchPath);
+      const resolution = resolveProject(registry, searchPath);
 
-      if (!project) {
+      if (!resolution) {
         return yield* new WorkspaceNotFoundError({
           path: searchPath,
           message: `No registered AeroGraph project contains ${searchPath}. Run 'aerograph init' at the project root.`,
         });
       }
 
-      return toWorkspaceInfo(project);
+      return toWorkspaceInfo(resolution.project, resolution.rootPath, resolution.method);
     }),
 
   exists: (path?: string) =>
     Effect.sync(() => {
       try {
         const searchPath = normalizeExistingPath(path ?? process.cwd());
-        return findProject(readRegistry(), searchPath) !== undefined;
+        return resolveProject(readRegistry(), searchPath) !== undefined;
       } catch {
         return false;
       }
@@ -283,32 +362,37 @@ export const ConfigServiceLive = Layer.succeed(ConfigServiceTag, {
     Effect.gen(function* () {
       const searchPath = normalizeExistingPath(startPath ?? process.cwd());
       const registry = yield* readRegistryEffect;
-      const project = findProject(registry, searchPath);
+      const resolution = resolveProject(registry, searchPath);
 
-      if (!project) {
+      if (!resolution) {
         return yield* new WorkspaceNotFoundError({
           path: searchPath,
           message: `No registered AeroGraph project contains ${searchPath}. Run 'aerograph init' at the project root.`,
         });
       }
 
-      return project.rootPath;
+      return resolution.rootPath;
     }),
 
   update: (updates: Partial<AeroGraphConfig>) =>
     Effect.gen(function* () {
       const searchPath = normalizeExistingPath(process.cwd());
       const registry = yield* readRegistryEffect;
-      const project = findProject(registry, searchPath);
+      const resolution = resolveProject(registry, searchPath);
 
-      if (!project) {
+      if (!resolution) {
         return yield* new WorkspaceNotFoundError({
           path: searchPath,
           message: `No registered AeroGraph project contains ${searchPath}. Run 'aerograph init' at the project root.`,
         });
       }
 
-      const existingConfig = toWorkspaceInfo(project).config;
+      const { project } = resolution;
+      const existingConfig = toWorkspaceInfo(
+        project,
+        resolution.rootPath,
+        resolution.method
+      ).config;
       const newConfig = { ...existingConfig, ...updates };
       const updatedProject: AeroGraphProject = {
         ...project,

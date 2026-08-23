@@ -1,7 +1,7 @@
 import { Console, Effect, Option } from "effect";
 /**
  * Init Command
- * Initialize a new AeroGraph workspace
+ * Initialize a new AeroGraph project
  */
 import { Argument, Command } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config";
@@ -16,7 +16,7 @@ export const initCommand = Command.make(
     Effect.gen(function* () {
       const configService = yield* ConfigServiceTag;
 
-      yield* Console.log("Initializing AeroGraph workspace...");
+      yield* Console.log("Initializing AeroGraph project...");
 
       // Convert Option to string | undefined
       const pathValue = Option.getOrUndefined(path);
@@ -30,15 +30,19 @@ export const initCommand = Command.make(
       );
 
       yield* Console.log("");
-      yield* Console.log(`AeroGraph workspace initialized at: ${workspace.rootPath}`);
+      yield* Console.log("AeroGraph project initialized!");
       yield* Console.log("");
-      yield* Console.log("Created:");
-      yield* Console.log(`  ${workspace.configPath}`);
-      yield* Console.log(`  ${workspace.dbPath}`);
+      yield* Console.log(`Project: ${workspace.projectName}`);
+      yield* Console.log(`ID:      ${workspace.projectId}`);
+      yield* Console.log(`Root:    ${workspace.rootPath}`);
+      yield* Console.log("");
+      yield* Console.log("Created storage:");
+      yield* Console.log(`  Registry: ${workspace.configPath}`);
+      yield* Console.log(`  Database: ${workspace.dbPath}`);
       yield* Console.log("");
       yield* Console.log("Next steps:");
       yield* Console.log("  aerograph onboard    Start AI-assisted onboarding");
-      yield* Console.log("  aerograph status     View workspace status");
+      yield* Console.log("  aerograph status     View project status");
       yield* Console.log("  aerograph doc create Create a new document");
     }).pipe(
       Effect.catchTags({
