@@ -16,6 +16,8 @@ import { Console, Effect, Option, Schema } from "effect";
  * Operations for managing tags and entity tagging
  */
 import { Argument, Command, Flag } from "effect/unstable/cli";
+import { emitError, emitOutput, formatJson } from "../ui/output";
+import { formatTagList } from "../ui/tag-output";
 import { withCliServices } from "./workspace";
 
 // ============================================================================
@@ -142,7 +144,7 @@ const outputError = <A, E extends AeroGraphError, R>(
   asJson
     ? effect.pipe(
         Effect.catch((error) =>
-          Console.log(JSON.stringify({ ok: false, command, error: errorData(error) })).pipe(
+          emitOutput(formatJson({ ok: false, command, error: errorData(error) })).pipe(
             Effect.andThen(
               Effect.sync(() => {
                 process.exitCode = 1;
@@ -151,7 +153,7 @@ const outputError = <A, E extends AeroGraphError, R>(
           )
         )
       )
-    : effect.pipe(Effect.tapError((error) => Console.error(`Error: ${errorData(error).message}`)));
+    : effect.pipe(Effect.tapError((error) => emitError(`Error: ${errorData(error).message}`)));
 
 const tagListCommand = Command.make(
   "list",
@@ -170,7 +172,6 @@ const tagListCommand = Command.make(
     json: jsonFlag,
   },
   ({ search, tree, governed, ungoverned, json: asJson }) =>
-    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Existing tree rendering logic is localized to the list command.
     Effect.gen(function* () {
       const searchValue = Option.getOrUndefined(search);
       const filter = yield* governanceFilter(governed, ungoverned);
@@ -189,56 +190,10 @@ const tagListCommand = Command.make(
         })
       );
 
-      if (asJson) {
-        yield* Console.log(JSON.stringify({ ok: true, command: "tag list", tags }));
-        return;
-      }
-      yield* Console.log("");
-      yield* Console.log(`Tags (${tags.length})`);
-      yield* Console.log("=".repeat(40));
-      yield* Console.log("");
-
-      if (tags.length === 0) {
-        yield* Console.log("No tags found.");
-        yield* Console.log("");
-        yield* Console.log("Create one with: aerograph tag create <name>");
-      } else {
-        const render = (inspection: TagGovernanceInspection, depth: number) => {
-          const tag = inspectionTag(inspection);
-          const desc = tag.description ? ` - ${tag.description}` : "";
-          const governedTerm = inspectionTerm(inspection);
-          const governanceText = governedTerm
-            ? ` [governed: ${governedTerm.canonicalName} (${governedTerm.term.kind})]`
-            : " [ungoverned]";
-          return `${"  ".repeat(depth)}#${tag.id}${desc}${governanceText}`;
-        };
-        if (!tree) {
-          for (const inspection of tags) yield* Console.log(render(inspection, 0));
-        } else {
-          const byParent = new Map<string | undefined, TagGovernanceInspection[]>();
-          for (const inspection of tags) {
-            const parent = inspectionTag(inspection).parentId;
-            const siblings = byParent.get(parent) ?? [];
-            siblings.push(inspection);
-            byParent.set(parent, siblings);
-          }
-          const selectedIds = new Set<string>(
-            tags.map((inspection) => inspectionTag(inspection).id)
-          );
-          const visit = (inspection: TagGovernanceInspection, depth: number): Effect.Effect<void> =>
-            Effect.gen(function* () {
-              const tag = inspectionTag(inspection);
-              yield* Console.log(render(inspection, depth));
-              for (const child of byParent.get(tag.id) ?? []) yield* visit(child, depth + 1);
-            });
-          for (const inspection of tags) {
-            const parentId = inspectionTag(inspection).parentId;
-            if (!parentId || !selectedIds.has(parentId)) yield* visit(inspection, 0);
-          }
-        }
-      }
-
-      yield* Console.log("");
+      const output = asJson
+        ? formatJson({ ok: true, command: "tag list", tags })
+        : formatTagList({ tags, tree });
+      yield* emitOutput(output);
     }).pipe((effect) => outputError(effect, "tag list", asJson))
 );
 
