@@ -1,4 +1,5 @@
-import { BunRuntime, BunServices } from "@effect/platform-bun";
+import * as BunRuntime from "@effect/platform-bun/BunRuntime";
+import * as BunServices from "@effect/platform-bun/BunServices";
 import { Effect, Layer } from "effect";
 /**
  * AeroGraph CLI
@@ -22,6 +23,7 @@ import {
   unlinkCommand,
 } from "./commands/index";
 import { ConfigServiceLive } from "./config";
+import { CLI_VERSION } from "./version";
 
 // ============================================================================
 // CLI Application
@@ -51,7 +53,7 @@ const command = aerograph.pipe(
 );
 
 const cli = Command.run(command, {
-  version: "0.1.0",
+  version: CLI_VERSION,
 });
 
 // ============================================================================

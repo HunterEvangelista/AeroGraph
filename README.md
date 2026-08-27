@@ -172,6 +172,10 @@ aerograph context --tags AcmeCorp --canonical-terms
 - `docs`: focused project documentation that remains useful outside AeroGraph memory
 
 
+## License
+
+AeroGraph is Copyright © Hunter Evangelista and licensed under Apache-2.0. The published CLI also includes generated notices for the licenses of its bundled dependencies.
+
 Common workspace commands:
 
 ```bash
