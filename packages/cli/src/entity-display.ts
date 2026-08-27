@@ -1,10 +1,15 @@
 import { Effect } from "effect";
 import { EntityPrefixIndexTag, formatEntityIdWithBoldPrefix } from "./db/entity-prefix-index";
 
-export const loadFormattedEntityIds = (entityIds: ReadonlyArray<string>) =>
+export const loadEntityIdPrefixes = (entityIds: ReadonlyArray<string>) =>
   Effect.gen(function* () {
     const prefixIndex = yield* EntityPrefixIndexTag;
-    const prefixes = yield* prefixIndex.getDisplayPrefixes(entityIds);
+    return yield* prefixIndex.getDisplayPrefixes(entityIds);
+  });
+
+export const loadFormattedEntityIds = (entityIds: ReadonlyArray<string>) =>
+  Effect.gen(function* () {
+    const prefixes = yield* loadEntityIdPrefixes(entityIds);
     return new Map(
       entityIds.map((id) => [id, formatEntityIdWithBoldPrefix(id, prefixes.get(id) ?? null)])
     );

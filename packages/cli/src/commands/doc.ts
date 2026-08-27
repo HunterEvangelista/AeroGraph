@@ -5,7 +5,8 @@ import { Console, Data, Effect, Option } from "effect";
  * CRUD operations for document entities
  */
 import { Argument, Command, Flag } from "effect/unstable/cli";
-import { formattedEntityId, loadFormattedEntityIds } from "../entity-display";
+import { editMarkdown } from "../editor";
+import { formattedEntityId, loadEntityIdPrefixes, loadFormattedEntityIds } from "../entity-display";
 import { formatEntityIdMatches, resolveEntityId } from "../entity-id";
 import { withCliServices } from "./workspace";
 
@@ -24,6 +25,25 @@ interface DocUpdates {
   content?: string;
 }
 
+const prepareDocUpdates = (
+  existing: { readonly title: string; readonly content: string },
+  title: string | undefined,
+  suppliedContent: string | undefined
+) =>
+  Effect.gen(function* () {
+    let content = suppliedContent;
+    if (content === undefined && title === undefined) {
+      const result = yield* editMarkdown(existing.content);
+      if (result._tag === "Empty") return { _tag: "Empty" } as const;
+      if (result._tag === "Edited") content = result.content;
+    }
+
+    const updates: DocUpdates = {};
+    if (title && title !== existing.title) updates.title = title;
+    if (content) updates.content = content;
+    return { _tag: "Updates", updates } as const;
+  });
+
 interface DocCommandError {
   readonly _tag: string;
   readonly matches?: Parameters<typeof formatEntityIdMatches>[0];
@@ -32,12 +52,37 @@ interface DocCommandError {
 }
 
 const formatDocError = (error: DocCommandError): string => {
+  if (
+    error._tag === "EditorConfigurationError" ||
+    error._tag === "EditorProcessError" ||
+    error._tag === "EditorFileError"
+  ) {
+    return error.message ?? String(error);
+  }
+
   if (error._tag === "AmbiguousEntityIdError") {
     return `Entity id "${error.value ?? ""}" is ambiguous: ${formatEntityIdMatches(error.matches ?? [])}`;
   }
 
   return `${error._tag}: ${error.message ?? String(error)}`;
 };
+
+const truncatedTagSummary = (
+  tags: ReadonlyArray<{ readonly id: string }>,
+  maxLength = 80
+): string => {
+  const summary = tags.map((tag) => `#${tag.id}`).join(", ");
+  return summary.length <= maxLength ? summary : `${summary.slice(0, maxLength - 1)}…`;
+};
+
+const exitWithEditorError = (error: { readonly message: string }) =>
+  Console.error(`Error: ${error.message}`).pipe(
+    Effect.andThen(
+      Effect.sync(() => {
+        process.exitCode = 1;
+      })
+    )
+  );
 
 // ============================================================================
 // Doc Create Command
@@ -49,7 +94,7 @@ const docCreateCommand = Command.make(
     title: Argument.string("title"),
     content: Flag.string("content").pipe(
       Flag.withAlias("c"),
-      Flag.withDescription("Document content (markdown)"),
+      Flag.withDescription("Document content (markdown); opens $VISUAL or $EDITOR when omitted"),
       Flag.optional
     ),
     tags: Flag.string("tags").pipe(
@@ -60,11 +105,22 @@ const docCreateCommand = Command.make(
   },
   ({ title, content, tags }) =>
     Effect.gen(function* () {
+      const suppliedContent = Option.getOrUndefined(content);
+      let contentValue = suppliedContent;
+
+      if (contentValue === undefined) {
+        const result = yield* editMarkdown("");
+        if (result._tag === "Empty" || result._tag === "Unchanged") {
+          yield* Console.log("Document creation aborted: content is empty.");
+          return;
+        }
+        contentValue = result.content;
+      }
+
       const { doc, displayIds } = yield* withCliServices(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
 
-          const contentValue = Option.getOrElse(content, () => "");
           const doc = yield* entityService.createDoc({
             title,
             content: contentValue,
@@ -98,6 +154,11 @@ const docCreateCommand = Command.make(
       yield* Console.log(`Version: ${doc.version}`);
       yield* Console.log("");
     }).pipe(
+      Effect.catchTags({
+        EditorConfigurationError: exitWithEditorError,
+        EditorFileError: exitWithEditorError,
+        EditorProcessError: exitWithEditorError,
+      }),
       Effect.catch((error) =>
         Console.error(
           `Error: ${error._tag}: ${"message" in error ? error.message : String(error)}`
@@ -278,22 +339,23 @@ const docEditCommand = Command.make(
     title: Flag.string("title").pipe(Flag.withDescription("New title"), Flag.optional),
     content: Flag.string("content").pipe(
       Flag.withAlias("c"),
-      Flag.withDescription("New content"),
+      Flag.withDescription("New content; without update flags, opens $VISUAL or $EDITOR"),
       Flag.optional
     ),
   },
   ({ id, title, content }) =>
     Effect.gen(function* () {
       const titleValue = Option.getOrUndefined(title);
-      const contentValue = Option.getOrUndefined(content);
+      const suppliedContent = Option.getOrUndefined(content);
 
-      if (!titleValue && !contentValue) {
+      if (suppliedContent !== undefined && !titleValue && !suppliedContent) {
         return yield* new NoUpdatesError();
       }
 
-      const updated = yield* withCliServices(
+      const result = yield* withCliServices(
         Effect.gen(function* () {
           const entityService = yield* EntityServiceTag;
+          const tagService = yield* TagServiceTag;
 
           // Verify it exists and is a doc
           const resolvedId = yield* resolveEntityId(id);
@@ -303,27 +365,47 @@ const docEditCommand = Command.make(
             return yield* new NotADocError({ id: resolvedId });
           }
 
-          const updates: DocUpdates = {};
-          if (titleValue) updates.title = titleValue;
-          if (contentValue) updates.content = contentValue;
+          const prepared = yield* prepareDocUpdates(existing, titleValue, suppliedContent);
+          if (prepared._tag === "Empty") {
+            yield* Console.log("Document update aborted: content is empty.");
+            return undefined;
+          }
 
-          return yield* entityService.update(resolvedId, updates);
+          if (Object.keys(prepared.updates).length === 0) {
+            yield* Console.log("Document update aborted: content is unchanged.");
+            return undefined;
+          }
+
+          const updated = yield* entityService.update(resolvedId, prepared.updates);
+          const tags = yield* tagService.getTagsForEntity(updated.id);
+          const prefixes = yield* loadEntityIdPrefixes([updated.id]);
+          return { updated, tags, shortId: prefixes.get(updated.id) ?? updated.id };
         })
       );
+
+      if (!result) return;
 
       yield* Console.log("");
       yield* Console.log("Document updated successfully!");
       yield* Console.log("");
-      yield* Console.log(`ID:      ${updated.id}`);
-      yield* Console.log(`Title:   ${updated.title}`);
-      yield* Console.log(`Version: ${updated.version}`);
+      yield* Console.log(`ID:       ${result.updated.id}`);
+      yield* Console.log(`Short ID: ${result.shortId}`);
+      yield* Console.log(`Title:    ${result.updated.title}`);
+      if (result.tags.length > 0) {
+        yield* Console.log(`Tags:     ${truncatedTagSummary(result.tags)}`);
+      }
+      yield* Console.log(`Version: ${result.updated.version}`);
       yield* Console.log("");
     }).pipe(
-      Effect.catchTag("NoUpdatesError", () =>
-        Console.error("Error: Provide at least --title or --content to update").pipe(
-          Effect.andThen(Effect.fail(new NoUpdatesError()))
-        )
-      ),
+      Effect.catchTags({
+        EditorConfigurationError: exitWithEditorError,
+        EditorFileError: exitWithEditorError,
+        EditorProcessError: exitWithEditorError,
+        NoUpdatesError: () =>
+          exitWithEditorError({
+            message: "Provide at least --title or a non-empty --content to update",
+          }),
+      }),
       Effect.catch((error) =>
         Console.error(`Error: ${formatDocError(error)}`).pipe(Effect.andThen(Effect.fail(error)))
       )
