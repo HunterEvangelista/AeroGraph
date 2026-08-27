@@ -13,6 +13,8 @@ export interface CliResult {
 export interface CliWorkspaceOptions {
   /** Seed the term-governance fixture in addition to the baseline query data. */
   readonly seedTerms?: boolean;
+  /** Override environment variables for CLI processes. Use undefined to unset a variable. */
+  readonly environment?: NodeJS.ProcessEnv;
 }
 
 export interface CliWorkspace {
@@ -84,6 +86,7 @@ export const createCliWorkspace = (options: CliWorkspaceOptions = {}): CliWorksp
   const aerographHome = mkdtempSync(join(tmpdir(), "aerograph-home-test-"));
   const environment = {
     ...process.env,
+    ...options.environment,
     AEROGRAPH_HOME: aerographHome,
   };
 
