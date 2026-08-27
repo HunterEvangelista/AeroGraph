@@ -1,120 +1,136 @@
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { assertNoExternalBundleImports } from "./bundle-imports";
 
 const packageRoot = resolve(import.meta.dir, "..");
+const sourceRoot = resolve(packageRoot, "../..");
 const manifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8")) as {
+  name: string;
   version: string;
 };
-const tempRoot = await mkdtemp(join(tmpdir(), "aerograph-pack-"));
+const tempRoot = await mkdtemp(join(tmpdir(), "aerograph-pack-smoke-"));
+const project = join(tempRoot, "checkout");
+const installPrefix = join(tempRoot, "install");
 const home = join(tempRoot, "home");
-const project = join(tempRoot, "project");
-const packageDir = join(tempRoot, "package");
 
-const run = async (command: string[], cwd = tempRoot) => {
-  const process = Bun.spawn(command, {
+const copy = async (relative: string) =>
+  cp(join(sourceRoot, relative), join(project, relative), {
+    recursive: true,
+    verbatimSymlinks: true,
+  });
+
+const run = async (command: string[], cwd: string) => {
+  const child = Bun.spawn(command, {
     cwd,
     env: { ...Bun.env, AEROGRAPH_HOME: home },
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [exitCode, stdout, stderr] = await Promise.all([
-    process.exited,
-    new Response(process.stdout).text(),
-    new Response(process.stderr).text(),
+  const [code, stdout, stderr] = await Promise.all([
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
   ]);
-  if (exitCode !== 0)
-    throw new Error(`${command.join(" ")} failed (${exitCode})\n${stdout}${stderr}`);
+  if (code !== 0) throw new Error(`${command.join(" ")} failed (${code})\n${stdout}${stderr}`);
   return stdout;
 };
 
 try {
-  // Remove any developer-produced artifact so npm pack's lifecycle build is
-  // the only way the tarball can obtain dist/cli.js.
-  await rm(resolve(packageRoot, "dist"), { recursive: true, force: true });
-  await Bun.$`mkdir -p ${project} ${packageDir}`;
-  // Plain npm pack must rebuild the bundle through the prepack lifecycle hook;
-  // callers should not need to remember a separate build command.
-  await run(["npm", "pack", "--pack-destination", tempRoot], packageRoot);
-  const tarballs = (await readdir(tempRoot)).filter((entry) => entry.endsWith(".tgz"));
-  if (tarballs.length !== 1)
-    throw new Error(`Expected one packed tarball, found ${tarballs.length}`);
-  const [tarballName] = tarballs;
-  if (!tarballName) throw new Error("npm pack did not produce a tarball");
-  const tarball = join(tempRoot, tarballName);
-  const packageJson = JSON.parse(
-    await run(["tar", "-xOf", tarball, "package/package.json"], tempRoot)
-  ) as {
-    license?: string;
-  };
-  if (packageJson.license !== "Apache-2.0")
-    throw new Error(`Expected Apache-2.0 package metadata, got ${packageJson.license}`);
-  const license = await run(["tar", "-xOf", tarball, "package/LICENSE"], tempRoot);
-  if (!license.includes("Apache License") || !license.includes("TERMS AND CONDITIONS"))
-    throw new Error("Tarball LICENSE is missing or is not Apache-2.0");
-  const thirdParty = await run(
-    ["tar", "-xOf", tarball, "package/THIRD_PARTY_LICENSES.md"],
+  await mkdir(project, { recursive: true });
+  // This is intentionally a small checkout. In particular, generated output,
+  // graph state, VCS metadata, and unrelated workspace packages never enter it.
+  for (const file of ["package.json", "bun.lock", "tsconfig.json", "LICENSE"]) await copy(file);
+  await copy("packages/core/package.json");
+  await copy("packages/core/tsconfig.json");
+  await copy("packages/core/src");
+  for (const file of [
+    "package.json",
+    ".npmignore",
+    "README.md",
+    "bin",
+    "src",
+    "scripts",
+    "tsconfig.json",
+    "tsconfig.tests.json",
+  ])
+    await copy(`packages/cli/${file}`);
+
+  // Copy only installed dependencies. A symlink would make Bun embed the
+  // source checkout's absolute node_modules paths in the generated bundle.
+  await cp(join(sourceRoot, "node_modules"), join(project, "node_modules"), {
+    recursive: true,
+    verbatimSymlinks: true,
+  });
+
+  // npm pack must be the first build in the isolated checkout so this test
+  // exercises the complete prepack lifecycle, including the core build.
+  const packOutput = await run(
+    ["npm", "pack", "--json", "--pack-destination", tempRoot],
+    join(project, "packages/cli")
+  );
+  const jsonStart = packOutput.indexOf("[");
+  if (jsonStart < 0) throw new Error(`npm pack --json returned no JSON: ${packOutput}`);
+  const packResult = JSON.parse(packOutput.slice(jsonStart)) as Array<{
+    filename: string;
+    files: Array<{ path: string }>;
+  }>;
+  if (packResult.length !== 1 || !packResult[0])
+    throw new Error("npm pack did not return exactly one package");
+  const tarball = join(tempRoot, packResult[0].filename);
+  const listing = packResult[0].files.map(({ path }) => `package/${path}`).sort();
+  const expected = [
+    "package/LICENSE",
+    "package/README.md",
+    "package/THIRD_PARTY_LICENSES.md",
+    "package/bin/aerograph",
+    "package/dist/cli.js",
+    "package/package.json",
+  ];
+  if (JSON.stringify(listing) !== JSON.stringify(expected))
+    throw new Error(`npm pack files differ from allowlist:\n${listing.join("\n")}`);
+
+  await run(
+    ["npm", "install", "--ignore-scripts", "--no-package-lock", "--prefix", installPrefix, tarball],
     tempRoot
   );
+  const installed = join(installPrefix, "node_modules", "@aerograph", "cli");
+  const packageJson = JSON.parse(await readFile(join(installed, "package.json"), "utf8")) as {
+    license?: string;
+    publishConfig?: { tag?: string };
+  };
+  if (packageJson.license !== "Apache-2.0" || packageJson.publishConfig?.tag !== "alpha")
+    throw new Error("Tarball metadata must declare Apache-2.0 and publishConfig.tag alpha");
+  const license = await readFile(join(installed, "LICENSE"), "utf8");
+  if (!license.includes("Apache License") || !license.includes("TERMS AND CONDITIONS"))
+    throw new Error("Invalid Apache license");
+  const thirdParty = await readFile(join(installed, "THIRD_PARTY_LICENSES.md"), "utf8");
   if (
     !thirdParty.includes("@effect/platform-bun") ||
     !thirdParty.includes("Copyright © Hunter Evangelista")
   )
-    throw new Error("Tarball third-party license artifact is incomplete");
-  const bundledArtifact = await run(["tar", "-xOf", tarball, "package/dist/cli.js"], tempRoot);
-  const externalImports = [
-    ...bundledArtifact.matchAll(/^import .* from ["']([^"']+)["'];?$/gm),
-  ].flatMap((match) => {
-    const specifier = match[1];
-    if (
-      specifier === undefined ||
-      specifier.startsWith("node:") ||
-      specifier.startsWith("bun:") ||
-      [
-        "child_process",
-        "crypto",
-        "fs",
-        "fs/promises",
-        "os",
-        "path",
-        "readline",
-        "stream",
-        "url",
-      ].includes(specifier)
-    ) {
-      return [];
-    }
-    return [specifier];
-  });
-  if (externalImports.length > 0)
-    throw new Error(`Bundle contains external package imports: ${externalImports.join(", ")}`);
-  if (bundledArtifact.includes('from "ws"'))
-    throw new Error("Bundle retains the optional Node ws import");
-  if (bundledArtifact.includes(packageRoot)) {
-    throw new Error(`Bundle contains checkout path: ${packageRoot}`);
-  }
-  if (/\/(?:Users|home)\/[^\s"']+\/(?:repos|src|node_modules)\//.test(bundledArtifact)) {
-    throw new Error("Bundle contains an absolute checkout or user path");
-  }
-  await run([
-    "npm",
-    "install",
-    "--ignore-scripts",
-    "--no-package-lock",
-    "--prefix",
-    packageDir,
-    tarball,
-  ]);
-  const executable = join(packageDir, "node_modules", ".bin", "aerograph");
-  const versionOutput = (await run([executable, "--version"], project)).trim();
-  const version = versionOutput.replace(/^aerograph v/, "");
-  if (version !== manifest.version) {
-    throw new Error(`Expected --version ${manifest.version}, got ${versionOutput}`);
-  }
+    throw new Error("Incomplete third-party attribution");
+  const bundle = await readFile(join(installed, "dist/cli.js"), "utf8");
+  assertNoExternalBundleImports(bundle);
+  const forbidden = [
+    bundle.includes('from "ws"') && "ws",
+    bundle.includes("NodeSocketServer") && "NodeSocketServer",
+    bundle.includes("msgpackr-extract") && "msgpackr-extract",
+    bundle.includes(sourceRoot) && "source checkout path",
+    bundle.includes(project) && "isolated checkout path",
+    /\/(?:Users|home)\/[^\s"']+\/(?:repos|src|node_modules)\//.test(bundle) && "absolute path",
+  ].filter(Boolean);
+  if (forbidden.length)
+    throw new Error(`Bundle contains forbidden content: ${forbidden.join(", ")}`);
+
+  const executable = join(installPrefix, "node_modules", ".bin", "aerograph");
+  const version = (await run([executable, "--version"], project)).trim();
+  if (version !== `aerograph v${manifest.version}`)
+    throw new Error(`Unexpected version: ${version}`);
   await run([executable, "--help"], project);
   await run([executable, "init"], project);
   await run([executable, "status"], project);
-  console.log(`Packed CLI smoke test passed: ${version}, --help, init, status`);
+  console.log(`Packed CLI smoke test passed: ${packResult[0].filename}`);
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
 }

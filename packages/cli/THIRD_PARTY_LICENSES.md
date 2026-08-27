@@ -2,7 +2,7 @@
 
 Copyright © Hunter Evangelista. AeroGraph is distributed under the Apache License 2.0.
 
-This file is generated from Bun's semantic bundle input graph. It includes every package contributing bundled input; AeroGraph sources are excluded.
+This file is generated from the source map of Bun's production bundle. It includes every package contributing bundled input; AeroGraph sources are excluded.
 
 <!-- bundled-package-inventory: @effect/platform-bun@4.0.0-rc.112, @effect/platform-node-shared@4.0.0-rc.112, drizzle-orm@0.45.2, effect@4.0.0-rc.112 -->
 

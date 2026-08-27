@@ -35,7 +35,8 @@
     "bun": ">=1.1.38"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "tag": "alpha"
   },
   "scripts": {
     "build": "bun run scripts/build.ts",
@@ -58,7 +59,6 @@
     "@types/bun": "^1.1.14",
     "drizzle-orm": "^0.45.2",
     "effect": "4.0.0-rc.112",
-    "esbuild": "0.25.12",
     "typescript": "^7.0.2",
     "vitest": "^2.1.8"
   }
