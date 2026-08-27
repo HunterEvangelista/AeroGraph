@@ -19,7 +19,7 @@
     "lint:fix": "turbo lint:fix",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "typecheck": "turbo typecheck && tsc -p tools/oxlint/tsconfig.json",
+    "typecheck": "turbo typecheck && tsc -p tools/oxlint/tsconfig.json && tsc -p tsconfig.configs.json",
     "typecheck:core": "turbo typecheck --filter=@aerograph/core",
     "typecheck:cli": "turbo typecheck --filter=@aerograph/cli",
     "typecheck:ai": "turbo typecheck --filter=@aerograph/ai",

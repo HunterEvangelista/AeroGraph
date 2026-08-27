@@ -3,6 +3,8 @@ node_modules/
 
 # Build outputs
 dist/
+!packages/cli/dist/
+!packages/cli/dist/cli.js
 *.tsbuildinfo
 
 # Turbo
