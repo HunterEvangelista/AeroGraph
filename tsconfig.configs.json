@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/@effect/tsgo/schema.json",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun-types", "node"],
+    "noEmit": true
+  },
+  "files": ["drizzle.config.ts", "oxlint.config.ts"],
+}

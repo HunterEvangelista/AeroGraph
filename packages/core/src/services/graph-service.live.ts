@@ -1,160 +1,180 @@
-/**
- * Graph Service live implementation
- */
-import { Effect, Layer } from "effect"
-import { type Entity, EntityTypeEnum } from "../domain/entity.js"
-import type { LinkType } from "../domain/link.js"
-import { EntityRepositoryTag } from "../repository/entity-repository.js"
-import { LinkRepositoryTag } from "../repository/link-repository.js"
-import { TagRepositoryTag } from "../repository/tag-repository.js"
+/** biome-ignore-all lint/complexity/noExcessiveCognitiveComplexity: deferred */
+import { Effect, Layer, Result } from "effect";
+import { type Entity, type EntityId, type EntityType, EntityTypes } from "../domain/entity";
+import type { LinkType } from "../domain/link";
+import { EntityNotFoundError } from "../errors";
+import { EntityRepositoryTag } from "../repository/entity-repository";
+import { LinkRepositoryTag } from "../repository/link-repository";
+import { TagRepositoryTag } from "../repository/tag-repository";
 import {
   type EntityWithLinks,
   type GraphService,
-  type GraphStats,
   GraphServiceTag,
+  type GraphStats,
   type TraversalResult,
-} from "./graph-service.js"
+} from "./graph-service";
 
 export const GraphServiceLive = Layer.effect(
   GraphServiceTag,
   Effect.gen(function* () {
-    const entityRepo = yield* EntityRepositoryTag
-    const linkRepo = yield* LinkRepositoryTag
-    const tagRepo = yield* TagRepositoryTag
+    const entityRepo = yield* EntityRepositoryTag;
+    const linkRepo = yield* LinkRepositoryTag;
+    const tagRepo = yield* TagRepositoryTag;
 
-    const getEntityWithLinks = (entityId: string) =>
+    const getEntityWithLinks = (entityId: EntityId) =>
       Effect.gen(function* () {
-        const entity = yield* entityRepo.getById(entityId as Entity["id"])
-        const allLinks = yield* linkRepo.getAllForEntity(entityId)
+        const entity = yield* entityRepo.getById(entityId);
+        const allLinks = yield* linkRepo.getAllForEntity(entityId);
 
-        const incomingLinks = allLinks.filter((l) => l.targetId === entityId)
-        const outgoingLinks = allLinks.filter((l) => l.sourceId === entityId)
+        const incomingLinks = allLinks.filter((l) => l.targetId === entityId);
+        const outgoingLinks = allLinks.filter((l) => l.sourceId === entityId);
 
-        return { entity, incomingLinks, outgoingLinks } satisfies EntityWithLinks
-      })
+        return { entity, incomingLinks, outgoingLinks } satisfies EntityWithLinks;
+      });
 
-    const getRelatedEntities = (entityId: string, linkTypes?: ReadonlyArray<LinkType>) =>
+    const getRelatedEntities = (entityId: EntityId, linkTypes?: ReadonlyArray<LinkType>) =>
       Effect.gen(function* () {
-        const links = yield* linkRepo.getAllForEntity(entityId)
+        const links = yield* linkRepo.getAllForEntity(entityId);
 
-        const filteredLinks = linkTypes ? links.filter((l) => linkTypes.includes(l.type)) : links
+        const filteredLinks = linkTypes ? links.filter((l) => linkTypes.includes(l.type)) : links;
 
-        const relatedIds = new Set<string>()
+        const relatedIds = new Set<string>();
         for (const link of filteredLinks) {
           if (link.sourceId === entityId) {
-            relatedIds.add(link.targetId)
+            relatedIds.add(link.targetId);
           } else {
-            relatedIds.add(link.sourceId)
+            relatedIds.add(link.sourceId);
           }
         }
 
-        const entities: Entity[] = []
+        const entities: Entity[] = [];
         for (const id of relatedIds) {
-          const result = yield* Effect.either(entityRepo.getById(id as Entity["id"]))
-          if (result._tag === "Right") {
-            entities.push(result.right)
+          // SAFETY: Related IDs come directly from persisted links and use the entity ID representation.
+          const result = yield* Effect.result(entityRepo.getById(id as Entity["id"]));
+          if (Result.isSuccess(result)) {
+            entities.push(result.success);
+          } else if (!(result.failure instanceof EntityNotFoundError)) {
+            return yield* result.failure;
           }
         }
 
-        return entities
-      })
+        return entities;
+      });
 
-    const traverse = (entityId: string, maxDepth: number, linkTypes?: ReadonlyArray<LinkType>) =>
+    const traverse = (entityId: EntityId, maxDepth: number, linkTypes?: ReadonlyArray<LinkType>) =>
       Effect.gen(function* () {
-        const visited = new Set<string>([entityId])
-        const entities: Entity[] = []
-        let currentLevel = [entityId]
-        let depth = 0
+        const visited = new Set([entityId]);
+        const entities: Entity[] = [];
+        let currentLevel = [entityId];
+        let depth = 0;
 
         while (currentLevel.length > 0 && depth < maxDepth) {
-          const nextLevel: string[] = []
+          const nextLevel: EntityId[] = [];
 
           for (const id of currentLevel) {
-            const related = yield* getRelatedEntities(id, linkTypes)
+            const related = yield* getRelatedEntities(id, linkTypes);
             for (const entity of related) {
               if (!visited.has(entity.id)) {
-                visited.add(entity.id)
-                entities.push(entity)
-                nextLevel.push(entity.id)
+                visited.add(entity.id);
+                entities.push(entity);
+                nextLevel.push(entity.id);
               }
             }
           }
 
-          currentLevel = nextLevel
-          depth++
+          currentLevel = nextLevel;
+          depth++;
         }
 
-        return { entities, depth } satisfies TraversalResult
-      })
+        return { entities, depth } satisfies TraversalResult;
+      });
 
-    const findByTagPath = (tagIds: ReadonlyArray<string>) => entityRepo.getByTags(tagIds)
+    const findByTagPath = (tagIds: ReadonlyArray<string>) => entityRepo.getByTags(tagIds);
 
-    const getStats = () =>
+    const findByTagGroups = (tagIdGroups: ReadonlyArray<ReadonlyArray<string>>) =>
       Effect.gen(function* () {
-        const [totalEntities, totalTags, totalLinks] = yield* Effect.all([
-          entityRepo.count(),
-          tagRepo.count(),
-          linkRepo.count(),
-        ])
-
-        const entitiesByType: Record<string, number> = {}
-        for (const type of [
-          EntityTypeEnum.Doc,
-          EntityTypeEnum.CodeRef,
-          EntityTypeEnum.Story,
-          EntityTypeEnum.Diagram,
-        ] as const) {
-          entitiesByType[type] = yield* entityRepo.count(type)
+        if (tagIdGroups.length === 0 || tagIdGroups.some((group) => group.length === 0)) {
+          return [];
         }
 
-        return { totalEntities, totalTags, totalLinks, entitiesByType } satisfies GraphStats
-      })
+        const matchesByGroup = yield* Effect.all(
+          tagIdGroups.map((group) =>
+            Effect.all([...new Set(group)].map((tagId) => entityRepo.getByTag(tagId))).pipe(
+              Effect.map(
+                (matches) => new Map(matches.flat().map((entity) => [entity.id, entity] as const))
+              )
+            )
+          )
+        );
+        const [first, ...rest] = matchesByGroup;
+        if (!first) return [];
 
-    const findPath = (sourceId: string, targetId: string, maxDepth = 5) =>
+        return [...first.values()].filter((entity) =>
+          rest.every((matches) => matches.has(entity.id))
+        );
+      });
+
+    const getStats = Effect.gen(function* () {
+      const [totalEntities, totalTags, totalLinks] = yield* Effect.all([
+        entityRepo.count(),
+        tagRepo.count,
+        linkRepo.count,
+      ]);
+
+      const entitiesByType: Partial<Record<EntityType, number>> = {};
+      for (const type of EntityTypes) {
+        entitiesByType[type] = yield* entityRepo.count(type);
+      }
+
+      return { totalEntities, totalTags, totalLinks, entitiesByType } satisfies GraphStats;
+    });
+
+    const findPath = (sourceId: EntityId, targetId: EntityId, maxDepth = 5) =>
       Effect.gen(function* () {
-        const visited = new Set<string>([sourceId])
-        const parentMap = new Map<string, string>()
-        let queue = [sourceId]
+        const visited = new Set<string>([sourceId]);
+        const parentMap = new Map<EntityId, EntityId>();
+        let queue = [sourceId];
 
         for (let depth = 0; depth <= maxDepth && queue.length > 0; depth++) {
-          const nextQueue: string[] = []
+          const nextQueue: EntityId[] = [];
 
           for (const currentId of queue) {
             if (currentId === targetId) {
-              const path: Entity[] = []
-              let id: string | undefined = targetId
+              const path: Entity[] = [];
+              let id: EntityId | undefined = targetId;
               while (id) {
-                const entity = yield* entityRepo.getById(id as Entity["id"])
-                path.unshift(entity)
-                id = parentMap.get(id)
+                const entity = yield* entityRepo.getById(id);
+                path.unshift(entity);
+                id = parentMap.get(id);
               }
-              return path
+              return path;
             }
 
-            const links = yield* linkRepo.getAllForEntity(currentId)
+            const links = yield* linkRepo.getAllForEntity(currentId);
             for (const link of links) {
-              const neighborId = link.sourceId === currentId ? link.targetId : link.sourceId
+              const neighborId = link.sourceId === currentId ? link.targetId : link.sourceId;
               if (!visited.has(neighborId)) {
-                visited.add(neighborId)
-                parentMap.set(neighborId, currentId)
-                nextQueue.push(neighborId)
+                visited.add(neighborId);
+                parentMap.set(neighborId, currentId);
+                nextQueue.push(neighborId);
               }
             }
           }
 
-          queue = nextQueue
+          queue = nextQueue;
         }
 
-        return null
-      })
+        return null;
+      });
 
     return {
       getEntityWithLinks,
       getRelatedEntities,
       traverse,
       findByTagPath,
+      findByTagGroups,
       getStats,
       findPath,
-    } satisfies GraphService
+    } satisfies GraphService;
   })
-)
+);

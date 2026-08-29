@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="A controlled material, color, and typography lab for AeroGraph's orbital Cloud."
+    />
+    <title>AeroGraph — Cloud Design Lab</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body data-material="liquid" data-palette="petroleum" data-type="extended" data-logo="slant">
+    <main class="experience" id="experience">
+      <div class="viewport">
+        <canvas id="aeroform" aria-hidden="true"></canvas>
+        <div class="optical-field" aria-hidden="true"></div>
+        <div class="registration-grid" aria-hidden="true"></div>
+
+        <header class="masthead">
+          <a class="wordmark logo-lockup" href="#top" aria-label="AeroGraph Cloud design lab">
+            <span>AERO</span><i></i><span>GRAPH</span>
+          </a>
+          <div class="study-id">
+            <span>Cloud design lab</span>
+            <span id="permutation-code">AG–CL / A2·C2·T1·L1</span>
+          </div>
+        </header>
+
+        <section class="lab-panel" aria-labelledby="lab-title">
+          <div class="lab-heading">
+            <p class="eyebrow">Controlled permutations</p>
+            <h1 id="lab-title">One form.<br />Full velocity.</h1>
+            <p>Cloud geometry and orbital movement remain fixed while material, chroma, and typography are tuned.</p>
+          </div>
+
+          <div class="control-stack">
+            <fieldset class="control-group" data-control="material">
+              <legend><span>01</span> Material</legend>
+              <div class="segmented-control">
+                <button type="button" data-value="airbrush">Vapor</button>
+                <button class="is-active" type="button" data-value="liquid">Liquid</button>
+                <button type="button" data-value="emulsion">Emulsion</button>
+              </div>
+              <p id="material-note">Soft liquid volume with sparse directional chrome highlights.</p>
+            </fieldset>
+
+            <fieldset class="control-group" data-control="palette">
+              <legend><span>02</span> Petrol intensity</legend>
+              <div class="segmented-control">
+                <button type="button" data-value="petrol-soft">
+                  <i class="swatch swatch-petrol-soft"></i>Restrained
+                </button>
+                <button class="is-active" type="button" data-value="petroleum">
+                  <i class="swatch swatch-petroleum"></i>Balanced
+                </button>
+                <button type="button" data-value="petrol-high">
+                  <i class="swatch swatch-petrol-high"></i>Charged
+                </button>
+              </div>
+              <p id="palette-note">Black petrol, oxidized green, and concentrated interference color.</p>
+            </fieldset>
+
+            <fieldset class="control-group" data-control="type">
+              <legend><span>03</span> Typography</legend>
+              <div class="segmented-control">
+                <button class="is-active" type="button" data-value="extended">Extended</button>
+                <button type="button" data-value="industrial">Industrial</button>
+                <button type="button" data-value="humanist">Humanist</button>
+              </div>
+              <p id="type-note">Wide corporate grotesk with compressed vertical rhythm.</p>
+            </fieldset>
+
+            <fieldset class="control-group" data-control="logo">
+              <legend><span>04</span> Wordmark</legend>
+              <div class="segmented-control">
+                <button class="wordmark-choice choice-slant is-active" type="button" data-value="slant">
+                  <b>AERO</b><small>Slant</small>
+                </button>
+                <button class="wordmark-choice choice-mono" type="button" data-value="mono">
+                  <b>AERO</b><small>Mono</small>
+                </button>
+                <button class="wordmark-choice choice-wide" type="button" data-value="wide">
+                  <b>AERO</b><small>Wide</small>
+                </button>
+              </div>
+              <p id="logo-note">Forward-skewed extended wordmark with the optical ellipse in-line.</p>
+            </fieldset>
+          </div>
+        </section>
+
+        <section class="brand-copy" aria-labelledby="brand-title">
+          <div class="logo-specimen logo-lockup" role="img" aria-label="AeroGraph wordmark specimen">
+            <span>AERO</span><i></i><span>GRAPH</span>
+          </div>
+          <h2 id="brand-title">Memory at velocity.</h2>
+          <p>
+            Context accumulates into a durable graph—fast to traverse, governed at every scale.
+          </p>
+        </section>
+
+        <section class="node-readout" aria-live="polite" aria-atomic="true">
+          <div class="node-index"><span id="node-index">01</span><small>/ 05</small></div>
+          <div>
+            <p class="eyebrow">Active memory</p>
+            <h2 id="node-title">Fragment</h2>
+            <p id="node-description">Context exists, but its relationships remain unresolved.</p>
+          </div>
+        </section>
+
+        <aside class="orbit-rail" aria-label="Orbital progress">
+          <span class="rail-label">Orbit</span>
+          <div class="rail-line"><i id="rail-progress"></i></div>
+          <ol id="orbit-stages">
+            <li class="is-active"><span>01</span><b>Fragment</b></li>
+            <li><span>02</span><b>Capture</b></li>
+            <li><span>03</span><b>Connect</b></li>
+            <li><span>04</span><b>Govern</b></li>
+            <li><span>05</span><b>Retrieve</b></li>
+          </ol>
+        </aside>
+
+        <footer class="telemetry">
+          <div><span class="status-light"></span>Fixed Cloud geometry</div>
+          <div><span id="particle-count">5,200</span> particulate signals</div>
+          <div class="coordinates" id="coordinates">AZ −040° / EL +06° / R 6.7</div>
+          <div class="shortcuts">
+            <kbd>M</kbd> material <kbd>C</kbd> color <kbd>T</kbd> type <kbd>L</kbd> logo
+          </div>
+          <div class="scroll-prompt"><i></i>Scroll to orbit</div>
+        </footer>
+      </div>
+
+      <div class="scroll-scenes" aria-hidden="true">
+        <div></div><div></div><div></div><div></div><div></div>
+      </div>
+    </main>
+
+    <script src="./aeroform.js"></script>
+  </body>
+</html>

@@ -1,9 +1,4 @@
-/**
- * Domain module exports
- */
-
-// Entity types and schemas
-export {
+export type {
   BaseEntity,
   CodeRef,
   CreateCodeRefInput,
@@ -12,27 +7,79 @@ export {
   CreateStoryInput,
   Diagram,
   DiagramType,
-  DiagramTypeEnum,
   Doc,
   Entity,
-  EntityType,
-  EntityTypeEnum,
+  EntityId,
   Priority,
-  PriorityEnum,
   Story,
   StoryStatus,
+} from "./entity";
+// Entity types and schemas
+export {
+  BaseEntitySchema,
+  BrandedId,
+  CodeRefSchema,
+  CreateCodeRefInputSchema,
+  CreateDiagramInputSchema,
+  CreateDocInputSchema,
+  CreateStoryInputSchema,
+  DiagramSchema,
+  DiagramTypeEnum,
+  DiagramTypeSchema,
+  DocSchema,
+  EntitySchema,
+  EntityType,
+  EntityTypeSchema,
+  EntityTypes,
+  PriorityEnum,
+  PrioritySchema,
+  StorySchema,
   StoryStatusEnum,
-} from "./entity.js"
-export type { EntityId } from "./entity.js"
-
-// Tag types and schemas
-export { CreateTagInput, Tag, UpdateTagInput } from "./tag.js"
-export type { TagId } from "./tag.js"
-
+  StoryStatusSchema,
+} from "./entity";
+export type { LinkId } from "./link";
 // Link types and schemas
-export { CreateLinkInput, getInverseLinkType, Link, LinkType } from "./link.js"
-export type { LinkId } from "./link.js"
-
+export { CreateLinkInput, getInverseLinkType, Link, LinkType } from "./link";
+export type {
+  CreateNextCommandInput,
+  NextCommand,
+  NextCommandId,
+  NextCommandType,
+} from "./next-command";
+export {
+  CreateNextCommandInputSchema,
+  NextCommandIdSchema,
+  NextCommandSchema,
+  NextCommandTypeSchema,
+} from "./next-command";
+export { NonNegativeInteger, PositiveInteger } from "./scalars";
+export type { TagId } from "./tag";
+// Tag types and schemas
+export { CreateTagInput, Tag, TagIdSchema, UpdateTagInput } from "./tag";
+// Term registry pure types
+export type { JournalEntryId, TermId } from "./term";
+// Term registry types and schemas
+export {
+  CreateTermInput,
+  CreateTermNameInput,
+  JournalEntryIdSchema,
+  MIGRATION_OPERATIONS,
+  MigrationJournalEntry,
+  MigrationOperation,
+  normalizeTermName,
+  RecordJournalEntryInput,
+  TERM_KINDS,
+  TERM_NAME_KINDS,
+  TERM_STATUSES,
+  Term,
+  TermIdSchema,
+  TermKind,
+  TermName,
+  TermNameKind,
+  TermStatus,
+  UpdateTermInput,
+  UpdateTermNameInput,
+} from "./term";
+export type { TypedEntityVersion, VersionId } from "./version";
 // Version types and schemas
-export { ChangeType, EntityVersion } from "./version.js"
-export type { TypedEntityVersion, VersionId } from "./version.js"
+export { ChangeType, EntityVersion } from "./version";

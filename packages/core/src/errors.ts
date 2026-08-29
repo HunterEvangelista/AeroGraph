@@ -2,21 +2,21 @@
  * Core error types
  * Typed errors for use with Effect
  */
-import { Data } from "effect"
+import { Data } from "effect";
 
 // ============================================================================
 // Base Errors
 // ============================================================================
 
 export class RepositoryError extends Data.TaggedError("RepositoryError")<{
-  readonly message: string
-  readonly cause?: unknown
+  readonly message: string;
+  readonly cause?: unknown;
 }> {}
 
 export class ValidationError extends Data.TaggedError("ValidationError")<{
-  readonly message: string
-  readonly field?: string
-  readonly cause?: unknown
+  readonly message: string;
+  readonly field?: string;
+  readonly cause?: unknown;
 }> {}
 
 // ============================================================================
@@ -24,24 +24,64 @@ export class ValidationError extends Data.TaggedError("ValidationError")<{
 // ============================================================================
 
 export class EntityNotFoundError extends Data.TaggedError("EntityNotFoundError")<{
-  readonly entityId: string
-  readonly message?: string
+  readonly entityId: string;
+  readonly message?: string;
 }> {}
 
 export class TagNotFoundError extends Data.TaggedError("TagNotFoundError")<{
-  readonly tagId: string
-  readonly message?: string
+  readonly tagId: string;
+  readonly message?: string;
+}> {}
+
+export class TermNotFoundError extends Data.TaggedError("TermNotFoundError")<{
+  readonly name: string;
+  readonly message?: string;
+}> {}
+
+export class TermAlreadyExistsError extends Data.TaggedError("TermAlreadyExistsError")<{
+  readonly name: string;
+  readonly message?: string;
+}> {}
+
+export interface TermNameCandidate {
+  readonly id: string;
+  readonly kind: string;
+  readonly canonicalName: string;
+  readonly matchedName: string;
+  readonly nameKind: string;
+}
+
+export class AmbiguousTermNameError extends Data.TaggedError("AmbiguousTermNameError")<{
+  readonly name: string;
+  /** Kept as display labels for existing callers. */
+  readonly candidates: ReadonlyArray<string>;
+  /** Stable, serializable candidate data for interface layers. */
+  readonly candidateMetadata?: ReadonlyArray<TermNameCandidate>;
+  readonly message?: string;
+}> {}
+
+export class TermMigrationError extends Data.TaggedError("TermMigrationError")<{
+  readonly message: string;
+  readonly operation?: string;
+  readonly cause?: unknown;
+}> {}
+
+export class MigrationJournalEntryNotFoundError extends Data.TaggedError(
+  "MigrationJournalEntryNotFoundError"
+)<{
+  readonly id: string;
+  readonly message?: string;
 }> {}
 
 export class LinkNotFoundError extends Data.TaggedError("LinkNotFoundError")<{
-  readonly linkId: string
-  readonly message?: string
+  readonly linkId: string;
+  readonly message?: string;
 }> {}
 
 export class VersionNotFoundError extends Data.TaggedError("VersionNotFoundError")<{
-  readonly entityId: string
-  readonly version: number
-  readonly message?: string
+  readonly entityId: string;
+  readonly version: number;
+  readonly message?: string;
 }> {}
 
 // ============================================================================
@@ -49,19 +89,19 @@ export class VersionNotFoundError extends Data.TaggedError("VersionNotFoundError
 // ============================================================================
 
 export class ConfigError extends Data.TaggedError("ConfigError")<{
-  readonly message: string
-  readonly path?: string
-  readonly cause?: unknown
+  readonly message: string;
+  readonly path?: string;
+  readonly cause?: unknown;
 }> {}
 
 export class WorkspaceNotFoundError extends Data.TaggedError("WorkspaceNotFoundError")<{
-  readonly path: string
-  readonly message?: string
+  readonly path: string;
+  readonly message?: string;
 }> {}
 
 export class WorkspaceAlreadyExistsError extends Data.TaggedError("WorkspaceAlreadyExistsError")<{
-  readonly path: string
-  readonly message?: string
+  readonly path: string;
+  readonly message?: string;
 }> {}
 
 // ============================================================================
@@ -69,29 +109,34 @@ export class WorkspaceAlreadyExistsError extends Data.TaggedError("WorkspaceAlre
 // ============================================================================
 
 export class DatabaseError extends Data.TaggedError("DatabaseError")<{
-  readonly message: string
-  readonly cause?: unknown
+  readonly message: string;
+  readonly cause?: unknown;
 }> {}
 
 export class MigrationError extends Data.TaggedError("MigrationError")<{
-  readonly message: string
-  readonly version?: number
-  readonly cause?: unknown
+  readonly message: string;
+  readonly version?: number;
+  readonly cause?: unknown;
 }> {}
 
 // ============================================================================
 // Error Type Union
 // ============================================================================
 
-export type KiokuError =
+export type AeroGraphError =
   | RepositoryError
   | ValidationError
   | EntityNotFoundError
   | TagNotFoundError
+  | TermNotFoundError
+  | TermAlreadyExistsError
+  | AmbiguousTermNameError
+  | TermMigrationError
+  | MigrationJournalEntryNotFoundError
   | LinkNotFoundError
   | VersionNotFoundError
   | ConfigError
   | WorkspaceNotFoundError
   | WorkspaceAlreadyExistsError
   | DatabaseError
-  | MigrationError
+  | MigrationError;
