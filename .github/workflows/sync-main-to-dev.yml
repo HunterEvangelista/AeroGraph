@@ -1,0 +1,58 @@
+name: Sync main promotion to dev
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-main-promotion-to-dev
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Fast-forward dev
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.ref == 'dev' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fast-forward dev to the promotion commit
+        env:
+          PROMOTED_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+          REPOSITORY: ${{ github.repository }}
+          SYNC_DEPLOY_KEY: ${{ secrets.PROMOTION_SYNC_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+
+          key_file="$(mktemp)"
+          trap 'rm -f "$key_file"' EXIT
+          printf '%s\n' "$SYNC_DEPLOY_KEY" >"$key_file"
+          chmod 600 "$key_file"
+
+          mkdir -p "$HOME/.ssh"
+          ssh-keyscan -t ed25519 github.com >>"$HOME/.ssh/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $key_file -o IdentitiesOnly=yes"
+
+          git init --quiet repository
+          cd repository
+          git remote add origin "git@github.com:$REPOSITORY.git"
+          git fetch --quiet --no-tags origin \
+            refs/heads/dev:refs/remotes/origin/dev \
+            refs/heads/main:refs/remotes/origin/main
+
+          if [[ "$(git rev-parse refs/remotes/origin/main)" != "$PROMOTED_SHA" ]]; then
+            echo "main advanced beyond the promotion commit; refusing to sync dev." >&2
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor refs/remotes/origin/dev "$PROMOTED_SHA"; then
+            echo "dev advanced outside the promoted history; refusing to move it." >&2
+            exit 1
+          fi
+
+          git push --quiet origin "$PROMOTED_SHA:refs/heads/dev"

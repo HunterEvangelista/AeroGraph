@@ -37,6 +37,11 @@ the same CI as any other change. Merging it consumes the pending changesets and 
 `packages/cli/package.json` and the CLI changelog. Promote `dev` to `main` only after the
 version PR has merged so the release branch receives the exact versioned tree.
 
+Promotion PRs target `main` directly from `dev` and use a merge commit. After a promotion
+merges, the sync workflow fast-forwards `dev` to the promotion commit so both long-lived
+branches share the same tip. The sync refuses to move `dev` if another commit reaches it
+during the promotion.
+
 `bun run changeset:version` remains available for isolated validation, but maintainers do
 not commit its output directly during the normal release workflow.
 
