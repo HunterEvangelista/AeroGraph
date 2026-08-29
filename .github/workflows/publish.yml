@@ -69,7 +69,7 @@ jobs:
       - name: Upload releasable CLI tarball
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: aerograph-cli-release-${{ needs.trigger.outputs.version }}
+          name: aerograph-release-${{ needs.trigger.outputs.version }}
           path: ${{ runner.temp }}/package/*.tgz
           if-no-files-found: error
           retention-days: 1
@@ -94,7 +94,7 @@ jobs:
       - name: Download releasable CLI tarball
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: aerograph-cli-release-${{ needs.trigger.outputs.version }}
+          name: aerograph-release-${{ needs.trigger.outputs.version }}
           path: ${{ runner.temp }}/package
       - name: Test installed CLI on minimum Bun
         run: bun run packages/cli/scripts/runtime-smoke.ts "${{ runner.temp }}"/package/*.tgz
@@ -125,7 +125,7 @@ jobs:
       - name: Download tested CLI tarball
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: aerograph-cli-release-${{ needs.trigger.outputs.version }}
+          name: aerograph-release-${{ needs.trigger.outputs.version }}
           path: ${{ runner.temp }}/package
       - name: Publish alpha with provenance
         env:
@@ -133,8 +133,8 @@ jobs:
         run: |
           error_log="$(mktemp)"
           trap 'rm -f "$error_log"' EXIT
-          if npm view "@aerograph/cli@$RELEASE_VERSION" version >/dev/null 2>"$error_log"; then
-            echo "@aerograph/cli@$RELEASE_VERSION is already published."
+          if npm view "aerograph@$RELEASE_VERSION" version >/dev/null 2>"$error_log"; then
+            echo "aerograph@$RELEASE_VERSION is already published."
             exit 0
           elif ! grep -q "E404" "$error_log"; then
             cat "$error_log" >&2
@@ -142,7 +142,7 @@ jobs:
           fi
 
           : >"$error_log"
-          if current_alpha="$(npm view @aerograph/cli dist-tags.alpha 2>"$error_log")"; then
+          if current_alpha="$(npm view aerograph dist-tags.alpha 2>"$error_log")"; then
             if [[ -n "$current_alpha" ]]; then
               bun run packages/cli/scripts/registry-tag-guard.ts "$RELEASE_VERSION" "$current_alpha"
             fi

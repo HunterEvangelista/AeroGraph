@@ -21,8 +21,8 @@ export function evaluatePublishTransition(
   previous: PackageManifest,
   current: PackageManifest
 ): PublishTransition {
-  if (current.name !== "@aerograph/cli") {
-    throw new Error(`Release automation only publishes @aerograph/cli, received ${current.name}`);
+  if (current.name !== "aerograph") {
+    throw new Error(`Release automation only publishes aerograph, received ${current.name}`);
   }
   if (previous.name !== current.name) return { publish: false, version: current.version };
 

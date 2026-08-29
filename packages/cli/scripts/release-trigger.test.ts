@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { compareSemver, evaluatePublishTransition, type PackageManifest } from "./release-trigger";
 
 const manifest = (version: string, tag = "alpha"): PackageManifest => ({
-  name: "@aerograph/cli",
+  name: "aerograph",
   version,
   publishConfig: { tag },
 });
@@ -56,7 +56,7 @@ describe("release trigger", () => {
   it("rejects any future package identity at this release boundary", () => {
     const current = { ...manifest("0.1.0-alpha.0"), name: "@aerograph/other" };
     expect(() => evaluatePublishTransition(manifest("0.0.0"), current)).toThrow(
-      "only publishes @aerograph/cli"
+      "only publishes aerograph"
     );
   });
 

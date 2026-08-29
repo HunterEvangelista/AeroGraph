@@ -1,6 +1,6 @@
 # CLI release workflow
 
-Changesets manages versions for the public `@aerograph/cli` package. The CLI manifest at
+Changesets manages versions for the public `aerograph` package. The CLI manifest at
 `packages/cli/package.json` is the version source used by both the source CLI and the
 bundled executable.
 
@@ -10,7 +10,7 @@ publish command.
 
 ## Package boundary
 
-Only `@aerograph/cli` is versioned and published. Changesets enforces this boundary in two
+Only `aerograph` is versioned and published. Changesets enforces this boundary in two
 ways:
 
 - `@aerograph/core` and `@aerograph/ai` are listed in `ignore`.
@@ -28,7 +28,7 @@ Create a changeset for every user-visible CLI change:
 bun run changeset:create
 ```
 
-Select only `@aerograph/cli` and choose the appropriate semantic version bump. Commit the
+Select only `aerograph` and choose the appropriate semantic version bump. Commit the
 generated Markdown file with the implementation. Changesets accumulate on `dev` until a
 promotion PR brings them to `main`.
 
@@ -98,5 +98,5 @@ The release automation depends on configuration outside the repository:
   configured approval.
 - npm trusted publishing names `HunterEvangelista/AeroGraph`, the `publish.yml` workflow,
   and the `npm-release` environment.
-- The `@aerograph/cli` package and `@aerograph` scope are available to the trusted npm
+- The `aerograph` package is owned by the account that configures the trusted npm
   publisher.

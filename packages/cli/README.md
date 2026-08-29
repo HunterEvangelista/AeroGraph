@@ -1,4 +1,4 @@
-# @aerograph/cli
+# aerograph
 
 The AeroGraph command-line interface for local-first project knowledge graphs.
 
@@ -7,9 +7,9 @@ The AeroGraph command-line interface for local-first project knowledge graphs.
 AeroGraph CLI is in alpha and requires Bun at runtime. Node.js is not a supported runtime.
 
 ```sh
-bunx @aerograph/cli@alpha --help
-bunx @aerograph/cli@alpha init
-bunx @aerograph/cli@alpha status
+bunx aerograph@alpha --help
+bunx aerograph@alpha init
+bunx aerograph@alpha status
 ```
 
 The CLI is bundled into a single JavaScript artifact and stores its registry under `AEROGRAPH_HOME` (or the default user data location). The CLI is the supported interface in this alpha; no programmatic package API is provided.

@@ -1,5 +1,5 @@
 {
-  "name": "@aerograph/cli",
+  "name": "aerograph",
   "description": "Bun-only command-line interface for the AeroGraph local-first knowledge graph.",
   "license": "Apache-2.0",
   "repository": {

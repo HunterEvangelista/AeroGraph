@@ -76,7 +76,7 @@ jobs:
       - name: Upload validated CLI tarball
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: aerograph-cli-package
+          name: aerograph-package
           path: ${{ runner.temp }}/package/*.tgz
           if-no-files-found: error
           retention-days: 1
@@ -100,7 +100,7 @@ jobs:
       - name: Download validated CLI tarball
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: aerograph-cli-package
+          name: aerograph-package
           path: ${{ runner.temp }}/package
       - name: Test installed CLI on minimum Bun
         run: bun run packages/cli/scripts/runtime-smoke.ts "${{ runner.temp }}"/package/*.tgz

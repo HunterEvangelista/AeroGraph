@@ -95,7 +95,7 @@ try {
     ["npm", "install", "--ignore-scripts", "--no-package-lock", "--prefix", installPrefix, tarball],
     tempRoot
   );
-  const installed = join(installPrefix, "node_modules", "@aerograph", "cli");
+  const installed = join(installPrefix, "node_modules", "aerograph");
   const packageJson = JSON.parse(await readFile(join(installed, "package.json"), "utf8")) as {
     license?: string;
     publishConfig?: { tag?: string };

@@ -1,5 +1,5 @@
 /**
- * @aerograph/cli
+ * aerograph
  * Command-line interface for the AeroGraph knowledge platform
  */
 

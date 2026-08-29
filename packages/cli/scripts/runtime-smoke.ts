@@ -40,7 +40,7 @@ try {
     installPrefix,
     tarball,
   ]);
-  const installed = join(installPrefix, "node_modules", "@aerograph", "cli");
+  const installed = join(installPrefix, "node_modules", "aerograph");
   const manifest = JSON.parse(await readFile(join(installed, "package.json"), "utf8")) as {
     version: string;
   };
