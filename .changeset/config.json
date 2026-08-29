@@ -1,0 +1,16 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@4.0.0/schema.json",
+  "baseBranch": "dev",
+  "access": "public",
+  "format": false,
+  "changelog": "@changesets/cli/changelog",
+  "commit": false,
+  "ignore": ["@aerograph/core", "@aerograph/ai"],
+  "fixed": [],
+  "linked": [],
+  "updateInternalDependencies": "patch",
+  "privatePackages": {
+    "version": false,
+    "tag": false
+  }
+}

@@ -10,4 +10,4 @@
 // - Progress bars
 // - Colors
 
-export const placeholder = true
+export const placeholder = true;

@@ -1,6 +1,7 @@
 {
-  "name": "@kioku/core",
+  "name": "@aerograph/core",
   "version": "0.1.0",
+  "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -29,19 +30,19 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "lint": "biome check src/",
-    "lint:fix": "biome check --write src/",
-    "typecheck": "tsc --noEmit",
+    "lint": "biome check src/; biome_status=$?; oxlint src/; oxlint_status=$?; [ $biome_status -eq 0 ] && [ $oxlint_status -eq 0 ]",
+    "lint:fix": "biome check --write src/; biome_status=$?; oxlint src/; oxlint_status=$?; [ $biome_status -eq 0 ] && [ $oxlint_status -eq 0 ]",
+    "typecheck": "tsc -p tsconfig.tests.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "effect": "^3.11.9"
+    "effect": "4.0.0-rc.112"
   },
   "devDependencies": {
-    "@biomejs/biome": "^1.9.4",
-    "typescript": "^5.7.2",
+    "@biomejs/biome": "^2.4.16",
+    "typescript": "^7.0.2",
     "vitest": "^2.1.8"
   }
 }

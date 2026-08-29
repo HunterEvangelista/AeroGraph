@@ -1,12 +1,24 @@
+import {
+  type AeroGraphError,
+  type GovernTagInput,
+  type TagGovernanceInspection,
+  TagIdSchema,
+  TagServiceTag,
+  TERM_KINDS,
+  TermGovernanceServiceTag,
+  TermIdSchema,
+  TermKind as TermKindSchema,
+  ValidationError,
+} from "@aerograph/core";
+import { Console, Effect, Option, Schema } from "effect";
 /**
  * Tag Commands
  * Operations for managing tags and entity tagging
  */
-import { Args, Command, Options } from "@effect/cli"
-import { type TagId, TagServiceTag } from "@kioku/core"
-import { Console, Effect, Option } from "effect"
-import { ConfigServiceTag } from "../config.js"
-import { CliCoreLive } from "../db/index.js"
+import { Argument, Command, Flag } from "effect/unstable/cli";
+import { emitError, emitOutput, formatJson } from "../ui/output";
+import { formatTagList } from "../ui/tag-output";
+import { withCliServices } from "./workspace";
 
 // ============================================================================
 // Tag Create Command
@@ -15,35 +27,31 @@ import { CliCoreLive } from "../db/index.js"
 const tagCreateCommand = Command.make(
   "create",
   {
-    name: Args.text({ name: "name" }),
-    parent: Options.text("parent").pipe(
-      Options.withAlias("p"),
-      Options.withDescription("Parent tag ID for hierarchy"),
-      Options.optional
+    name: Argument.string("name"),
+    parent: Flag.string("parent").pipe(
+      Flag.withAlias("p"),
+      Flag.withDescription("Parent tag ID for hierarchy"),
+      Flag.optional
     ),
-    description: Options.text("description").pipe(
-      Options.withAlias("d"),
-      Options.withDescription("Tag description"),
-      Options.optional
+    description: Flag.string("description").pipe(
+      Flag.withAlias("d"),
+      Flag.withDescription("Tag description"),
+      Flag.optional
     ),
   },
   ({ name, parent, description }) =>
     Effect.gen(function* () {
-      const configService = yield* ConfigServiceTag
-      const workspace = yield* configService.load()
-      const ServiceLayers = CliCoreLive(workspace.dbPath)
+      const parentValue = Option.getOrUndefined(parent);
+      const descValue = Option.getOrUndefined(description);
 
-      const parentValue = Option.getOrUndefined(parent)
-      const descValue = Option.getOrUndefined(description)
-
-      const tag = yield* Effect.scoped(
+      const tag = yield* withCliServices(
         Effect.gen(function* () {
-          const tagService = yield* TagServiceTag
+          const tagService = yield* TagServiceTag;
 
           // If parent is specified, use hierarchical creation
           if (parentValue) {
-            const tagPath = `${parentValue}/${name}`
-            return yield* tagService.ensureHierarchy(tagPath)
+            const tagPath = `${parentValue}/${name}`;
+            return yield* tagService.ensureHierarchy(tagPath);
           }
 
           // Otherwise create a root tag
@@ -51,136 +59,143 @@ const tagCreateCommand = Command.make(
             id: name,
             name,
             description: descValue,
-          })
-        }).pipe(Effect.provide(ServiceLayers))
-      )
+          });
+        })
+      );
 
-      yield* Console.log("")
-      yield* Console.log("Tag created successfully!")
-      yield* Console.log("")
-      yield* Console.log(`ID:     #${tag.id}`)
-      yield* Console.log(`Name:   ${tag.name}`)
+      yield* Console.log("");
+      yield* Console.log("Tag created successfully!");
+      yield* Console.log("");
+      yield* Console.log(`ID:     #${tag.id}`);
+      yield* Console.log(`Name:   ${tag.name}`);
       if (tag.description) {
-        yield* Console.log(`Desc:   ${tag.description}`)
+        yield* Console.log(`Desc:   ${tag.description}`);
       }
       if (tag.parentId) {
-        yield* Console.log(`Parent: #${tag.parentId}`)
+        yield* Console.log(`Parent: #${tag.parentId}`);
       }
-      yield* Console.log("")
+      yield* Console.log("");
     }).pipe(
       Effect.catchTags({
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ValidationError: (e) =>
-          Console.error(`Validation error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Validation error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
-)
+);
 
 // ============================================================================
 // Tag List Command
 // ============================================================================
 
+const jsonFlag = Flag.boolean("json").pipe(
+  Flag.withDescription("Emit JSON"),
+  Flag.withDefault(false)
+);
+const governanceFilter = (
+  governed: boolean,
+  ungoverned: boolean
+): Effect.Effect<"governed" | "ungoverned" | undefined, ValidationError> =>
+  governed === ungoverned
+    ? governed
+      ? Effect.fail(
+          new ValidationError({
+            field: "governance",
+            message: "Use only one of --governed or --ungoverned.",
+          })
+        )
+      : Effect.void.pipe(Effect.as(undefined))
+    : Effect.succeed(governed ? "governed" : "ungoverned");
+const inspectionTag = (value: TagGovernanceInspection) => value.tag;
+const inspectionTerm = (value: TagGovernanceInspection) => value.term;
+
+interface TagJsonError {
+  readonly tag: string;
+  readonly message: string;
+  readonly field?: string;
+  readonly name?: string;
+}
+
+const errorMessage = (error: AeroGraphError): string => {
+  if (error.message) return error.message;
+  if (error._tag === "TagNotFoundError") return `Tag not found: #${error.tagId}`;
+  if (error._tag === "TermNotFoundError") return `Term not found: ${error.name}`;
+  if (error._tag === "EntityNotFoundError") return `Entity not found: ${error.entityId}`;
+  return error._tag;
+};
+
+const errorData = (error: AeroGraphError): TagJsonError => {
+  const data: TagJsonError = { tag: error._tag, message: errorMessage(error) };
+  if ("field" in error && error.field !== undefined) return { ...data, field: error.field };
+  if ("name" in error && error.name !== undefined) return { ...data, name: error.name };
+  return data;
+};
+
+const outputError = <A, E extends AeroGraphError, R>(
+  effect: Effect.Effect<A, E, R>,
+  command: string,
+  asJson: boolean
+) =>
+  asJson
+    ? effect.pipe(
+        Effect.catch((error) =>
+          emitOutput(formatJson({ ok: false, command, error: errorData(error) })).pipe(
+            Effect.andThen(
+              Effect.sync(() => {
+                process.exitCode = 1;
+              })
+            )
+          )
+        )
+      )
+    : effect.pipe(Effect.tapError((error) => emitError(`Error: ${errorData(error).message}`)));
+
 const tagListCommand = Command.make(
   "list",
   {
-    search: Options.text("search").pipe(
-      Options.withAlias("s"),
-      Options.withDescription("Search tags by name"),
-      Options.optional
+    search: Flag.string("search").pipe(
+      Flag.withAlias("s"),
+      Flag.withDescription("Search tags by name"),
+      Flag.optional
     ),
-    tree: Options.boolean("tree").pipe(
-      Options.withDescription("Show as hierarchy tree"),
-      Options.withDefault(false)
+    tree: Flag.boolean("tree").pipe(
+      Flag.withDescription("Show as hierarchy tree"),
+      Flag.withDefault(false)
     ),
+    governed: Flag.boolean("governed").pipe(Flag.withDefault(false)),
+    ungoverned: Flag.boolean("ungoverned").pipe(Flag.withDefault(false)),
+    json: jsonFlag,
   },
-  ({ search, tree }) =>
+  ({ search, tree, governed, ungoverned, json: asJson }) =>
     Effect.gen(function* () {
-      const configService = yield* ConfigServiceTag
-      const workspace = yield* configService.load()
-      const ServiceLayers = CliCoreLive(workspace.dbPath)
-
-      const searchValue = Option.getOrUndefined(search)
-
-      const tags = yield* Effect.scoped(
+      const searchValue = Option.getOrUndefined(search);
+      const filter = yield* governanceFilter(governed, ungoverned);
+      const tags = yield* withCliServices(
         Effect.gen(function* () {
-          const tagService = yield* TagServiceTag
+          const governance = yield* TermGovernanceServiceTag;
+          const inspections = yield* governance.listTags(filter);
+          if (!searchValue) return inspections;
+          const query = searchValue.toLocaleLowerCase();
+          return inspections.filter((inspection) => {
+            const tag = inspectionTag(inspection);
+            return [tag.id, tag.name, ...(tag.aliases ?? [])].some((value) =>
+              value.toLocaleLowerCase().includes(query)
+            );
+          });
+        })
+      );
 
-          if (searchValue) {
-            return yield* tagService.search(searchValue)
-          }
-
-          return yield* tagService.getAll()
-        }).pipe(Effect.provide(ServiceLayers))
-      )
-
-      yield* Console.log("")
-      yield* Console.log(`Tags (${tags.length})`)
-      yield* Console.log("=".repeat(40))
-      yield* Console.log("")
-
-      if (tags.length === 0) {
-        yield* Console.log("No tags found.")
-        yield* Console.log("")
-        yield* Console.log("Create one with: kioku tag create <name>")
-      } else if (tree) {
-        // Build tree structure
-        const rootTags = tags.filter((t) => !t.parentId)
-        const childMap = new Map<string, Array<(typeof tags)[0]>>()
-
-        for (const tag of tags) {
-          if (tag.parentId) {
-            const children = childMap.get(tag.parentId) || []
-            children.push(tag)
-            childMap.set(tag.parentId, children)
-          }
-        }
-
-        const printTag = function* (
-          tag: (typeof tags)[0],
-          indent: number
-        ): Generator<Effect.Effect<void, never, never>, void, void> {
-          const prefix = "  ".repeat(indent)
-          const desc = tag.description ? ` - ${tag.description}` : ""
-          yield Console.log(`${prefix}#${tag.id}${desc}`)
-
-          const children = childMap.get(tag.id) || []
-          for (const child of children) {
-            yield* printTag(child, indent + 1)
-          }
-        }
-
-        for (const rootTag of rootTags) {
-          yield* Effect.gen(function* () {
-            for (const effect of printTag(rootTag, 0)) {
-              yield* effect
-            }
-          })
-        }
-      } else {
-        for (const tag of tags) {
-          const desc = tag.description ? ` - ${tag.description}` : ""
-          const parent = tag.parentId ? ` (parent: #${tag.parentId})` : ""
-          yield* Console.log(`#${tag.id}${desc}${parent}`)
-        }
-      }
-
-      yield* Console.log("")
-    }).pipe(
-      Effect.catchTags({
-        WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
-        ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
-        RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
-      })
-    )
-)
+      const output = asJson
+        ? formatJson({ ok: true, command: "tag list", tags })
+        : formatTagList({ tags, tree });
+      yield* emitOutput(output);
+    }).pipe((effect) => outputError(effect, "tag list", asJson))
+);
 
 // ============================================================================
 // Tag Apply Command
@@ -189,49 +204,45 @@ const tagListCommand = Command.make(
 const tagApplyCommand = Command.make(
   "apply",
   {
-    entityId: Args.text({ name: "entity-id" }),
-    tagId: Args.text({ name: "tag" }),
+    entityId: Argument.string("entity-id"),
+    tagId: Argument.string("tag"),
   },
   ({ entityId, tagId }) =>
     Effect.gen(function* () {
-      const configService = yield* ConfigServiceTag
-      const workspace = yield* configService.load()
-      const ServiceLayers = CliCoreLive(workspace.dbPath)
-
-      yield* Effect.scoped(
+      yield* withCliServices(
         Effect.gen(function* () {
-          const tagService = yield* TagServiceTag
+          const tagService = yield* TagServiceTag;
 
           // Ensure tag exists (creates hierarchy if needed)
-          const tag = yield* tagService.ensureHierarchy(tagId)
+          const tag = yield* tagService.ensureHierarchy(tagId);
 
           // Apply to entity
-          yield* tagService.applyToEntity(tag.id, entityId)
-        }).pipe(Effect.provide(ServiceLayers))
-      )
+          yield* tagService.applyToEntity(tag.id, entityId);
+        })
+      );
 
-      yield* Console.log("")
-      yield* Console.log(`Tag #${tagId} applied to entity ${entityId}`)
-      yield* Console.log("")
+      yield* Console.log("");
+      yield* Console.log(`Tag #${tagId} applied to entity ${entityId}`);
+      yield* Console.log("");
     }).pipe(
       Effect.catchTags({
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         EntityNotFoundError: (e) =>
           Console.error(`Error: Entity not found: ${e.entityId}`).pipe(
-            Effect.zipRight(Effect.fail(e))
+            Effect.andThen(Effect.fail(e))
           ),
         TagNotFoundError: (e) =>
-          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.andThen(Effect.fail(e))),
         ValidationError: (e) =>
-          Console.error(`Validation error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Validation error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
-)
+);
 
 // ============================================================================
 // Tag Remove Command
@@ -240,42 +251,111 @@ const tagApplyCommand = Command.make(
 const tagRemoveCommand = Command.make(
   "remove",
   {
-    entityId: Args.text({ name: "entity-id" }),
-    tagId: Args.text({ name: "tag" }),
+    entityId: Argument.string("entity-id"),
+    tagId: Argument.string("tag"),
   },
   ({ entityId, tagId }) =>
     Effect.gen(function* () {
-      const configService = yield* ConfigServiceTag
-      const workspace = yield* configService.load()
-      const ServiceLayers = CliCoreLive(workspace.dbPath)
-
-      yield* Effect.scoped(
+      yield* withCliServices(
         Effect.gen(function* () {
-          const tagService = yield* TagServiceTag
-          yield* tagService.removeFromEntity(tagId as TagId, entityId)
-        }).pipe(Effect.provide(ServiceLayers))
-      )
+          const tagService = yield* TagServiceTag;
+          yield* tagService.removeFromEntity(TagIdSchema.make(tagId), entityId);
+        })
+      );
 
-      yield* Console.log("")
-      yield* Console.log(`Tag #${tagId} removed from entity ${entityId}`)
-      yield* Console.log("")
+      yield* Console.log("");
+      yield* Console.log(`Tag #${tagId} removed from entity ${entityId}`);
+      yield* Console.log("");
     }).pipe(
       Effect.catchTags({
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         EntityNotFoundError: (e) =>
           Console.error(`Error: Entity not found: ${e.entityId}`).pipe(
-            Effect.zipRight(Effect.fail(e))
+            Effect.andThen(Effect.fail(e))
           ),
         TagNotFoundError: (e) =>
-          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
-)
+);
+
+// ============================================================================
+// Tag Governance Commands
+// ============================================================================
+
+const tagGovernCommand = Command.make(
+  "govern",
+  {
+    tagId: Argument.string("tag-id"),
+    term: Flag.string("term"),
+    kind: Flag.string("kind").pipe(Flag.optional),
+    replace: Flag.string("replace").pipe(Flag.optional),
+    json: jsonFlag,
+  },
+  (args) =>
+    Effect.gen(function* () {
+      const kindValue = Option.getOrUndefined(args.kind);
+      if (kindValue !== undefined && !Schema.is(TermKindSchema)(kindValue)) {
+        return yield* new ValidationError({
+          field: "kind",
+          message: `Invalid term kind '${kindValue}'. Expected one of: ${TERM_KINDS.join(", ")}`,
+        });
+      }
+      const result = yield* withCliServices(
+        Effect.gen(function* () {
+          const governance = yield* TermGovernanceServiceTag;
+          // Stable IDs always win; kind qualifies names only.
+          const termInspection =
+            kindValue === undefined
+              ? yield* governance.show(args.term)
+              : yield* governance
+                  .show({ id: TermIdSchema.make(args.term) })
+                  .pipe(
+                    Effect.catchTag("TermNotFoundError", () =>
+                      governance.show({ name: args.term, kind: kindValue })
+                    )
+                  );
+          const replacement = Option.getOrUndefined(args.replace);
+          const expected =
+            replacement === undefined
+              ? undefined
+              : yield* (
+                  kindValue === undefined
+                    ? governance.show(replacement)
+                    : governance
+                        .show({ id: TermIdSchema.make(replacement) })
+                        .pipe(
+                          Effect.catchTag("TermNotFoundError", () =>
+                            governance.show({ name: replacement, kind: kindValue })
+                          )
+                        )
+                ).pipe(Effect.map((inspection) => ({ id: inspection.term.id })));
+          const input: GovernTagInput = {
+            tagId: TagIdSchema.make(args.tagId),
+            term: { id: termInspection.term.id },
+          };
+          return yield* governance.governTag(expected ? { ...input, replace: expected } : input);
+        })
+      );
+      if (args.json)
+        yield* Console.log(JSON.stringify({ ok: true, command: "tag govern", tag: result }));
+      else {
+        const term = inspectionTerm(result);
+        yield* Console.log(`Tag ID: #${result.tag.id}`);
+        yield* Console.log(`Tag name: ${result.tag.name}`);
+        yield* Console.log("Status: governed");
+        if (term)
+          yield* Console.log(
+            `Term: ${term.term.id} | ${term.canonicalName} | kind: ${term.term.kind} | status: ${term.term.status}`
+          );
+      }
+    }).pipe((effect) => outputError(effect, "tag govern", args.json))
+);
 
 // ============================================================================
 // Tag Show Command
@@ -284,68 +364,68 @@ const tagRemoveCommand = Command.make(
 const tagShowCommand = Command.make(
   "show",
   {
-    id: Args.text({ name: "tag-id" }),
+    id: Argument.string("tag-id"),
+    json: jsonFlag,
   },
-  ({ id }) =>
+  ({ id, json: asJson }) =>
+    // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: show renders optional hierarchy and governance metadata.
     Effect.gen(function* () {
-      const configService = yield* ConfigServiceTag
-      const workspace = yield* configService.load()
-      const ServiceLayers = CliCoreLive(workspace.dbPath)
-
-      const { tag, ancestors, children } = yield* Effect.scoped(
+      const { tag, ancestors, children, inspection } = yield* withCliServices(
         Effect.gen(function* () {
-          const tagService = yield* TagServiceTag
+          const tagService = yield* TagServiceTag;
+          const governance = yield* TermGovernanceServiceTag;
 
-          const tag = yield* tagService.getById(id as TagId)
-          const ancestors = yield* tagService.getAncestors(tag.id)
-          const children = yield* Effect.catchAll(tagService.getChildren(tag.id), () =>
-            Effect.succeed([] as ReadonlyArray<typeof tag>)
-          )
+          const tag = yield* tagService.getById(TagIdSchema.make(id));
+          const inspection = yield* governance.inspectTag(TagIdSchema.make(id));
+          const ancestors = yield* tagService.getAncestors(tag.id);
+          const children = yield* tagService
+            .getChildren(tag.id)
+            .pipe(Effect.orElseSucceed(() => []));
 
-          return { tag, ancestors, children }
-        }).pipe(Effect.provide(ServiceLayers))
-      )
+          return { tag, ancestors, children, inspection };
+        })
+      );
 
-      yield* Console.log("")
-      yield* Console.log(`Tag: #${tag.id}`)
-      yield* Console.log("=".repeat(40))
-      yield* Console.log("")
-      yield* Console.log(`Name:    ${tag.name}`)
-      if (tag.description) {
-        yield* Console.log(`Desc:    ${tag.description}`)
+      if (asJson) {
+        yield* Console.log(JSON.stringify({ ok: true, command: "tag show", tag: inspection }));
+        return;
       }
-      yield* Console.log(`Created: ${tag.createdAt.toISOString()}`)
+      yield* Console.log("");
+      yield* Console.log(`Tag: #${tag.id}`);
+      yield* Console.log("=".repeat(40));
+      yield* Console.log("");
+      yield* Console.log(`Name:    ${tag.name}`);
+      if (tag.description) {
+        yield* Console.log(`Desc:    ${tag.description}`);
+      }
+      yield* Console.log(`Created: ${tag.createdAt.toISOString()}`);
+      const governedTerm = inspectionTerm(inspection);
+      yield* Console.log(`Governance: ${governedTerm ? "governed" : "ungoverned"}`);
+      if (governedTerm) {
+        yield* Console.log(
+          `Term: ${governedTerm.term.id} (${governedTerm.canonicalName}; ${governedTerm.term.kind}; ${governedTerm.term.status})`
+        );
+      }
 
       if (ancestors.length > 0) {
-        yield* Console.log("")
-        yield* Console.log("Ancestors:")
+        yield* Console.log("");
+        yield* Console.log("Ancestors:");
         for (const ancestor of [...ancestors].reverse()) {
-          yield* Console.log(`  #${ancestor.id}`)
+          yield* Console.log(`  #${ancestor.id}`);
         }
       }
 
       if (children.length > 0) {
-        yield* Console.log("")
-        yield* Console.log("Children:")
+        yield* Console.log("");
+        yield* Console.log("Children:");
         for (const child of children) {
-          yield* Console.log(`  #${child.id}`)
+          yield* Console.log(`  #${child.id}`);
         }
       }
 
-      yield* Console.log("")
-    }).pipe(
-      Effect.catchTags({
-        WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
-        ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
-        RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
-        TagNotFoundError: (e) =>
-          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.zipRight(Effect.fail(e))),
-      })
-    )
-)
+      yield* Console.log("");
+    }).pipe((effect) => outputError(effect, "tag show", asJson))
+);
 
 // ============================================================================
 // Tag Delete Command
@@ -354,50 +434,46 @@ const tagShowCommand = Command.make(
 const tagDeleteCommand = Command.make(
   "delete",
   {
-    id: Args.text({ name: "tag-id" }),
-    force: Options.boolean("force").pipe(
-      Options.withAlias("f"),
-      Options.withDescription("Skip confirmation"),
-      Options.withDefault(false)
+    id: Argument.string("tag-id"),
+    force: Flag.boolean("force").pipe(
+      Flag.withAlias("f"),
+      Flag.withDescription("Skip confirmation"),
+      Flag.withDefault(false)
     ),
   },
   ({ id, force }) =>
     Effect.gen(function* () {
-      const configService = yield* ConfigServiceTag
-      const workspace = yield* configService.load()
-      const ServiceLayers = CliCoreLive(workspace.dbPath)
-
-      yield* Effect.scoped(
+      yield* withCliServices(
         Effect.gen(function* () {
-          const tagService = yield* TagServiceTag
+          const tagService = yield* TagServiceTag;
 
-          const tag = yield* tagService.getById(id as TagId)
+          const tag = yield* tagService.getById(TagIdSchema.make(id));
 
           if (!force) {
-            yield* Console.log(`Deleting tag: #${tag.id}`)
-            yield* Console.log("(Use --force to skip this confirmation in scripts)")
+            yield* Console.log(`Deleting tag: #${tag.id}`);
+            yield* Console.log("(Use --force to skip this confirmation in scripts)");
           }
 
-          yield* tagService.delete(tag.id)
-        }).pipe(Effect.provide(ServiceLayers))
-      )
+          yield* tagService.delete(tag.id);
+        })
+      );
 
-      yield* Console.log("")
-      yield* Console.log(`Tag #${id} deleted.`)
-      yield* Console.log("")
+      yield* Console.log("");
+      yield* Console.log(`Tag #${id} deleted.`);
+      yield* Console.log("");
     }).pipe(
       Effect.catchTags({
         WorkspaceNotFoundError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         ConfigError: (e) =>
-          Console.error(`Error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         RepositoryError: (e) =>
-          Console.error(`Database error: ${e.message}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Database error: ${e.message}`).pipe(Effect.andThen(Effect.fail(e))),
         TagNotFoundError: (e) =>
-          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.zipRight(Effect.fail(e))),
+          Console.error(`Error: Tag not found: ${e.tagId}`).pipe(Effect.andThen(Effect.fail(e))),
       })
     )
-)
+);
 
 // ============================================================================
 // Tag Parent Command (with subcommands)
@@ -408,9 +484,10 @@ export const tagCommand = Command.make("tag").pipe(
   Command.withSubcommands([
     tagCreateCommand,
     tagListCommand,
+    tagGovernCommand,
     tagApplyCommand,
     tagRemoveCommand,
     tagShowCommand,
     tagDeleteCommand,
   ])
-)
+);

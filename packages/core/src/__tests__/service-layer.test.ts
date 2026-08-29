@@ -1,36 +1,33 @@
-/**
- * Service Layer Unit Tests (KIOKU-17)
- *
- * Tests for TagService and GraphService business logic using mock repositories.
- * These are unit tests - they verify service behavior in isolation.
- */
-import { Effect, Exit, Layer } from "effect";
+import { Cause, Effect, Exit, Layer, Schema } from "effect";
 import { describe, expect, it } from "vitest";
 
-import type {
-  CodeRef,
-  Diagram,
-  Doc,
-  Entity,
-  EntityId,
-  EntityType,
-  Story,
-} from "../domain/entity.js";
-import { DiagramTypeEnum, EntityTypeEnum, StoryStatusEnum } from "../domain/entity.js";
-import type { Link, LinkId, LinkType } from "../domain/link.js";
-import type { Tag, TagId } from "../domain/tag.js";
-import { EntityNotFoundError, RepositoryError, TagNotFoundError } from "../errors.js";
-import type { EntityRepository } from "../repository/entity-repository.js";
-import { EntityRepositoryTag } from "../repository/entity-repository.js";
-import type { LinkRepository } from "../repository/link-repository.js";
-import { LinkRepositoryTag } from "../repository/link-repository.js";
-import type { TagRepository } from "../repository/tag-repository.js";
-import { TagRepositoryTag } from "../repository/tag-repository.js";
-import { GraphServiceTag } from "../services/graph-service.js";
-import { GraphServiceLive } from "../services/graph-service.live.js";
-import { TagServiceTag } from "../services/tag-service.js";
-import { TagServiceLive } from "../services/tag-service.live.js";
-import { FIXED_TIMESTAMP_ISO } from "./helpers/index.js";
+import type { CodeRef, Diagram, Doc, Entity, EntityId, Story } from "../domain/entity";
+import { BrandedId, DiagramTypeEnum, EntityType, StoryStatusEnum } from "../domain/entity";
+import type { Link, LinkId, LinkType } from "../domain/link";
+import type { Tag } from "../domain/tag";
+import { TagIdSchema } from "../domain/tag";
+import type { Term, TermName } from "../domain/term";
+import { normalizeTermName, TermIdSchema } from "../domain/term";
+import {
+  EntityNotFoundError,
+  RepositoryError,
+  TagNotFoundError,
+  TermNotFoundError,
+  ValidationError,
+} from "../errors";
+import type { EntityRepository } from "../repository/entity-repository";
+import { EntityRepositoryTag } from "../repository/entity-repository";
+import type { LinkRepository } from "../repository/link-repository";
+import { LinkRepositoryTag } from "../repository/link-repository";
+import type { TagRepository } from "../repository/tag-repository";
+import { TagRepositoryTag } from "../repository/tag-repository";
+import type { ResolvedTermName, TermRepository } from "../repository/term-repository";
+import { TermRepositoryTag } from "../repository/term-repository";
+import { GraphServiceTag } from "../services/graph-service";
+import { GraphServiceLive } from "../services/graph-service.live";
+import { TagServiceTag } from "../services/tag-service";
+import { TagServiceLive } from "../services/tag-service.live";
+import { FIXED_TIMESTAMP_ISO } from "./helpers/index";
 
 // ============================================================================
 // Test Fixtures
@@ -38,9 +35,15 @@ import { FIXED_TIMESTAMP_ISO } from "./helpers/index.js";
 
 const FIXED_DATE = new Date(FIXED_TIMESTAMP_ISO);
 
+const testEntityId = (id: string): EntityId => Schema.decodeUnknownSync(BrandedId)(id);
+const testTagId = (id: string): Tag["id"] => Schema.decodeUnknownSync(TagIdSchema)(id);
+const testTermId = (id: string): Term["id"] => Schema.decodeUnknownSync(TermIdSchema)(id);
+const LinkIdSchema = Schema.String.pipe(Schema.brand("LinkId"));
+const testLinkId = (id: string): LinkId => Schema.decodeUnknownSync(LinkIdSchema)(id);
+
 const createTestDoc = (id: string): Doc => ({
-  _tag: EntityTypeEnum.Doc,
-  id: id as EntityId,
+  _tag: EntityType.Doc,
+  id: testEntityId(id),
   title: `Entity ${id}`,
   content: `Content for ${id}`,
   tags: [],
@@ -50,8 +53,8 @@ const createTestDoc = (id: string): Doc => ({
 });
 
 const createTestCodeRef = (id: string): CodeRef => ({
-  _tag: EntityTypeEnum.CodeRef,
-  id: id as EntityId,
+  _tag: EntityType.CodeRef,
+  id: testEntityId(id),
   title: `Entity ${id}`,
   content: `Content for ${id}`,
   tags: [],
@@ -63,8 +66,8 @@ const createTestCodeRef = (id: string): CodeRef => ({
 });
 
 const createTestStory = (id: string): Story => ({
-  _tag: EntityTypeEnum.Story,
-  id: id as EntityId,
+  _tag: EntityType.Story,
+  id: testEntityId(id),
   title: `Entity ${id}`,
   content: `Content for ${id}`,
   tags: [],
@@ -75,8 +78,8 @@ const createTestStory = (id: string): Story => ({
 });
 
 const createTestDiagram = (id: string): Diagram => ({
-  _tag: EntityTypeEnum.Diagram,
-  id: id as EntityId,
+  _tag: EntityType.Diagram,
+  id: testEntityId(id),
   title: `Entity ${id}`,
   content: `Content for ${id}`,
   tags: [],
@@ -87,30 +90,30 @@ const createTestDiagram = (id: string): Diagram => ({
   version: 1,
 });
 
-const createTestEntity = (id: string, type: EntityType = EntityTypeEnum.Doc): Entity => {
+const createTestEntity = (id: string, type: EntityType = EntityType.Doc): Entity => {
   switch (type) {
-    case EntityTypeEnum.Doc:
+    case EntityType.Doc:
       return createTestDoc(id);
-    case EntityTypeEnum.CodeRef:
+    case EntityType.CodeRef:
       return createTestCodeRef(id);
-    case EntityTypeEnum.Story:
+    case EntityType.Story:
       return createTestStory(id);
-    case EntityTypeEnum.Diagram:
+    case EntityType.Diagram:
       return createTestDiagram(id);
   }
 };
 
 const createTestTag = (id: string, name: string, parentId?: string): Tag => ({
-  id: id as TagId,
+  id: testTagId(id),
   name,
   parentId,
   createdAt: FIXED_DATE,
 });
 
 const createTestLink = (id: string, sourceId: string, targetId: string, type: LinkType): Link => ({
-  id: id as LinkId,
-  sourceId,
-  targetId,
+  id: testLinkId(id),
+  sourceId: testEntityId(sourceId),
+  targetId: testEntityId(targetId),
   type,
   createdAt: FIXED_DATE,
 });
@@ -131,10 +134,10 @@ const createMockTagRepository = (config: MockTagRepositoryConfig = {}): TagRepos
     create: (input) =>
       Effect.gen(function* () {
         if (config.createBehavior === "error") {
-          return yield* Effect.fail(new RepositoryError({ message: "Create failed" }));
+          return yield* new RepositoryError({ message: "Create failed" });
         }
         const tag: Tag = {
-          id: input.id as TagId,
+          id: testTagId(input.id),
           name: input.name,
           description: input.description,
           parentId: input.parentId,
@@ -149,30 +152,53 @@ const createMockTagRepository = (config: MockTagRepositoryConfig = {}): TagRepos
       Effect.gen(function* () {
         const tag = tags.get(id);
         if (!tag) {
-          return yield* Effect.fail(new TagNotFoundError({ tagId: id }));
+          return yield* new TagNotFoundError({ tagId: id });
         }
         return tag;
       }),
 
-    getAll: () => Effect.succeed(Array.from(tags.values())),
+    getAll: Effect.sync(() => Array.from(tags.values())),
     getChildren: () => Effect.succeed([]),
     getAncestors: () => Effect.succeed([]),
     update: (id) =>
       Effect.gen(function* () {
         const tag = tags.get(id);
         if (!tag) {
-          return yield* Effect.fail(new TagNotFoundError({ tagId: id }));
+          return yield* new TagNotFoundError({ tagId: id });
         }
         return tag;
       }),
-    delete: () => Effect.succeed(undefined),
-    applyToEntity: () => Effect.succeed(undefined),
-    removeFromEntity: () => Effect.succeed(undefined),
+    delete: () => Effect.void,
+    applyToEntity: () => Effect.void,
+    removeFromEntity: () => Effect.void,
     getTagsForEntity: () => Effect.succeed([]),
     search: () => Effect.succeed([]),
-    count: () => Effect.succeed(tags.size),
+    count: Effect.sync(() => tags.size),
   };
 };
+
+const createMockTermRepository = (
+  matches: ReadonlyArray<ResolvedTermName> = []
+): TermRepository => ({
+  create: () => Effect.die(new Error("not implemented")),
+  getById: (id) => {
+    const match = matches.find(({ term }) => term.id === id);
+    return match ? Effect.succeed(match.term) : Effect.fail(new TermNotFoundError({ name: id }));
+  },
+  getByIds: () => Effect.succeed([]),
+  listNamesByTermIds: () => Effect.succeed([]),
+  listMergedInto: () => Effect.succeed([]),
+  getByCanonicalName: () => Effect.die(new Error("not implemented")),
+  findByName: (name) =>
+    Effect.succeed(matches.filter(({ termName }) => termName.name === normalizeTermName(name))),
+  list: () => Effect.succeed([]),
+  addName: () => Effect.die(new Error("not implemented")),
+  listNames: (id) =>
+    Effect.succeed(matches.filter(({ term }) => term.id === id).map(({ termName }) => termName)),
+  updateName: () => Effect.die(new Error("not implemented")),
+  update: () => Effect.die(new Error("not implemented")),
+  renameCanonical: () => Effect.die(new Error("not implemented")),
+});
 
 interface MockEntityRepositoryConfig {
   entities?: Map<string, Entity>;
@@ -186,8 +212,8 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
   return {
     createDoc: (input) =>
       Effect.succeed({
-        _tag: EntityTypeEnum.Doc,
-        id: `doc-${Date.now()}` as EntityId,
+        _tag: EntityType.Doc,
+        id: testEntityId(`doc-${Date.now()}`),
         title: input.title,
         content: input.content,
         tags: input.tags ?? [],
@@ -197,8 +223,8 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
       }),
     createCodeRef: (input) =>
       Effect.succeed({
-        _tag: EntityTypeEnum.CodeRef,
-        id: `code-${Date.now()}` as EntityId,
+        _tag: EntityType.CodeRef,
+        id: testEntityId(`code-${Date.now()}`),
         title: input.title,
         content: input.content,
         tags: input.tags ?? [],
@@ -213,8 +239,8 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
       }),
     createStory: (input) =>
       Effect.succeed({
-        _tag: EntityTypeEnum.Story,
-        id: `story-${Date.now()}` as EntityId,
+        _tag: EntityType.Story,
+        id: testEntityId(`story-${Date.now()}`),
         title: input.title,
         content: input.content,
         tags: input.tags ?? [],
@@ -227,8 +253,8 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
       }),
     createDiagram: (input) =>
       Effect.succeed({
-        _tag: EntityTypeEnum.Diagram,
-        id: `diagram-${Date.now()}` as EntityId,
+        _tag: EntityType.Diagram,
+        id: testEntityId(`diagram-${Date.now()}`),
         title: input.title,
         content: input.content,
         tags: input.tags ?? [],
@@ -244,7 +270,7 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
       Effect.gen(function* () {
         const entity = entities.get(id);
         if (!entity) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId: id }));
+          return yield* new EntityNotFoundError({ entityId: id });
         }
         return entity;
       }),
@@ -268,12 +294,12 @@ const createMockEntityRepository = (config: MockEntityRepositoryConfig = {}): En
       Effect.gen(function* () {
         const entity = entities.get(id);
         if (!entity) {
-          return yield* Effect.fail(new EntityNotFoundError({ entityId: id }));
+          return yield* new EntityNotFoundError({ entityId: id });
         }
         return entity;
       }),
 
-    delete: () => Effect.succeed(undefined),
+    delete: () => Effect.void,
 
     count: (type) =>
       Effect.succeed(Array.from(entities.values()).filter((e) => !type || e._tag === type).length),
@@ -297,7 +323,7 @@ const createMockLinkRepository = (config: MockLinkRepositoryConfig = {}): LinkRe
   return {
     create: (input) =>
       Effect.succeed({
-        id: `link-${Date.now()}` as LinkId,
+        id: testLinkId(`link-${Date.now()}`),
         sourceId: input.sourceId,
         targetId: input.targetId,
         type: input.type,
@@ -306,14 +332,14 @@ const createMockLinkRepository = (config: MockLinkRepositoryConfig = {}): LinkRe
     createBidirectional: (input) =>
       Effect.succeed([
         {
-          id: `link-${Date.now()}-fwd` as LinkId,
+          id: testLinkId(`link-${Date.now()}-fwd`),
           sourceId: input.sourceId,
           targetId: input.targetId,
           type: input.type,
           createdAt: FIXED_DATE,
         },
         {
-          id: `link-${Date.now()}-rev` as LinkId,
+          id: testLinkId(`link-${Date.now()}-rev`),
           sourceId: input.targetId,
           targetId: input.sourceId,
           type: input.type,
@@ -324,7 +350,7 @@ const createMockLinkRepository = (config: MockLinkRepositoryConfig = {}): LinkRe
       Effect.gen(function* () {
         const link = links.get(id);
         if (!link) {
-          return yield* Effect.fail(new RepositoryError({ message: `Link ${id} not found` }));
+          return yield* new RepositoryError({ message: `Link ${id} not found` });
         }
         return link;
       }),
@@ -340,10 +366,10 @@ const createMockLinkRepository = (config: MockLinkRepositoryConfig = {}): LinkRe
           (l) => l.sourceId === sourceId && l.targetId === targetId
         ) ?? null
       ),
-    delete: () => Effect.succeed(undefined),
+    delete: () => Effect.void,
     deleteAllForEntity: () => Effect.succeed(0),
-    deleteBetween: () => Effect.succeed(undefined),
-    count: () => Effect.succeed(links.size),
+    deleteBetween: () => Effect.void,
+    count: Effect.sync(() => links.size),
   };
 };
 
@@ -355,6 +381,7 @@ const createTestLayer = (config: {
   tagRepo?: TagRepository;
   entityRepo?: EntityRepository;
   linkRepo?: LinkRepository;
+  termRepo?: TermRepository;
 }) => {
   const tagRepoLayer = Layer.succeed(TagRepositoryTag, config.tagRepo ?? createMockTagRepository());
   const entityRepoLayer = Layer.succeed(
@@ -365,8 +392,12 @@ const createTestLayer = (config: {
     LinkRepositoryTag,
     config.linkRepo ?? createMockLinkRepository()
   );
+  const termRepoLayer = Layer.succeed(
+    TermRepositoryTag,
+    config.termRepo ?? createMockTermRepository()
+  );
 
-  const repoLayer = Layer.mergeAll(tagRepoLayer, entityRepoLayer, linkRepoLayer);
+  const repoLayer = Layer.mergeAll(tagRepoLayer, entityRepoLayer, linkRepoLayer, termRepoLayer);
 
   return Layer.provideMerge(Layer.merge(TagServiceLive, GraphServiceLive), repoLayer);
 };
@@ -377,6 +408,145 @@ const createTestLayer = (config: {
 
 describe("TagService", () => {
   describe("ensureHierarchy()", () => {
+    it("reuses a single stable tag when an attachment uses a governed term name", async () => {
+      const term: Term = {
+        id: testTermId("term-brand-aerograph"),
+        canonicalName: "AeroGraph",
+        kind: "brand",
+        status: "active",
+        createdAt: FIXED_DATE,
+        updatedAt: FIXED_DATE,
+      };
+      const termName: TermName = {
+        termId: term.id,
+        kind: term.kind,
+        name: "aerograph",
+        displayName: "AeroGraph",
+        nameKind: "canonical",
+        createdAt: FIXED_DATE,
+      };
+      const tags = new Map<string, Tag>([
+        [
+          "kioku",
+          {
+            id: testTagId("kioku"),
+            name: "AeroGraph",
+            termId: term.id,
+            createdAt: FIXED_DATE,
+          },
+        ],
+      ]);
+      const layer = createTestLayer({
+        tagRepo: createMockTagRepository({ tags }),
+        termRepo: createMockTermRepository([{ term, termName }]),
+      });
+
+      const result = await Effect.runPromise(
+        Effect.provide(
+          Effect.gen(function* () {
+            const tagService = yield* TagServiceTag;
+            return yield* tagService.ensureHierarchy("AeroGraph");
+          }),
+          layer
+        )
+      );
+
+      expect(result.id).toBe("kioku");
+      expect(tags.has("AeroGraph")).toBe(false);
+    });
+
+    it("resolves slash-bearing governed names before applying hierarchy semantics", async () => {
+      const term: Term = {
+        id: testTermId("term-feature-editor-indexer"),
+        canonicalName: "editor/indexer",
+        kind: "feature",
+        status: "active",
+        createdAt: FIXED_DATE,
+        updatedAt: FIXED_DATE,
+      };
+      const termName: TermName = {
+        termId: term.id,
+        kind: term.kind,
+        name: "editor/indexer",
+        displayName: "editor/indexer",
+        nameKind: "canonical",
+        createdAt: FIXED_DATE,
+      };
+      const tags = new Map<string, Tag>([
+        [
+          "editor-indexer",
+          {
+            id: testTagId("editor-indexer"),
+            name: "editor/indexer",
+            termId: term.id,
+            createdAt: FIXED_DATE,
+          },
+        ],
+      ]);
+      const layer = createTestLayer({
+        tagRepo: createMockTagRepository({ tags }),
+        termRepo: createMockTermRepository([{ term, termName }]),
+      });
+
+      const result = await Effect.runPromise(
+        Effect.provide(
+          Effect.gen(function* () {
+            const tagService = yield* TagServiceTag;
+            return yield* tagService.ensureHierarchy("editor/indexer");
+          }),
+          layer
+        )
+      );
+
+      expect(result.id).toBe("editor-indexer");
+      expect(tags.has("editor")).toBe(false);
+    });
+
+    it("rejects governed attachment names with multiple possible physical tags", async () => {
+      const term: Term = {
+        id: testTermId("term-concept-auth"),
+        canonicalName: "Authentication",
+        kind: "concept",
+        status: "active",
+        createdAt: FIXED_DATE,
+        updatedAt: FIXED_DATE,
+      };
+      const termName: TermName = {
+        termId: term.id,
+        kind: term.kind,
+        name: "authentication",
+        displayName: "Authentication",
+        nameKind: "canonical",
+        createdAt: FIXED_DATE,
+      };
+      const tags = new Map<string, Tag>([
+        ["auth", { id: testTagId("auth"), name: "Auth", termId: term.id, createdAt: FIXED_DATE }],
+        [
+          "login",
+          { id: testTagId("login"), name: "Login", termId: term.id, createdAt: FIXED_DATE },
+        ],
+      ]);
+      const layer = createTestLayer({
+        tagRepo: createMockTagRepository({ tags }),
+        termRepo: createMockTermRepository([{ term, termName }]),
+      });
+
+      const error = await Effect.runPromise(
+        Effect.flip(
+          Effect.provide(
+            Effect.gen(function* () {
+              const tagService = yield* TagServiceTag;
+              return yield* tagService.ensureHierarchy("Authentication");
+            }),
+            layer
+          )
+        )
+      );
+
+      expect(error).toBeInstanceOf(ValidationError);
+      expect(error.message).toContain("multiple attachment tags");
+    });
+
     it("creates nested tags from a path with proper parent relationships", async () => {
       const tags = new Map<string, Tag>();
       const tagRepo = createMockTagRepository({ tags });
@@ -442,6 +612,31 @@ describe("TagService", () => {
       expect(tags.size).toBe(2); // Only 2 tags created, not 4
     });
 
+    it("tolerates concurrent creation races when ensuring a hierarchy", async () => {
+      const tags = new Map<string, Tag>();
+      const baseTagRepo = createMockTagRepository({ tags });
+      const tagRepo: TagRepository = {
+        ...baseTagRepo,
+        create: (input) =>
+          Effect.gen(function* () {
+            tags.set(input.id, createTestTag(input.id, input.name, input.parentId));
+            return yield* new RepositoryError({ message: "Tag was created concurrently" });
+          }),
+      };
+      const layer = createTestLayer({ tagRepo });
+
+      const program = Effect.gen(function* () {
+        const tagService = yield* TagServiceTag;
+        return yield* tagService.ensureHierarchy("concurrency");
+      });
+
+      const result = await Effect.runPromise(Effect.provide(program, layer));
+
+      expect(result.id).toBe("concurrency");
+      expect(result.name).toBe("concurrency");
+      expect(tags.size).toBe(1);
+    });
+
     it("returns ValidationError for empty path", async () => {
       const layer = createTestLayer({});
 
@@ -454,8 +649,7 @@ describe("TagService", () => {
 
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit)) {
-        const error = exit.cause;
-        expect(error._tag).toBe("Fail");
+        expect(exit.cause.reasons.some(Cause.isFailReason)).toBe(true);
       }
     });
   });
@@ -486,15 +680,17 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getEntityWithLinks("e1");
+        return yield* graphService.getEntityWithLinks(testEntityId("e1"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
 
       expect(result.entity.id).toBe("e1");
       expect(result.outgoingLinks).toHaveLength(1);
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
       expect(result.outgoingLinks[0]!.targetId).toBe("e2");
       expect(result.incomingLinks).toHaveLength(1);
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
       expect(result.incomingLinks[0]!.sourceId).toBe("e3");
     });
 
@@ -505,7 +701,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getEntityWithLinks("nonexistent");
+        return yield* graphService.getEntityWithLinks(testEntityId("nonexistent"));
       });
 
       const exit = await Effect.runPromiseExit(Effect.provide(program, layer));
@@ -535,7 +731,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getRelatedEntities("center");
+        return yield* graphService.getRelatedEntities(testEntityId("center"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -564,12 +760,13 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getRelatedEntities("center", ["references"]);
+        return yield* graphService.getRelatedEntities(testEntityId("center"), ["references"]);
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
 
       expect(result).toHaveLength(1);
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
       expect(result[0]!.id).toBe("ref");
     });
 
@@ -584,7 +781,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getRelatedEntities("isolated");
+        return yield* graphService.getRelatedEntities(testEntityId("isolated"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -614,7 +811,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.traverse("e1", 2); // Only go 2 hops
+        return yield* graphService.traverse(testEntityId("e1"), 2); // Only go 2 hops
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -644,7 +841,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.traverse("e1", 10); // High depth to test cycle handling
+        return yield* graphService.traverse(testEntityId("e1"), 10); // High depth to test cycle handling
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -664,7 +861,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.traverse("isolated", 5);
+        return yield* graphService.traverse(testEntityId("isolated"), 5);
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -694,6 +891,7 @@ describe("GraphService", () => {
       const result = await Effect.runPromise(Effect.provide(program, layer));
 
       expect(result).toHaveLength(1);
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
       expect(result[0]!.id).toBe("e1");
     });
 
@@ -720,7 +918,37 @@ describe("GraphService", () => {
 
       // Only e2 has both tags
       expect(result).toHaveLength(1);
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
       expect(result[0]!.id).toBe("e2");
+    });
+  });
+
+  describe("findByTagGroups()", () => {
+    it("unions tags within groups and intersects separate groups", async () => {
+      const entities = new Map<string, Entity>();
+      entities.set("e1", createTestEntity("e1"));
+      entities.set("e2", createTestEntity("e2"));
+      entities.set("e3", createTestEntity("e3"));
+
+      const taggedEntities = new Map<string, Set<string>>();
+      taggedEntities.set("legacy-auth", new Set(["e1"]));
+      taggedEntities.set("current-auth", new Set(["e2", "e3"]));
+      taggedEntities.set("middleware", new Set(["e2"]));
+
+      const layer = createTestLayer({
+        entityRepo: createMockEntityRepository({ entities, taggedEntities }),
+      });
+      const program = Effect.gen(function* () {
+        const graphService = yield* GraphServiceTag;
+        return yield* graphService.findByTagGroups([
+          ["legacy-auth", "current-auth"],
+          ["middleware"],
+        ]);
+      });
+
+      const result = await Effect.runPromise(Effect.provide(program, layer));
+
+      expect(result.map(({ id }) => id)).toEqual(["e2"]);
     });
   });
 
@@ -740,15 +968,17 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.findPath("source", "target");
+        return yield* graphService.findPath(testEntityId("source"), testEntityId("target"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
 
       expect(result).not.toBeNull();
       expect(result).toHaveLength(2);
-      expect(result![0]!.id).toBe("source");
-      expect(result![1]!.id).toBe("target");
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
+      expect(result![0]?.id).toBe("source");
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
+      expect(result![1]?.id).toBe("target");
     });
 
     it("finds shortest multi-hop path", async () => {
@@ -777,7 +1007,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.findPath("source", "target");
+        return yield* graphService.findPath(testEntityId("source"), testEntityId("target"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -785,8 +1015,11 @@ describe("GraphService", () => {
       expect(result).not.toBeNull();
       // BFS finds shortest path: source -> a -> target (3 entities)
       expect(result).toHaveLength(3);
-      expect(result![0]!.id).toBe("source");
-      expect(result![2]!.id).toBe("target");
+
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
+      expect(result![0]?.id).toBe("source");
+      // biome-ignore lint/style/noNonNullAssertion: Assertions narrow but type checker cant infer
+      expect(result![2]?.id).toBe("target");
     });
 
     it("returns null when no path exists", async () => {
@@ -801,7 +1034,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.findPath("island1", "island2");
+        return yield* graphService.findPath(testEntityId("island1"), testEntityId("island2"));
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -813,10 +1046,10 @@ describe("GraphService", () => {
   describe("getStats()", () => {
     it("returns correct totals and entity-type breakdown", async () => {
       const entities = new Map<string, Entity>();
-      entities.set("doc1", createTestEntity("doc1", EntityTypeEnum.Doc));
-      entities.set("doc2", createTestEntity("doc2", EntityTypeEnum.Doc));
-      entities.set("code1", createTestEntity("code1", EntityTypeEnum.CodeRef));
-      entities.set("story1", createTestEntity("story1", EntityTypeEnum.Story));
+      entities.set("doc1", createTestEntity("doc1", EntityType.Doc));
+      entities.set("doc2", createTestEntity("doc2", EntityType.Doc));
+      entities.set("code1", createTestEntity("code1", EntityType.CodeRef));
+      entities.set("story1", createTestEntity("story1", EntityType.Story));
 
       const tags = new Map<string, Tag>();
       tags.set("tag1", createTestTag("tag1", "tag1"));
@@ -833,7 +1066,7 @@ describe("GraphService", () => {
 
       const program = Effect.gen(function* () {
         const graphService = yield* GraphServiceTag;
-        return yield* graphService.getStats();
+        return yield* graphService.getStats;
       });
 
       const result = await Effect.runPromise(Effect.provide(program, layer));
@@ -841,10 +1074,10 @@ describe("GraphService", () => {
       expect(result.totalEntities).toBe(4);
       expect(result.totalTags).toBe(2);
       expect(result.totalLinks).toBe(1);
-      expect(result.entitiesByType[EntityTypeEnum.Doc]).toBe(2);
-      expect(result.entitiesByType[EntityTypeEnum.CodeRef]).toBe(1);
-      expect(result.entitiesByType[EntityTypeEnum.Story]).toBe(1);
-      expect(result.entitiesByType[EntityTypeEnum.Diagram]).toBe(0);
+      expect(result.entitiesByType[EntityType.Doc]).toBe(2);
+      expect(result.entitiesByType[EntityType.CodeRef]).toBe(1);
+      expect(result.entitiesByType[EntityType.Story]).toBe(1);
+      expect(result.entitiesByType[EntityType.Diagram]).toBe(0);
     });
   });
 });

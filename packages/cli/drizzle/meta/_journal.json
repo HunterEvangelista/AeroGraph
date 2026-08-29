@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1781299212227,
+      "tag": "0000_minor_bucky",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1781307735538,
+      "tag": "0001_normal_franklin_richards",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782165620000,
+      "tag": "0002_term_registry",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1784742397415,
+      "tag": "0003_term_registry_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1787020153794,
+      "tag": "0004_perpetual_dazzler",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1787050000000,
+      "tag": "0005_repair_external_content_fts",
+      "breakpoints": true
+    }
+  ]
+}

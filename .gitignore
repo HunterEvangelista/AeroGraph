@@ -26,9 +26,14 @@ coverage/
 .env.local
 .env.*.local
 
-# Kioku workspace data
+# Retained pre-global-storage AeroGraph data
+.aerograph/
+
+# Pre-rename workspace and verified migration backups
 .kioku/
 
 # Logs
 *.log
 npm-debug.log*
+
+.opencode/skills/*

@@ -1,19 +1,15 @@
 /**
- * @kioku/core
- * Shared domain logic for the Kioku knowledge graph platform
+ * @aerograph/core
+ * Shared domain logic for the AeroGraph knowledge graph platform
  */
 
 // Domain models
-export * from "./domain/index.js"
-
-// Repository interfaces
-export * from "./repository/index.js"
-
-// Services
-export * from "./services/index.js"
-
-// Layer bundles
-export * from "./layers/index.js"
-
+export * from "./domain/index";
 // Errors
-export * from "./errors.js"
+export * from "./errors";
+// Layer bundles
+export * from "./layers/index";
+// Repository interfaces
+export * from "./repository/index";
+// Services
+export * from "./services/index";

@@ -1,6 +1,6 @@
 /**
- * @kioku/ai
- * AI integration for the Kioku knowledge platform
+ * @aerograph/ai
+ * AI integration for the AeroGraph knowledge platform
  *
  * This package provides:
  * - LLM provider abstraction (OpenAI, Anthropic, Ollama)
@@ -10,12 +10,13 @@
  * Implementation coming in Phase 3.
  */
 
-// Provider abstraction
+// Prompt templates
 export {
-  AIProviderError,
-  AIProviderLive,
-  AIProviderTag,
-} from "./providers/index.js"
+  formatEntityContext,
+  formatTagSuggestion,
+  ONBOARDING_SYSTEM_PROMPT,
+  QUERY_SYSTEM_PROMPT,
+} from "./prompts/index";
 export type {
   AIProvider,
   GenerateOptions,
@@ -23,15 +24,13 @@ export type {
   Message,
   ProviderConfig,
   ProviderType,
-} from "./providers/index.js"
-
-// Prompt templates
+} from "./providers/index";
+// Provider abstraction
 export {
-  formatEntityContext,
-  formatTagSuggestion,
-  ONBOARDING_SYSTEM_PROMPT,
-  QUERY_SYSTEM_PROMPT,
-} from "./prompts/index.js"
+  AIProviderError,
+  AIProviderLive,
+  AIProviderTag,
+} from "./providers/index";
 
 // Structured output schemas
 export {
@@ -40,4 +39,4 @@ export {
   SuggestedCodeRef,
   SuggestedDoc,
   SuggestedTag,
-} from "./structured/index.js"
+} from "./structured/index";
