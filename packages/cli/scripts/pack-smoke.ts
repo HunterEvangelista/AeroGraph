@@ -13,6 +13,7 @@ const tempRoot = await mkdtemp(join(tmpdir(), "aerograph-pack-smoke-"));
 const project = join(tempRoot, "checkout");
 const installPrefix = join(tempRoot, "install");
 const home = join(tempRoot, "home");
+const outputDirectory = parseOutputDirectory(process.argv.slice(2));
 
 const copy = async (relative: string) =>
   cp(join(sourceRoot, relative), join(project, relative), {
@@ -94,13 +95,13 @@ try {
     ["npm", "install", "--ignore-scripts", "--no-package-lock", "--prefix", installPrefix, tarball],
     tempRoot
   );
-  const installed = join(installPrefix, "node_modules", "@aerograph", "cli");
+  const installed = join(installPrefix, "node_modules", "aerograph");
   const packageJson = JSON.parse(await readFile(join(installed, "package.json"), "utf8")) as {
     license?: string;
     publishConfig?: { tag?: string };
   };
-  if (packageJson.license !== "Apache-2.0" || packageJson.publishConfig?.tag !== "alpha")
-    throw new Error("Tarball metadata must declare Apache-2.0 and publishConfig.tag alpha");
+  if (packageJson.license !== "Apache-2.0" || packageJson.publishConfig?.tag !== "latest")
+    throw new Error("Tarball metadata must declare Apache-2.0 and publishConfig.tag latest");
   const license = await readFile(join(installed, "LICENSE"), "utf8");
   if (!license.includes("Apache License") || !license.includes("TERMS AND CONDITIONS"))
     throw new Error("Invalid Apache license");
@@ -130,7 +131,20 @@ try {
   await run([executable, "--help"], project);
   await run([executable, "init"], project);
   await run([executable, "status"], project);
+
+  if (outputDirectory !== undefined) {
+    await mkdir(outputDirectory, { recursive: true });
+    await cp(tarball, join(outputDirectory, packResult[0].filename));
+  }
   console.log(`Packed CLI smoke test passed: ${packResult[0].filename}`);
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
+}
+
+function parseOutputDirectory(args: string[]): string | undefined {
+  if (args.length === 0) return undefined;
+  if (args.length !== 2 || args[0] !== "--output" || args[1] === undefined) {
+    throw new Error("Usage: pack-smoke.ts [--output <directory>]");
+  }
+  return resolve(args[1]);
 }

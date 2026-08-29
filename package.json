@@ -9,24 +9,26 @@
   "scripts": {
     "build": "turbo build",
     "build:core": "turbo build --filter=@aerograph/core",
-    "build:cli": "turbo build --filter=@aerograph/cli",
+    "build:cli": "turbo build --filter=aerograph",
     "build:ai": "turbo build --filter=@aerograph/ai",
     "dev": "turbo dev",
     "lint": "turbo lint",
     "lint:core": "turbo lint --filter=@aerograph/core",
-    "lint:cli": "turbo lint --filter=@aerograph/cli",
+    "lint:cli": "turbo lint --filter=aerograph",
     "lint:ai": "turbo lint --filter=@aerograph/ai",
     "lint:fix": "turbo lint:fix",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "typecheck": "turbo typecheck && tsc -p tools/oxlint/tsconfig.json && tsc -p tsconfig.configs.json",
+    "typecheck:ci": "turbo typecheck --force && tsc -p tools/oxlint/tsconfig.json && tsc -p tsconfig.configs.json",
     "typecheck:core": "turbo typecheck --filter=@aerograph/core",
-    "typecheck:cli": "turbo typecheck --filter=@aerograph/cli",
+    "typecheck:cli": "turbo typecheck --filter=aerograph",
     "typecheck:ai": "turbo typecheck --filter=@aerograph/ai",
     "test": "turbo test",
     "test:core": "turbo test --filter=@aerograph/core",
-    "test:cli": "turbo test --filter=@aerograph/cli",
+    "test:cli": "turbo test --filter=aerograph",
     "test:ai": "turbo test --filter=@aerograph/ai",
+    "test:tools": "node --test tools/oxlint/anti-slop/rules/*.test.ts tools/oxlint/anti-slop/effect/rules/*.test.ts",
     "changeset:create": "changeset",
     "changeset:version": "changeset version",
     "changeset:pre-enter": "changeset pre enter alpha",
@@ -51,6 +53,6 @@
   },
   "packageManager": "bun@1.2.15",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }
