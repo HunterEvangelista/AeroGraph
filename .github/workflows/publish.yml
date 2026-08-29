@@ -5,6 +5,12 @@ on:
     branches: [main]
     paths:
       - packages/cli/package.json
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Full SHA of the version-incrementing commit on main
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -20,10 +26,12 @@ jobs:
     outputs:
       publish: ${{ steps.release.outputs.publish }}
       version: ${{ steps.release.outputs.version }}
+      release_sha: ${{ steps.release.outputs.release_sha }}
     steps:
       - name: Check out release commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_sha || github.sha }}
           fetch-depth: 0
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -31,7 +39,35 @@ jobs:
           bun-version: 1.2.15
       - name: Check CLI version transition
         id: release
-        run: bun run packages/cli/scripts/release-trigger.ts "${{ github.event.before }}"
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          REQUESTED_RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$EVENT_REF" != "refs/heads/main" ]]; then
+              echo "Manual releases must run from the main workflow ref." >&2
+              exit 1
+            fi
+            if ! [[ "$REQUESTED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "release_sha must be a full lowercase commit SHA." >&2
+              exit 1
+            fi
+            release_sha="$(git rev-parse --verify "$REQUESTED_RELEASE_SHA^{commit}")"
+            git fetch --no-tags origin main
+            if ! git merge-base --is-ancestor "$release_sha" origin/main; then
+              echo "Release commit $release_sha is not on main." >&2
+              exit 1
+            fi
+            before_sha="$(git rev-parse "$release_sha^1")"
+          else
+            release_sha="$GITHUB_SHA"
+            before_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          bun run packages/cli/scripts/release-trigger.ts "$before_sha"
+          echo "release_sha=$release_sha" >>"$GITHUB_OUTPUT"
 
   validate:
     name: Validate release
@@ -42,6 +78,8 @@ jobs:
     steps:
       - name: Check out release commit
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.trigger.outputs.release_sha }}
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
@@ -83,6 +121,8 @@ jobs:
     steps:
       - name: Check out runtime smoke test
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.trigger.outputs.release_sha }}
       - name: Set up minimum supported Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
@@ -107,11 +147,13 @@ jobs:
     timeout-minutes: 10
     environment: npm-release
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - name: Check out release guard
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.trigger.outputs.release_sha }}
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
@@ -154,3 +196,25 @@ jobs:
           tarballs=("${{ runner.temp }}"/package/*.tgz)
           test "${#tarballs[@]}" -eq 1
           npm publish "${tarballs[0]}" --access public --tag latest --provenance
+      - name: Tag published release commit
+        env:
+          RELEASE_SHA: ${{ needs.trigger.outputs.release_sha }}
+          RELEASE_VERSION: ${{ needs.trigger.outputs.version }}
+        run: |
+          release_tag="aerograph@$RELEASE_VERSION"
+          published_version="$(npm view "aerograph@$RELEASE_VERSION" version)"
+          test "$published_version" = "$RELEASE_VERSION"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" >/dev/null 2>&1; then
+            git fetch --no-tags origin "refs/tags/$release_tag:refs/tags/$release_tag"
+            tagged_sha="$(git rev-parse "$release_tag^{commit}")"
+            if [[ "$tagged_sha" != "$RELEASE_SHA" ]]; then
+              echo "$release_tag already points to $tagged_sha, not $RELEASE_SHA." >&2
+              exit 1
+            fi
+            echo "$release_tag already points to the release commit."
+            exit 0
+          fi
+
+          git tag "$release_tag" "$RELEASE_SHA"
+          git push origin "refs/tags/$release_tag"

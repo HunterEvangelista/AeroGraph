@@ -62,8 +62,16 @@ Before requesting approval from the protected `npm-release` environment, the wor
 
 Before the first stable release, npm's `latest` dist-tag points to the current alpha so
 `bunx aerograph` resolves the supported CLI. After environment approval, npm publishes the
-tested tarball with OpenID Connect trusted publishing and provenance. No `NPM_TOKEN` is
-used. A retry exits successfully when that exact package version already exists.
+tested tarball with OpenID Connect trusted publishing and provenance, then tags the exact
+release commit as `aerograph@<version>`. No `NPM_TOKEN` is used. A retry skips publication
+when that exact package version already exists and idempotently creates or verifies the
+corresponding git tag.
+
+If publication or tagging needs to be retried without another version increment, manually
+run the `Publish CLI` workflow and provide the full SHA of the original version-incrementing
+commit on `main` as `release_sha`. Run the workflow from its `main` ref. The workflow rejects
+abbreviated SHAs and commits that are not ancestors of `main`; it rebuilds and validates the
+selected commit before publishing or tagging it.
 
 ## Enter alpha prerelease mode
 
