@@ -11,3 +11,5 @@ bun run changeset:create
 
 Every changeset must select only `@aerograph/cli`. The private `@aerograph/core` and
 `@aerograph/ai` workspaces are excluded from versioning, npm publication, and git tags.
+Changesets accumulate on `dev`; after they reach `main`, the version workflow opens or
+updates the version PR that consumes them.

@@ -1,0 +1,156 @@
+name: Publish CLI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - packages/cli/package.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-release
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    name: Check version increment
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.release.outputs.publish }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - name: Check out release commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.2.15
+      - name: Check CLI version transition
+        id: release
+        run: bun run packages/cli/scripts/release-trigger.ts "${{ github.event.before }}"
+
+  validate:
+    name: Validate release
+    if: needs.trigger.outputs.publish == 'true'
+    needs: trigger
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out release commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.2.15
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Check formatting
+        run: bun run format:check
+      - name: Lint
+        run: bun run lint
+      - name: Typecheck without cache
+        run: bun run typecheck:ci
+      - name: Test workspaces
+        run: bun run test
+      - name: Test Oxlint plugins
+        run: bun run test:tools
+      - name: Build packages
+        run: bun run build
+      - name: Build and validate CLI tarball
+        run: bun run --cwd packages/cli pack:smoke --output "${{ runner.temp }}/package"
+      - name: Upload releasable CLI tarball
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: aerograph-cli-release-${{ needs.trigger.outputs.version }}
+          path: ${{ runner.temp }}/package/*.tgz
+          if-no-files-found: error
+          retention-days: 1
+
+  minimum-runtime:
+    name: Validate minimum Bun runtime
+    if: needs.trigger.outputs.publish == 'true'
+    needs: [trigger, validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out runtime smoke test
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up minimum supported Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.1.38
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Download releasable CLI tarball
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: aerograph-cli-release-${{ needs.trigger.outputs.version }}
+          path: ${{ runner.temp }}/package
+      - name: Test installed CLI on minimum Bun
+        run: bun run packages/cli/scripts/runtime-smoke.ts "${{ runner.temp }}"/package/*.tgz
+
+  publish:
+    name: Publish alpha to npm
+    if: needs.trigger.outputs.publish == 'true'
+    needs: [trigger, validate, minimum-runtime]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out release guard
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.2.15
+      - name: Set up Node and npm
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install trusted-publishing npm version
+        run: npm install --global npm@11.5.1
+      - name: Download tested CLI tarball
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: aerograph-cli-release-${{ needs.trigger.outputs.version }}
+          path: ${{ runner.temp }}/package
+      - name: Publish alpha with provenance
+        env:
+          RELEASE_VERSION: ${{ needs.trigger.outputs.version }}
+        run: |
+          error_log="$(mktemp)"
+          trap 'rm -f "$error_log"' EXIT
+          if npm view "@aerograph/cli@$RELEASE_VERSION" version >/dev/null 2>"$error_log"; then
+            echo "@aerograph/cli@$RELEASE_VERSION is already published."
+            exit 0
+          elif ! grep -q "E404" "$error_log"; then
+            cat "$error_log" >&2
+            exit 1
+          fi
+
+          : >"$error_log"
+          if current_alpha="$(npm view @aerograph/cli dist-tags.alpha 2>"$error_log")"; then
+            if [[ -n "$current_alpha" ]]; then
+              bun run packages/cli/scripts/registry-tag-guard.ts "$RELEASE_VERSION" "$current_alpha"
+            fi
+          elif ! grep -q "E404" "$error_log"; then
+            cat "$error_log" >&2
+            exit 1
+          fi
+
+          tarballs=("${{ runner.temp }}"/package/*.tgz)
+          test "${#tarballs[@]}" -eq 1
+          npm publish "${tarballs[0]}" --access public --tag alpha --provenance
