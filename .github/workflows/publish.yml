@@ -198,9 +198,12 @@ jobs:
           npm publish "${tarballs[0]}" --access public --tag latest --provenance
       - name: Tag published release commit
         env:
+          RELEASE_DEPLOY_KEY: ${{ secrets.PROMOTION_SYNC_DEPLOY_KEY }}
           RELEASE_SHA: ${{ needs.trigger.outputs.release_sha }}
           RELEASE_VERSION: ${{ needs.trigger.outputs.version }}
         run: |
+          set -euo pipefail
+
           release_tag="aerograph@$RELEASE_VERSION"
           published_version="$(npm view "aerograph@$RELEASE_VERSION" version)"
           test "$published_version" = "$RELEASE_VERSION"
@@ -216,5 +219,14 @@ jobs:
             exit 0
           fi
 
+          key_file="$(mktemp)"
+          trap 'rm -f "$key_file"' EXIT
+          printf '%s\n' "$RELEASE_DEPLOY_KEY" >"$key_file"
+          chmod 600 "$key_file"
+
+          mkdir -p "$HOME/.ssh"
+          ssh-keyscan -t ed25519 github.com >>"$HOME/.ssh/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $key_file -o IdentitiesOnly=yes"
+
           git tag "$release_tag" "$RELEASE_SHA"
-          git push origin "refs/tags/$release_tag"
+          git push "git@github.com:$GITHUB_REPOSITORY.git" "refs/tags/$release_tag"
