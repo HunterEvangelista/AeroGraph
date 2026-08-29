@@ -2,7 +2,7 @@ name: Version packages
 
 on:
   push:
-    branches: [main]
+    branches: [dev]
 
 permissions:
   contents: write
@@ -29,4 +29,4 @@ jobs:
           version-script: bun run changeset:version
           commit-message: Version packages
           pr-title: Version packages
-          pr-base-branch: main
+          pr-base-branch: dev

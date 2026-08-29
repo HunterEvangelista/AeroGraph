@@ -4,9 +4,9 @@ Changesets manages versions for the public `aerograph` package. The CLI manifest
 `packages/cli/package.json` is the version source used by both the source CLI and the
 bundled executable.
 
-Publication is automated only after a version PR increments the CLI version on `main`.
-Pull requests never receive npm credentials or an OpenID Connect token and never run the
-publish command.
+Publication is automated only when a version PR has incremented the CLI version on `dev`
+and the resulting commit is promoted to `main`. Pull requests never receive npm credentials
+or an OpenID Connect token and never run the publish command.
 
 ## Package boundary
 
@@ -29,13 +29,13 @@ bun run changeset:create
 ```
 
 Select only `aerograph` and choose the appropriate semantic version bump. Commit the
-generated Markdown file with the implementation. Changesets accumulate on `dev` until a
-promotion PR brings them to `main`.
+generated Markdown file with the implementation.
 
-A push to `main` runs the version workflow. When pending changesets exist,
-`changesets/action` opens or updates a `Version packages` PR targeting `main`. The PR runs
+A push to `dev` runs the version workflow. When pending changesets exist,
+`changesets/action` opens or updates a `Version packages` PR targeting `dev`. The PR runs
 the same CI as any other change. Merging it consumes the pending changesets and updates
-`packages/cli/package.json` and the CLI changelog.
+`packages/cli/package.json` and the CLI changelog. Promote `dev` to `main` only after the
+version PR has merged so the release branch receives the exact versioned tree.
 
 `bun run changeset:version` remains available for isolated validation, but maintainers do
 not commit its output directly during the normal release workflow.
