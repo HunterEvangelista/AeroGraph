@@ -45,7 +45,7 @@ not commit its output directly during the normal release workflow.
 A push to `main` starts the publish workflow only when the CLI manifest changed. The
 workflow compares the manifest at the previous `main` revision with the merged revision.
 It proceeds only when SemVer increased to an `alpha` prerelease and `publishConfig.tag`
-remains `alpha`; unrelated manifest edits and unchanged versions do not publish.
+remains `latest`; unrelated manifest edits and unchanged versions do not publish.
 
 Before requesting approval from the protected `npm-release` environment, the workflow:
 
@@ -55,9 +55,10 @@ Before requesting approval from the protected `npm-release` environment, the wor
    allowlist.
 3. Installs and exercises that same tarball on the minimum supported Bun 1.1.38 runtime.
 
-After environment approval, npm publishes the tested tarball with the `alpha` dist-tag,
-OpenID Connect trusted publishing, and provenance. No `NPM_TOKEN` is used. A retry exits
-successfully when that exact package version already exists.
+Before the first stable release, npm's `latest` dist-tag points to the current alpha so
+`bunx aerograph` resolves the supported CLI. After environment approval, npm publishes the
+tested tarball with OpenID Connect trusted publishing and provenance. No `NPM_TOKEN` is
+used. A retry exits successfully when that exact package version already exists.
 
 ## Enter alpha prerelease mode
 
@@ -83,10 +84,11 @@ in a dedicated PR:
 bun run changeset:pre-exit
 ```
 
-Stable publishing requires an explicit change to the publication policy because the CLI
-manifest and publish workflow intentionally reject anything other than the `alpha`
-dist-tag. Do not merge a stable version PR until that policy, the release workflow, and
-the protected npm publisher configuration have been updated and reviewed.
+Stable publishing requires an explicit change to the release guard because the workflow
+currently accepts only `alpha` prerelease versions. The npm dist-tag remains `latest`, so
+the first stable release replaces the alpha as the default without a tag migration. Do not
+merge a stable version PR until that policy and the release workflow have been updated and
+reviewed.
 
 ## Repository and npm configuration
 

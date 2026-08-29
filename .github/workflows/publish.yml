@@ -142,9 +142,9 @@ jobs:
           fi
 
           : >"$error_log"
-          if current_alpha="$(npm view aerograph dist-tags.alpha 2>"$error_log")"; then
-            if [[ -n "$current_alpha" ]]; then
-              bun run packages/cli/scripts/registry-tag-guard.ts "$RELEASE_VERSION" "$current_alpha"
+          if current_latest="$(npm view aerograph dist-tags.latest 2>"$error_log")"; then
+            if [[ -n "$current_latest" ]]; then
+              bun run packages/cli/scripts/registry-tag-guard.ts "$RELEASE_VERSION" "$current_latest"
             fi
           elif ! grep -q "E404" "$error_log"; then
             cat "$error_log" >&2
@@ -153,4 +153,4 @@ jobs:
 
           tarballs=("${{ runner.temp }}"/package/*.tgz)
           test "${#tarballs[@]}" -eq 1
-          npm publish "${tarballs[0]}" --access public --tag alpha --provenance
+          npm publish "${tarballs[0]}" --access public --tag latest --provenance

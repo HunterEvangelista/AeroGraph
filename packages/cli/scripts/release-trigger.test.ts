@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { compareSemver, evaluatePublishTransition, type PackageManifest } from "./release-trigger";
 
-const manifest = (version: string, tag = "alpha"): PackageManifest => ({
+const manifest = (version: string, tag = "latest"): PackageManifest => ({
   name: "aerograph",
   version,
   publishConfig: { tag },
@@ -47,10 +47,10 @@ describe("release trigger", () => {
     );
   });
 
-  it("rejects an npm tag that could move an alpha release to latest", () => {
+  it("requires prereleases to remain the default before the first stable release", () => {
     expect(() =>
-      evaluatePublishTransition(manifest("0.0.0"), manifest("0.1.0-alpha.0", "latest"))
-    ).toThrow("publishConfig.tag alpha");
+      evaluatePublishTransition(manifest("0.0.0"), manifest("0.1.0-alpha.0", "alpha"))
+    ).toThrow("publishConfig.tag latest");
   });
 
   it("rejects any future package identity at this release boundary", () => {

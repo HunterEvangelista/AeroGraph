@@ -44,9 +44,9 @@ export function evaluatePublishTransition(
       `Release automation only publishes alpha versions, received ${current.version}`
     );
   }
-  if (current.publishConfig?.tag !== "alpha") {
+  if (current.publishConfig?.tag !== "latest") {
     throw new Error(
-      `Release automation requires publishConfig.tag alpha, received ${current.publishConfig?.tag}`
+      `Release automation requires publishConfig.tag latest, received ${current.publishConfig?.tag}`
     );
   }
   return { publish: true, version: current.version };

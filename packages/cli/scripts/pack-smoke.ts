@@ -100,8 +100,8 @@ try {
     license?: string;
     publishConfig?: { tag?: string };
   };
-  if (packageJson.license !== "Apache-2.0" || packageJson.publishConfig?.tag !== "alpha")
-    throw new Error("Tarball metadata must declare Apache-2.0 and publishConfig.tag alpha");
+  if (packageJson.license !== "Apache-2.0" || packageJson.publishConfig?.tag !== "latest")
+    throw new Error("Tarball metadata must declare Apache-2.0 and publishConfig.tag latest");
   const license = await readFile(join(installed, "LICENSE"), "utf8");
   if (!license.includes("Apache License") || !license.includes("TERMS AND CONDITIONS"))
     throw new Error("Invalid Apache license");
