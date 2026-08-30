@@ -65,7 +65,8 @@ Before the first stable release, npm's `latest` dist-tag points to the current a
 tested tarball with OpenID Connect trusted publishing and provenance, then tags the exact
 release commit as `aerograph@<version>`. No `NPM_TOKEN` is used. A retry skips publication
 when that exact package version already exists and idempotently creates or verifies the
-corresponding git tag.
+corresponding git tag. Tagging does not re-query the npm registry after publication because
+registry reads can lag a successful publish.
 
 If publication or tagging needs to be retried without another version increment, manually
 run the `Publish CLI` workflow and provide the full SHA of the original version-incrementing
