@@ -41,7 +41,6 @@ export const initCommand = Command.make(
       yield* Console.log(`  Database: ${workspace.dbPath}`);
       yield* Console.log("");
       yield* Console.log("Next steps:");
-      yield* Console.log("  aerograph onboard    Start AI-assisted onboarding");
       yield* Console.log("  aerograph status     View project status");
       yield* Console.log("  aerograph doc create Create a new document");
     }).pipe(
