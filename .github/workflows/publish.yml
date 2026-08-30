@@ -198,7 +198,7 @@ jobs:
           npm publish "${tarballs[0]}" --access public --tag latest --provenance
       - name: Tag published release commit
         env:
-          RELEASE_DEPLOY_KEY: ${{ secrets.PROMOTION_SYNC_DEPLOY_KEY }}
+          RELEASE_TAG_TOKEN: ${{ secrets.RELEASE_TAG_TOKEN }}
           RELEASE_SHA: ${{ needs.trigger.outputs.release_sha }}
           RELEASE_VERSION: ${{ needs.trigger.outputs.version }}
         run: |
@@ -217,16 +217,13 @@ jobs:
             exit 0
           fi
 
-          key_file="$(mktemp)"
-          trap 'rm -f "$key_file"' EXIT
-          printf '%s\n' "$RELEASE_DEPLOY_KEY" >"$key_file"
-          chmod 600 "$key_file"
+          if [[ -z "$RELEASE_TAG_TOKEN" ]]; then
+            echo "RELEASE_TAG_TOKEN must have Contents and Workflows write permission." >&2
+            exit 1
+          fi
 
-          mkdir -p "$HOME/.ssh"
-          ssh-keyscan -t ed25519 github.com >>"$HOME/.ssh/known_hosts"
-          export GIT_SSH_COMMAND="ssh -i $key_file -o IdentitiesOnly=yes"
-
+          git config --local --unset-all http.https://github.com/.extraheader || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag --annotate "$release_tag" "$RELEASE_SHA" --message "Release $release_tag"
-          git push "git@github.com:$GITHUB_REPOSITORY.git" "refs/tags/$release_tag"
+          git push "https://x-access-token:${RELEASE_TAG_TOKEN}@github.com/$GITHUB_REPOSITORY.git" "refs/tags/$release_tag"

@@ -116,6 +116,7 @@ The release automation depends on configuration outside the repository:
   and the `npm-release` environment.
 - The `aerograph` package is owned by the account that configures the trusted npm
   publisher.
-- The write-enabled SSH key in `PROMOTION_SYNC_DEPLOY_KEY` pushes release tags as well as
-  synchronizing successful `main` promotions back to `dev`. The built-in GitHub Actions
-  token cannot tag a commit that adds or changes workflow files.
+- `PROMOTION_SYNC_DEPLOY_KEY` synchronizes successful `main` promotions back to `dev`.
+- `RELEASE_TAG_TOKEN` pushes release tags. It must be a dedicated token with Contents and
+  Workflows write permission because GitHub does not permit a deploy key or the built-in
+  GitHub Actions token to tag a commit that adds or changes workflow files.
