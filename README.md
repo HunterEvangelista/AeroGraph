@@ -15,7 +15,7 @@ AeroGraph helps you and your coding agent manage project knowledge that lives ou
 
 ### Installing AeroGraph
 
-AeroGraph currently requires [Bun](https://bun.sh/) 1.1 or later. Once the package is published, install it with Bun:
+AeroGraph currently requires [Bun](https://bun.sh/) 1.1 or later. Install it with Bun:
 
 ```bash
 bun add --global aerograph
