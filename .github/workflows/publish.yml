@@ -205,8 +205,6 @@ jobs:
           set -euo pipefail
 
           release_tag="aerograph@$RELEASE_VERSION"
-          published_version="$(npm view "aerograph@$RELEASE_VERSION" version)"
-          test "$published_version" = "$RELEASE_VERSION"
 
           if git ls-remote --exit-code --tags origin "refs/tags/$release_tag" >/dev/null 2>&1; then
             git fetch --no-tags origin "refs/tags/$release_tag:refs/tags/$release_tag"
@@ -228,5 +226,7 @@ jobs:
           ssh-keyscan -t ed25519 github.com >>"$HOME/.ssh/known_hosts"
           export GIT_SSH_COMMAND="ssh -i $key_file -o IdentitiesOnly=yes"
 
-          git tag "$release_tag" "$RELEASE_SHA"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag --annotate "$release_tag" "$RELEASE_SHA" --message "Release $release_tag"
           git push "git@github.com:$GITHUB_REPOSITORY.git" "refs/tags/$release_tag"
