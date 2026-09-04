@@ -125,7 +125,7 @@ const AeroGraphRegistrySchema = Schema.Struct({
   projects: Schema.Array(AeroGraphProjectSchema),
 });
 
-const getAeroGraphHome = (): string => {
+export const getAeroGraphHome = (): string => {
   const override = process.env[AEROGRAPH_HOME_ENV]?.trim();
   return resolve(override || join(homedir(), AEROGRAPH_DIR));
 };

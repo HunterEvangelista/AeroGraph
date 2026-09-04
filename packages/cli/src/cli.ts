@@ -1,6 +1,6 @@
 import * as BunRuntime from "@effect/platform-bun/BunRuntime";
 import * as BunServices from "@effect/platform-bun/BunServices";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Stdio } from "effect";
 /**
  * AeroGraph CLI
  * Main entry point for the command-line interface
@@ -23,6 +23,7 @@ import {
   unlinkCommand,
 } from "./commands/index";
 import { ConfigServiceLive } from "./config";
+import { ExecutionRecorderLive, withExecutionLifecycle } from "./observability/index";
 import { CLI_VERSION } from "./version";
 
 // ============================================================================
@@ -52,14 +53,24 @@ const command = aerograph.pipe(
   ])
 );
 
-const cli = Command.run(command, {
+const runCommand = Command.runWith(command, {
   version: CLI_VERSION,
 });
+
+const cli = Stdio.Stdio.use(({ args }) =>
+  args.pipe(
+    Effect.flatMap((commandArgs) =>
+      withExecutionLifecycle(commandArgs, CLI_VERSION, runCommand(commandArgs))
+    )
+  )
+);
 
 // ============================================================================
 // Run
 // ============================================================================
 
-const MainLive = Layer.mergeAll(ConfigServiceLive, BunServices.layer);
+const PlatformLive = BunServices.layer;
+const RecorderLive = ExecutionRecorderLive.pipe(Layer.provide(PlatformLive));
+const MainLive = Layer.mergeAll(ConfigServiceLive, PlatformLive, RecorderLive);
 
 cli.pipe(Effect.provide(MainLive), BunRuntime.runMain);
