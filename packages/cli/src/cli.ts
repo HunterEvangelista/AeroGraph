@@ -1,5 +1,3 @@
-import * as BunRuntime from "@effect/platform-bun/BunRuntime";
-import * as BunServices from "@effect/platform-bun/BunServices";
 import { Effect, Layer } from "effect";
 /**
  * AeroGraph CLI
@@ -23,6 +21,7 @@ import {
   unlinkCommand,
 } from "./commands/index";
 import { ConfigServiceLive } from "./config";
+import { runtimeKind } from "./runtime";
 import { CLI_VERSION } from "./version";
 
 // ============================================================================
@@ -60,6 +59,23 @@ const cli = Command.run(command, {
 // Run
 // ============================================================================
 
-const MainLive = Layer.mergeAll(ConfigServiceLive, BunServices.layer);
+const run = async (): Promise<void> => {
+  if (runtimeKind === "bun") {
+    const [BunRuntime, BunServices] = await Promise.all([
+      import("@effect/platform-bun/BunRuntime"),
+      import("@effect/platform-bun/BunServices"),
+    ]);
+    const MainLive = Layer.mergeAll(ConfigServiceLive, BunServices.layer);
+    BunRuntime.runMain(cli.pipe(Effect.provide(MainLive)));
+    return;
+  }
 
-cli.pipe(Effect.provide(MainLive), BunRuntime.runMain);
+  const [NodeRuntime, NodeServices] = await Promise.all([
+    import("@effect/platform-node/NodeRuntime"),
+    import("@effect/platform-node/NodeServices"),
+  ]);
+  const MainLive = Layer.mergeAll(ConfigServiceLive, NodeServices.layer);
+  NodeRuntime.runMain(cli.pipe(Effect.provide(MainLive)));
+};
+
+void run();

@@ -80,7 +80,7 @@ try {
     throw new Error("npm pack did not return exactly one package");
   const tarball = join(tempRoot, packResult[0].filename);
   const listing = packResult[0].files.map(({ path }) => `package/${path}`).sort();
-  const expected = [
+  const required = [
     "package/LICENSE",
     "package/README.md",
     "package/THIRD_PARTY_LICENSES.md",
@@ -88,7 +88,14 @@ try {
     "package/dist/cli.js",
     "package/package.json",
   ];
-  if (JSON.stringify(listing) !== JSON.stringify(expected))
+  const unexpected = listing.filter(
+    (file) => !required.includes(file) && !/^package\/dist\/chunks\/[a-zA-Z0-9_-]+\.js$/.test(file)
+  );
+  if (
+    required.some((file) => !listing.includes(file)) ||
+    !listing.some((file) => file.startsWith("package/dist/chunks/")) ||
+    unexpected.length > 0
+  )
     throw new Error(`npm pack files differ from allowlist:\n${listing.join("\n")}`);
 
   await run(
@@ -111,8 +118,14 @@ try {
     !thirdParty.includes("Copyright © Hunter Evangelista")
   )
     throw new Error("Incomplete third-party attribution");
-  const bundle = await readFile(join(installed, "dist/cli.js"), "utf8");
-  assertNoExternalBundleImports(bundle);
+  const bundleFiles = listing
+    .filter((file) => file.startsWith("package/dist/") && file.endsWith(".js"))
+    .map((file) => file.slice("package/".length));
+  const bundles = await Promise.all(
+    bundleFiles.map((file) => readFile(join(installed, file), "utf8"))
+  );
+  for (const bundle of bundles) assertNoExternalBundleImports(bundle);
+  const bundle = bundles.join("\n");
   const forbidden = [
     bundle.includes('from "ws"') && "ws",
     bundle.includes("NodeSocketServer") && "NodeSocketServer",
@@ -131,6 +144,8 @@ try {
   await run([executable, "--help"], project);
   await run([executable, "init"], project);
   await run([executable, "status"], project);
+  await run(["bun", executable, "--version"], project);
+  await run(["bun", executable, "status"], project);
 
   if (outputDirectory !== undefined) {
     await mkdir(outputDirectory, { recursive: true });

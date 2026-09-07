@@ -2,9 +2,13 @@ import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 
-const [tarballArgument] = process.argv.slice(2);
-if (tarballArgument === undefined || process.argv.length !== 3) {
-  throw new Error("Usage: runtime-smoke.ts <package.tgz>");
+const [runtime, tarballArgument] = process.argv.slice(2);
+if (
+  (runtime !== "bun" && runtime !== "node") ||
+  tarballArgument === undefined ||
+  process.argv.length !== 4
+) {
+  throw new Error("Usage: runtime-smoke.ts <bun|node> <package.tgz>");
 }
 
 const tarball = resolve(tarballArgument);
@@ -45,14 +49,40 @@ try {
     version: string;
   };
   const executable = join(installPrefix, "node_modules", ".bin", "aerograph");
-  const version = (await run([executable, "--version"])).trim();
+  const invoke = (...args: ReadonlyArray<string>) =>
+    runtime === "bun" ? ["bun", executable, ...args] : [executable, ...args];
+  const version = (await run(invoke("--version"))).trim();
   if (version !== `aerograph v${manifest.version}`) {
     throw new Error(`Unexpected version: ${version}`);
   }
-  await run([executable, "--help"]);
-  await run([executable, "init"]);
-  await run([executable, "status"]);
-  console.log(`Bun ${Bun.version} runtime smoke test passed: ${basename(tarball)}`);
+  await run(invoke("--help"));
+  await run(invoke("init"));
+  await run(invoke("doc", "create", "Runtime smoke", "--content", "portable sqlite marker"));
+  const search = await run(invoke("doc", "list", "--search", "portable sqlite"));
+  if (!search.includes("Runtime smoke")) throw new Error("Runtime FTS smoke test failed");
+  await Promise.all(
+    Array.from({ length: 4 }, (_, index) =>
+      run(
+        invoke(
+          "doc",
+          "create",
+          `Concurrent runtime smoke ${index}`,
+          "--content",
+          `concurrent marker ${index}`,
+          "--tags",
+          "runtime/concurrency"
+        )
+      )
+    )
+  );
+  const status = await run(invoke("status", "--verbose"));
+  const expectedRuntime = runtime === "bun" ? "Runtime:    Bun " : "Runtime:    Node.js ";
+  if (!status.includes(expectedRuntime)) {
+    throw new Error(`Runtime diagnostics did not identify ${runtime}`);
+  }
+  const runtimeVersion =
+    runtime === "bun" ? `Bun ${Bun.version}` : (await run(["node", "--version"])).trim();
+  console.log(`${runtimeVersion} runtime smoke test passed: ${basename(tarball)}`);
 } finally {
   await rm(tempRoot, { recursive: true, force: true });
 }

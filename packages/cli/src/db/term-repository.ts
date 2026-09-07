@@ -57,7 +57,8 @@ const validateTermName = (value: string, field: string) => {
 const isUniqueConstraintError = (cause: unknown): boolean => {
   const code = cause instanceof Error && "code" in cause ? String(cause.code) : "";
   const message = cause instanceof Error ? cause.message : String(cause);
-  return `${code} ${message}`.toLowerCase().includes("unique constraint");
+  if (`${code} ${message}`.toLowerCase().includes("unique constraint")) return true;
+  return cause instanceof Error && "cause" in cause ? isUniqueConstraintError(cause.cause) : false;
 };
 
 const writeError = (action: string, name: string, cause: unknown) =>

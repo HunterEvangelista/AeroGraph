@@ -7,6 +7,7 @@ import { Effect } from "effect";
 import { Command, Flag } from "effect/unstable/cli";
 import { ConfigServiceTag } from "../config";
 import { CliCoreLive } from "../db/index";
+import { runtimeDescription } from "../runtime";
 import { emitError, emitOutput } from "../ui/output";
 import { formatStatus, type StatusResult } from "../ui/status-output";
 
@@ -34,6 +35,7 @@ export const statusCommand = Command.make(
       );
 
       const result: StatusResult = {
+        runtime: runtimeDescription(),
         project: {
           name: workspace.projectName,
           id: workspace.projectId,

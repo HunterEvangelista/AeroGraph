@@ -14,10 +14,15 @@ import {
 import { type Cause, Effect, Exit, Layer } from "effect";
 import { type DatabaseClient, DatabaseClientTag } from "./client";
 import { SqliteEntityRepositorySessionLive } from "./entity-repository";
+import { type DatabaseExecutor, runDatabaseTransaction } from "./executor";
 import { SqliteLinkRepositorySessionLive } from "./link-repository";
 import { SqliteMigrationJournalRepositorySessionLive } from "./migration-journal-repository";
 import { SqliteNextRepositorySessionLive } from "./next-repository";
-import { type DatabaseSession, DatabaseSessionTag } from "./session";
+import {
+  type DatabaseSession,
+  DatabaseSessionTag,
+  runImmediateDatabaseTransaction,
+} from "./session";
 import { withSqliteWriteRetry } from "./sqlite-retry";
 import { SqliteTagRepositorySessionLive } from "./tag-repository";
 import { SqliteTermRepositorySessionLive } from "./term-repository";
@@ -39,6 +44,16 @@ const repositoryError = (action: string, cause: unknown) =>
     message: `Failed to ${action} database transaction: ${cause instanceof Error ? cause.message : String(cause)}`,
     cause,
   });
+
+const transactionSession = (
+  client: DatabaseClient,
+  executor: DatabaseExecutor
+): DatabaseSession => ({
+  db: client.db,
+  drizzle: executor,
+  write: (operation) => operation(),
+  transaction: (operation) => runDatabaseTransaction(executor, operation),
+});
 
 const runWithRepositories = <A, E>(
   session: DatabaseSession,
@@ -79,25 +94,17 @@ const runTransaction = <A, E>(
 
     try {
       const value = withSqliteWriteRetry(() =>
-        client.drizzle.transaction(
-          (tx) => {
-            const session: DatabaseSession = {
-              db: client.db,
-              drizzle: tx,
-              write: (writeOperation) => writeOperation(),
-              transaction: (transactionOperation) => tx.transaction(transactionOperation),
-            };
-            const operationExit = Effect.runSyncExit(runWithRepositories(session, operation));
+        runImmediateDatabaseTransaction(client, (tx) => {
+          const session = transactionSession(client, tx);
+          const operationExit = Effect.runSyncExit(runWithRepositories(session, operation));
 
-            if (Exit.isFailure(operationExit)) {
-              operationCause = operationExit.cause;
-              throw rollbackSignal;
-            }
+          if (Exit.isFailure(operationExit)) {
+            operationCause = operationExit.cause;
+            throw rollbackSignal;
+          }
 
-            return operationExit.value;
-          },
-          { behavior: "immediate" }
-        )
+          return operationExit.value;
+        })
       );
 
       return Effect.succeed(value);
