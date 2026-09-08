@@ -141,3 +141,54 @@ jobs:
       - name: Test existing graph upgrades across Node.js and Bun
         if: matrix.node-version == 24
         run: bun run packages/cli/scripts/runtime-upgrade-smoke.ts "${{ runner.temp }}"/package/*.tgz
+
+  deploy-website:
+    name: Deploy production website
+    needs: [quality, tests, package, minimum-runtime, node-runtime]
+    if: github.repository == 'HunterEvangelista/AeroGraph' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: website-production
+      url: https://aerograph.dev
+    concurrency:
+      group: website-production
+      # Cancelling a client cannot reliably cancel a publish already accepted by Cloudflare.
+      cancel-in-progress: false
+    steps:
+      - name: Check out tested revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.2.15
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build website from tested revision
+        run: bun run --cwd apps/website build
+      - name: Publish current main revision
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: "false"
+        run: |
+          set -euo pipefail
+          node apps/website/scripts/deploy-policy.mjs
+          node node_modules/wrangler/bin/wrangler.js deploy \
+            --config apps/website/wrangler.jsonc \
+            --message "Commit $GITHUB_SHA | CI $GITHUB_RUN_ID attempt $GITHUB_RUN_ATTEMPT"
+          {
+            echo '## Production website published'
+            echo "- Website: https://aerograph.dev"
+            echo "- Tested commit: $GITHUB_SHA"
+            echo "- CI: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo '- Cloudflare version ID: see the publish step output and Worker deployment history.'
+            echo '- Verify public DNS, TLS, routes, and assets using apps/website/README.md.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -5,8 +5,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "bun run build && wrangler dev",
-    "deploy": "bun run build && wrangler deploy",
-    "test": "playwright test",
+    "test": "node --test scripts/*.test.mjs && playwright test",
     "social": "node scripts/social.mjs",
     "lint": "biome check public scripts tests playwright.config.mjs package.json wrangler.jsonc",
     "lint:fix": "biome check --write public scripts tests playwright.config.mjs package.json wrangler.jsonc",
