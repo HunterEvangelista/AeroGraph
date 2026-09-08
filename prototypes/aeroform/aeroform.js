@@ -47,8 +47,20 @@ function buildSphere() {
   const image = ctx.createImageData(size, size);
   const lavender = state.palette === "lavender";
   const stops = lavender
-    ? [[15, 12, 20], [47, 36, 61], [119, 99, 149], [191, 171, 219], [234, 222, 249]]
-    : [[12, 10, 17], [49, 16, 39], [207, 27, 66], [246, 54, 70], [141, 125, 191]];
+    ? [
+        [15, 12, 20],
+        [47, 36, 61],
+        [119, 99, 149],
+        [191, 171, 219],
+        [234, 222, 249],
+      ]
+    : [
+        [12, 10, 17],
+        [49, 16, 39],
+        [207, 27, 66],
+        [246, 54, 70],
+        [141, 125, 191],
+      ];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const nx = (x + 0.5 - size / 2) / (size / 2 - 2);
@@ -62,12 +74,13 @@ function buildSphere() {
       const scaled = value * (stops.length - 1);
       const index = Math.floor(scaled);
       const blend = scaled - index;
-      const grain = (Math.sin(x * 127.1 + y * 311.7) * 43758.5453 % 1) * 3;
+      const grain = ((Math.sin(x * 127.1 + y * 311.7) * 43758.5453) % 1) * 3;
       const offset = (y * size + x) * 4;
       for (let channel = 0; channel < 3; channel++) {
-        image.data[offset + channel] = stops[index][channel] * (1 - blend) + stops[index + 1][channel] * blend + grain;
+        image.data[offset + channel] =
+          stops[index][channel] * (1 - blend) + stops[index + 1][channel] * blend + grain;
       }
-      image.data[offset + 3] = Math.min(1, (1 - Math.sqrt(radius)) * size / 2) * 255;
+      image.data[offset + 3] = Math.min(1, ((1 - Math.sqrt(radius)) * size) / 2) * 255;
     }
   }
   ctx.putImageData(image, 0, 0);
@@ -104,7 +117,7 @@ function contourField(cx, cy, radius, front) {
     context.beginPath();
     const steps = Math.max(2, Math.ceil((to - from) * 80));
     for (let step = 0; step <= steps; step++) {
-      const angle = from + step / steps * (to - from);
+      const angle = from + (step / steps) * (to - from);
       const point = orbitPoint(angle, t, cx, cy, radius);
       if (step === 0) context.moveTo(point.x, point.y);
       else context.lineTo(point.x, point.y);
@@ -126,7 +139,14 @@ function render() {
   const amount = state.connection / 100;
   const traveler = orbitPoint(Math.PI + amount * Math.PI * 2, 0.5, cx, cy, radius);
   const satellite = radius * 0.17;
-  const drawTraveler = () => context.drawImage(sphere, traveler.x - satellite, traveler.y - satellite, satellite * 2, satellite * 2);
+  const drawTraveler = () =>
+    context.drawImage(
+      sphere,
+      traveler.x - satellite,
+      traveler.y - satellite,
+      satellite * 2,
+      satellite * 2
+    );
   contourField(cx, cy, radius, false);
   if (!traveler.front) drawTraveler();
   context.drawImage(sphere, cx - radius, cy - radius, radius * 2, radius * 2);
@@ -167,7 +187,10 @@ connection.addEventListener("input", () => {
 canvas.addEventListener("pointermove", (event) => {
   if (motionPreference.matches || event.pointerType === "touch") return;
   const bounds = canvas.getBoundingClientRect();
-  pointer = { x: (event.clientX - bounds.left) / width - 0.5, y: (event.clientY - bounds.top) / height - 0.5 };
+  pointer = {
+    x: (event.clientX - bounds.left) / width - 0.5,
+    y: (event.clientY - bounds.top) / height - 0.5,
+  };
   requestRender();
 });
 function resetPointer() {
