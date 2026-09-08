@@ -42,12 +42,12 @@
       "!**/node_modules",
       "!**/dist",
       "!**/.turbo",
-      "!**/.wrangler/",
-      "!**/test-results/",
-      "!**/playwright-report/",
-      "!**/.delta/",
+      "!**/.wrangler/**",
+      "!**/test-results/**",
+      "!**/playwright-report/**",
+      "!**/.delta/**",
       "!**/*.json",
-      "!tools/oxlint/anti-slop/"
+      "!tools/oxlint/anti-slop/**"
     ]
   }
 }
