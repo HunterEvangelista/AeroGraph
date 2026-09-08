@@ -46,7 +46,7 @@
     "@changesets/cli": "3.0.1",
     "@effect/tsgo": "^0.24.3",
     "@oxlint/plugins": "1.78.0",
-    "drizzle-kit": "^0.31.10",
+    "drizzle-kit": "1.0.0-rc.4",
     "oxlint": "1.78.0",
     "turbo": "^2.3.3",
     "typescript": "^7.0.2"

@@ -1,6 +1,6 @@
-import { copyFile, mkdtemp, readFile, rm } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { copyFile, mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertNoExternalBundleImports } from "./bundle-imports";
 
@@ -11,7 +11,11 @@ const outdir = resolve(packageRoot, "dist");
 const buildOptions = {
   entrypoints: [entrypoint],
   target: "bun" as const,
-  naming: "cli.js",
+  naming: {
+    entry: "cli.js",
+    chunk: "chunks/[name]-[hash].[ext]",
+  },
+  splitting: true,
   minify: false,
   packages: "bundle" as const,
   define: {},
@@ -22,6 +26,7 @@ const buildOptions = {
 
 // The CLI package is published independently, so its lifecycle must not depend
 // on a dist directory left by a different workspace task or checkout.
+await rm(outdir, { recursive: true, force: true });
 await Bun.$`bun run --cwd ${coreRoot} build`;
 const result = await Bun.build({ ...buildOptions, outdir, sourcemap: "none" });
 if (!result.success) {
@@ -43,14 +48,29 @@ try {
     for (const log of analysis.logs) console.error(log);
     throw new Error("Unable to produce the CLI bundle analysis source map");
   }
-  const map = JSON.parse(await readFile(resolve(analysisRoot, "cli.js.map"), "utf8")) as {
-    sources?: string[];
-    sourceRoot?: string;
-  };
-  if (!map.sources?.length) throw new Error("CLI bundle analysis source map is empty");
-  const inputs = map.sources.map((source) => resolve(analysisRoot, map.sourceRoot ?? "", source));
-  const bundle = await readFile(resolve(outdir, "cli.js"), "utf8");
-  assertNoExternalBundleImports(bundle);
+  const analysisFiles = await readdir(analysisRoot, { recursive: true });
+  const mapFiles = analysisFiles.filter((file) => file.endsWith(".js.map"));
+  const inputs = (
+    await Promise.all(
+      mapFiles.map(async (file) => {
+        const mapPath = resolve(analysisRoot, file);
+        const map = JSON.parse(await readFile(mapPath, "utf8")) as {
+          sources?: string[];
+          sourceRoot?: string;
+        };
+        return (map.sources ?? []).map((source) =>
+          resolve(analysisRoot, map.sourceRoot ?? "", source)
+        );
+      })
+    )
+  ).flat();
+  if (inputs.length === 0) throw new Error("CLI bundle analysis source maps are empty");
+  const bundleFiles = (await readdir(outdir, { recursive: true })).filter((file) =>
+    file.endsWith(".js")
+  );
+  for (const file of bundleFiles) {
+    assertNoExternalBundleImports(await readFile(resolve(outdir, file), "utf8"));
+  }
   await validateInputs(inputs);
   await copyFile(resolve(packageRoot, "../../LICENSE"), resolve(packageRoot, "LICENSE"));
   await Bun.$`bun run ${resolve(packageRoot, "scripts/generate-third-party-licenses.ts")} ${JSON.stringify(inputs)}`;

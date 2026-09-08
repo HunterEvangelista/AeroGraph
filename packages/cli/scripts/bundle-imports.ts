@@ -11,7 +11,13 @@ export function scanBundleImports(bundle: string): string[] {
 export function assertNoExternalBundleImports(bundle: string): void {
   const external = scanBundleImports(bundle).filter((specifier) => {
     const bareSpecifier = specifier.startsWith("node:") ? specifier.slice(5) : specifier;
-    return !specifier.startsWith("bun:") && !builtins.has(bareSpecifier);
+    return (
+      !specifier.startsWith("./") &&
+      !specifier.startsWith("../") &&
+      !specifier.startsWith("bun:") &&
+      !specifier.startsWith("node:") &&
+      !builtins.has(bareSpecifier)
+    );
   });
   if (external.length > 0) {
     throw new Error(`Bundle has unresolved non-builtin imports: ${external.sort().join(", ")}`);

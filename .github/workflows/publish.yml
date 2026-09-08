@@ -137,12 +137,43 @@ jobs:
           name: aerograph-release-${{ needs.trigger.outputs.version }}
           path: ${{ runner.temp }}/package
       - name: Test installed CLI on minimum Bun
-        run: bun run packages/cli/scripts/runtime-smoke.ts "${{ runner.temp }}"/package/*.tgz
+        run: bun run packages/cli/scripts/runtime-smoke.ts bun "${{ runner.temp }}"/package/*.tgz
+      - name: Test Bun package install without Node or npm
+        run: bun run packages/cli/scripts/bun-only-smoke.ts "${{ runner.temp }}"/package/*.tgz
+
+  node-runtime:
+    name: Validate minimum Node.js runtime
+    if: needs.trigger.outputs.publish == 'true'
+    needs: [trigger, validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out runtime smoke test
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.trigger.outputs.release_sha }}
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: 1.2.15
+      - name: Set up minimum supported Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Download releasable CLI tarball
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: aerograph-release-${{ needs.trigger.outputs.version }}
+          path: ${{ runner.temp }}/package
+      - name: Test installed CLI on minimum Node.js
+        run: bun run packages/cli/scripts/runtime-smoke.ts node "${{ runner.temp }}"/package/*.tgz
+      - name: Test existing graph upgrades across Node.js and Bun
+        run: bun run packages/cli/scripts/runtime-upgrade-smoke.ts "${{ runner.temp }}"/package/*.tgz
 
   publish:
     name: Publish alpha to npm
     if: needs.trigger.outputs.publish == 'true'
-    needs: [trigger, validate, minimum-runtime]
+    needs: [trigger, validate, minimum-runtime, node-runtime]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: npm-release
@@ -198,7 +229,7 @@ jobs:
           npm publish "${tarballs[0]}" --access public --tag latest --provenance
       - name: Tag published release commit
         env:
-          RELEASE_DEPLOY_KEY: ${{ secrets.PROMOTION_SYNC_DEPLOY_KEY }}
+          RELEASE_TAG_TOKEN: ${{ secrets.RELEASE_TAG_TOKEN }}
           RELEASE_SHA: ${{ needs.trigger.outputs.release_sha }}
           RELEASE_VERSION: ${{ needs.trigger.outputs.version }}
         run: |
@@ -217,16 +248,13 @@ jobs:
             exit 0
           fi
 
-          key_file="$(mktemp)"
-          trap 'rm -f "$key_file"' EXIT
-          printf '%s\n' "$RELEASE_DEPLOY_KEY" >"$key_file"
-          chmod 600 "$key_file"
+          if [[ -z "$RELEASE_TAG_TOKEN" ]]; then
+            echo "RELEASE_TAG_TOKEN must have Contents and Workflows write permission." >&2
+            exit 1
+          fi
 
-          mkdir -p "$HOME/.ssh"
-          ssh-keyscan -t ed25519 github.com >>"$HOME/.ssh/known_hosts"
-          export GIT_SSH_COMMAND="ssh -i $key_file -o IdentitiesOnly=yes"
-
+          git config --local --unset-all http.https://github.com/.extraheader || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git tag --annotate "$release_tag" "$RELEASE_SHA" --message "Release $release_tag"
-          git push "git@github.com:$GITHUB_REPOSITORY.git" "refs/tags/$release_tag"
+          git push "https://x-access-token:${RELEASE_TAG_TOKEN}@github.com/$GITHUB_REPOSITORY.git" "refs/tags/$release_tag"

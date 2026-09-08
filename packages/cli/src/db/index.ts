@@ -21,7 +21,6 @@ export type { DatabaseExecutor, DatabaseSession } from "./session";
 export {
   DatabaseSessionTag,
   makeRootDatabaseSession,
-  makeTransactionDatabaseSession,
   RootDatabaseSessionLive,
 } from "./session";
 export { SqliteTagRepositoryLive } from "./tag-repository";

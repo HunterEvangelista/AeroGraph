@@ -15,17 +15,40 @@ AeroGraph helps you and your coding agent manage project knowledge that lives ou
 
 ### Installing AeroGraph
 
-AeroGraph currently requires [Bun](https://bun.sh/) 1.1 or later. Install it with Bun:
+AeroGraph is Bun-first and supports two production runtimes:
 
 ```bash
-bun add --global aerograph
+# Preferred: Bun 1.1.38 or later
+bunx --bun aerograph --version
+
+# Supported: Node.js 24 or later
+npx aerograph --version
 ```
 
-The package installs the `aerograph` command. Confirm that the command is available:
+The npm executable uses a Node.js shebang for compatibility with npm, `npx`, and global
+package installations. `bunx --bun` explicitly selects Bun instead. Installing Bun does not
+silently change the runtime used by an existing Node.js workflow.
+
+To install the Node.js executable globally:
 
 ```bash
-aerograph --version
+npm install --global aerograph
 ```
+
+The remaining examples use `aerograph` for readability. When running without a global
+installation, replace it with your selected runner:
+
+```bash
+bunx --bun aerograph status  # Bun
+npx aerograph status         # Node.js
+```
+
+### Upgrading From a Bun-Only Alpha
+
+Earlier AeroGraph alphas installed `aerograph` with a Bun shebang. After upgrading to the
+dual-runtime release, the plain installed `aerograph` command requires Node.js 24 or later.
+The graph format and CLI commands remain compatible. On a Bun-only machine, invoke the same
+package with `bunx --bun aerograph`.
 
 ### Initialize a Project
 

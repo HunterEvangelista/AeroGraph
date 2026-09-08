@@ -1,6 +1,12 @@
 # Apps Directory
 
-This directory will contain future client applications:
+This directory contains the public website and reserves space for future client applications.
+
+## Website (`website/`)
+
+The static product website for `aerograph.dev`, based on the Aeroform design prototype and hosted with Cloudflare Workers Static Assets. See [`website/README.md`](website/README.md) for development, tests, and deployment.
+
+This site is not a graph-management web application.
 
 ## Planned Applications
 
@@ -16,4 +22,4 @@ This directory will contain future client applications:
 
 ## Current Status
 
-These applications are planned for v2. The v1 focus is on the CLI (`packages/cli`).
+The desktop and graph-management web applications are planned for v2. The v1 product focus is on the CLI (`packages/cli`); `website/` provides its public landing page.

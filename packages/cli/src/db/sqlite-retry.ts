@@ -18,7 +18,8 @@ export const isSqliteLockedError = (cause: unknown): boolean => {
   const message = cause instanceof Error ? cause.message : String(cause);
   const haystack = `${code} ${message}`.toLowerCase();
 
-  return SQLITE_LOCKED_ERROR_PATTERNS.some((pattern) => haystack.includes(pattern));
+  if (SQLITE_LOCKED_ERROR_PATTERNS.some((pattern) => haystack.includes(pattern))) return true;
+  return cause instanceof Error && "cause" in cause ? isSqliteLockedError(cause.cause) : false;
 };
 
 export const withSqliteWriteRetry = <A>(operation: () => A): A => {

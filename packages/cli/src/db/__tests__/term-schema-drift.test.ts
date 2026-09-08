@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { MIGRATION_OPERATIONS, TERM_KINDS, TERM_NAME_KINDS, TERM_STATUSES } from "@aerograph/core";
@@ -71,20 +71,25 @@ describe("term registry schema drift guards", () => {
   });
 
   it("commits term registry checks to the Drizzle snapshot", () => {
-    const snapshotPath = join(
-      dirname(fileURLToPath(import.meta.url)),
-      "../../../drizzle/meta/0004_snapshot.json"
-    );
+    const migrationsPath = join(dirname(fileURLToPath(import.meta.url)), "../../../drizzle");
+    const latestMigration = readdirSync(migrationsPath)
+      .filter((entry) => entry.startsWith("20"))
+      .sort()
+      .at(-1);
+    if (latestMigration === undefined) throw new Error("No Drizzle migration snapshot found");
+    const snapshotPath = join(migrationsPath, latestMigration, "snapshot.json");
     const snapshot = JSON.parse(readFileSync(snapshotPath, "utf8"));
+    const checkNamesFor = (table: string) =>
+      snapshot.ddl
+        .filter(
+          (entry: { entityType: string; table?: string }) =>
+            entry.entityType === "checks" && entry.table === table
+        )
+        .map((entry: { name: string }) => entry.name)
+        .sort();
 
-    expect(Object.keys(snapshot.tables.terms?.checkConstraints ?? {}).sort()).toEqual(
-      checkNames(terms)
-    );
-    expect(Object.keys(snapshot.tables.term_names?.checkConstraints ?? {}).sort()).toEqual(
-      checkNames(termNames)
-    );
-    expect(Object.keys(snapshot.tables.migration_journal?.checkConstraints ?? {}).sort()).toEqual(
-      checkNames(migrationJournal)
-    );
+    expect(checkNamesFor("terms")).toEqual(checkNames(terms));
+    expect(checkNamesFor("term_names")).toEqual(checkNames(termNames));
+    expect(checkNamesFor("migration_journal")).toEqual(checkNames(migrationJournal));
   });
 });

@@ -1,6 +1,4 @@
-import * as BunRuntime from "@effect/platform-bun/BunRuntime";
-import * as BunServices from "@effect/platform-bun/BunServices";
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Stdio } from "effect";
 /**
  * AeroGraph CLI
  * Main entry point for the command-line interface
@@ -23,6 +21,12 @@ import {
   unlinkCommand,
 } from "./commands/index";
 import { ConfigServiceLive } from "./config";
+import {
+  commandCatalog,
+  ExecutionRecorderLive,
+  withExecutionLifecycle,
+} from "./observability/index";
+import { runtimeKind } from "./runtime";
 import { CLI_VERSION } from "./version";
 
 // ============================================================================
@@ -52,14 +56,44 @@ const command = aerograph.pipe(
   ])
 );
 
-const cli = Command.run(command, {
+const executionCommands = commandCatalog(command);
+const runCommand = Command.runWith(command, {
   version: CLI_VERSION,
 });
+
+const cli = Stdio.Stdio.use(({ args }) =>
+  args.pipe(
+    Effect.flatMap((commandArgs) =>
+      withExecutionLifecycle(executionCommands, commandArgs, CLI_VERSION, runCommand(commandArgs))
+    )
+  )
+);
 
 // ============================================================================
 // Run
 // ============================================================================
 
-const MainLive = Layer.mergeAll(ConfigServiceLive, BunServices.layer);
+const run = async (): Promise<void> => {
+  if (runtimeKind === "bun") {
+    const [BunRuntime, BunServices] = await Promise.all([
+      import("@effect/platform-bun/BunRuntime"),
+      import("@effect/platform-bun/BunServices"),
+    ]);
+    const PlatformLive = BunServices.layer;
+    const RecorderLive = ExecutionRecorderLive(executionCommands).pipe(Layer.provide(PlatformLive));
+    const MainLive = Layer.mergeAll(ConfigServiceLive, PlatformLive, RecorderLive);
+    BunRuntime.runMain(cli.pipe(Effect.provide(MainLive)));
+    return;
+  }
 
-cli.pipe(Effect.provide(MainLive), BunRuntime.runMain);
+  const [NodeRuntime, NodeServices] = await Promise.all([
+    import("@effect/platform-node/NodeRuntime"),
+    import("@effect/platform-node/NodeServices"),
+  ]);
+  const PlatformLive = NodeServices.layer;
+  const RecorderLive = ExecutionRecorderLive(executionCommands).pipe(Layer.provide(PlatformLive));
+  const MainLive = Layer.mergeAll(ConfigServiceLive, PlatformLive, RecorderLive);
+  NodeRuntime.runMain(cli.pipe(Effect.provide(MainLive)));
+};
+
+void run();

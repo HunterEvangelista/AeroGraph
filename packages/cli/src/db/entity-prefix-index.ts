@@ -1,6 +1,5 @@
 import { BrandedId, type EntityId, RepositoryError } from "@aerograph/core";
 import { and, eq, inArray, like } from "drizzle-orm";
-import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { DatabaseClientTag } from "./client";
 
@@ -11,9 +10,10 @@ export {
 } from "./entity-prefix-format";
 
 import { calculateEntityIdPrefixes, DEFAULT_ENTITY_ID_PREFIX_SCOPE } from "./entity-prefix-format";
-import type * as schema from "./schema";
+import { runDatabaseTransaction } from "./executor";
 import { entities, entityIdPrefixes } from "./schema";
 import type { DatabaseSession } from "./session";
+import type { DrizzleDatabase } from "./sqlite-driver";
 import { withSqliteWriteRetry } from "./sqlite-retry";
 
 const decodeEntityId = Schema.decodeUnknownOption(BrandedId);
@@ -49,7 +49,7 @@ export class EntityPrefixIndexTag extends Context.Service<
 >()("EntityPrefixIndex") {}
 
 export const rebuildEntityIdPrefixes = (
-  db: BunSQLiteDatabase<typeof schema>,
+  db: DrizzleDatabase,
   scope = DEFAULT_ENTITY_ID_PREFIX_SCOPE,
   runTransaction?: DatabaseSession["transaction"]
 ): void => {
@@ -60,7 +60,8 @@ export const rebuildEntityIdPrefixes = (
   );
 
   const transaction =
-    runTransaction ?? ((operation) => withSqliteWriteRetry(() => db.transaction(operation)));
+    runTransaction ??
+    ((operation) => withSqliteWriteRetry(() => runDatabaseTransaction(db, operation)));
 
   transaction((tx) => {
     tx.delete(entityIdPrefixes).where(eq(entityIdPrefixes.scope, scope)).run();

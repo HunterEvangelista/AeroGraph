@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { Effect, Exit } from "effect";
 import { type DatabaseClient, DatabaseClientLive, DatabaseClientTag } from "../../client";
 import { CREATE_TABLES_SQL } from "../../schema";
+import type { SqliteDatabase } from "../../sqlite-driver";
 
 const root = mkdtempSync(join(tmpdir(), "aerograph-upgrade-"));
 const getRequired = <T>(row: T | null): T => {
@@ -161,7 +162,7 @@ const createV5DatabaseWithBrokenFts = (path: string): void => {
   db.close();
 };
 
-const searchEntityIds = (db: Database, query: string): string[] =>
+const searchEntityIds = (db: SqliteDatabase, query: string): string[] =>
   db
     .query<SearchRow, [string]>(`
       SELECT e.id
