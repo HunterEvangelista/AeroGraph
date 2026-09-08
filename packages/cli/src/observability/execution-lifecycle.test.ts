@@ -116,6 +116,12 @@ describe("CLI execution lifecycle", () => {
       const completionEvent = readEvents(workspace.aerographHome).at(-1);
       expect(completionEvent?.command).toBe("aerograph");
       expect(completionEvent?.errorCategory).toBe("usage");
+
+      const reportedFailure = workspace.run("tag", "list", "--json", "--governed", "--ungoverned");
+      expect(reportedFailure.status).not.toBe(0);
+      const reportedFailureEvent = readEvents(workspace.aerographHome).at(-1);
+      expect(reportedFailureEvent?.command).toBe("tag.list");
+      expect(reportedFailureEvent?.outcome).toBe("failure");
     } finally {
       workspace.cleanup();
     }
@@ -140,10 +146,15 @@ describe("CLI execution lifecycle", () => {
     }
   });
 
-  it("uses private permissions and fails open when the sink cannot be created", () => {
+  it("uses private permissions, recovers dead writers, and fails open", () => {
     const workspace = createCliWorkspace();
     try {
       const directory = join(workspace.aerographHome, EXECUTION_LOGS_DIR);
+      const lockDirectory = join(directory, ".writer-lock");
+      mkdirSync(lockDirectory);
+      writeFileSync(join(lockDirectory, "owner"), "2147483647:dead-writer");
+      expect(workspace.run("status").status).toBe(0);
+      expect(existsSync(lockDirectory)).toBe(false);
       const activeFile = join(directory, executionLogFileName(new Date()));
       expect(statSync(directory).mode & 0o777).toBe(0o700);
       expect(statSync(activeFile).mode & 0o777).toBe(0o600);
@@ -179,8 +190,8 @@ describe("CLI execution lifecycle", () => {
       const oversized = Number(EXECUTION_LOG_CLOSED_FILE_BUDGET_BYTES / 2n + 1n);
       truncateSync(olderRecentFile, oversized);
       truncateSync(newerRecentFile, oversized);
-      const olderModifiedAt = new Date(now.getTime() - 48 * 60 * 60 * 1000);
-      const newerModifiedAt = new Date(now.getTime() - 36 * 60 * 60 * 1000);
+      const olderModifiedAt = new Date(now.getTime() - 60 * 1000);
+      const newerModifiedAt = now;
       utimesSync(olderRecentFile, olderModifiedAt, olderModifiedAt);
       utimesSync(newerRecentFile, newerModifiedAt, newerModifiedAt);
 
@@ -193,7 +204,9 @@ describe("CLI execution lifecycle", () => {
       expect(existsSync(cutoffFile)).toBe(false);
       expect(existsSync(olderRecentFile)).toBe(false);
       expect(existsSync(newerRecentFile)).toBe(true);
-      expect(readFileSync(activeFile, "utf8")).toMatch(/^partial-record\n\{/);
+      const activeLines = readFileSync(activeFile, "utf8").trim().split("\n");
+      expect(activeLines[0]).toStartWith("{");
+      expect(() => activeLines.map((line) => JSON.parse(line))).not.toThrow();
     } finally {
       const directory = join(workspace.aerographHome, EXECUTION_LOGS_DIR);
       if (existsSync(directory) && statSync(directory).isDirectory()) {

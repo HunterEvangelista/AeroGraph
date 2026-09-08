@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Clock, Effect, Exit, Ref } from "effect";
 import { type ConfigService, ConfigServiceTag } from "../config";
-import { canonicalCommandName } from "./command-name";
+import type { CommandCatalog } from "./command-name";
 import { classifyCause } from "./error-category";
 import { createExecutionEvent, type ProjectResolution } from "./execution-event";
 import { ExecutionRecorderTag } from "./execution-recorder";
@@ -29,6 +29,7 @@ const replayExit = <A, E>(exit: Exit.Exit<A, E>): Effect.Effect<A, E> =>
  * workspace itself. Logging therefore cannot add filesystem or Git behavior to a command.
  */
 export const withExecutionLifecycle = <A, E, R>(
+  catalog: CommandCatalog,
   args: ReadonlyArray<string>,
   cliVersion: string,
   program: Effect.Effect<A, E, R>
@@ -40,6 +41,7 @@ export const withExecutionLifecycle = <A, E, R>(
       const resolution = yield* Ref.make<ProjectResolution>("unresolved");
       const observedConfig = observeProjectResolution(configService, resolution);
       const runId = randomUUID();
+      const initialExitCode = process.exitCode;
       const startedAtMillis = yield* Clock.currentTimeMillis;
       const startedAtNanos = yield* Clock.monotonicTimeNanos;
 
@@ -50,13 +52,19 @@ export const withExecutionLifecycle = <A, E, R>(
       const endedAtNanos = yield* Clock.monotonicTimeNanos;
       const endedAtMillis = yield* Clock.currentTimeMillis;
       const projectResolution = yield* Ref.get(resolution);
+      const setNonzeroExitCode =
+        process.exitCode !== initialExitCode &&
+        process.exitCode !== undefined &&
+        Number(process.exitCode) !== 0;
       const classified = Exit.isSuccess(exit)
-        ? ({ outcome: "success" } as const)
+        ? setNonzeroExitCode
+          ? ({ outcome: "failure", errorCategory: "unknown" } as const)
+          : ({ outcome: "success" } as const)
         : classifyCause(exit.cause);
 
       const event = createExecutionEvent({
         runId,
-        command: canonicalCommandName(args),
+        command: catalog.classify(args),
         cliVersion,
         startedAt: new Date(startedAtMillis).toISOString(),
         endedAt: new Date(endedAtMillis).toISOString(),
