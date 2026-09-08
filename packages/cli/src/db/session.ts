@@ -1,21 +1,17 @@
-import type { Database } from "bun:sqlite";
-import type { BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
-import type { SQLiteBunTransaction } from "drizzle-orm/bun-sqlite/session";
-import type { ExtractTablesWithRelations } from "drizzle-orm/relations";
 import { Context, Effect, Layer } from "effect";
 import { type DatabaseClient, DatabaseClientTag } from "./client";
-import type * as schema from "./schema";
+import {
+  type DatabaseExecutor,
+  type DatabaseTransaction,
+  runDatabaseTransaction,
+} from "./executor";
+import type { SqliteDatabase } from "./sqlite-driver";
 import { withSqliteWriteRetry } from "./sqlite-retry";
 
-type DatabaseTransaction = SQLiteBunTransaction<
-  typeof schema,
-  ExtractTablesWithRelations<typeof schema>
->;
-
-export type DatabaseExecutor = BunSQLiteDatabase<typeof schema> | DatabaseTransaction;
+export type { DatabaseExecutor } from "./executor";
 
 export interface DatabaseSession {
-  readonly db: Database;
+  readonly db: SqliteDatabase;
   readonly drizzle: DatabaseExecutor;
   readonly write: <A>(operation: () => A) => A;
   readonly transaction: <A>(operation: (executor: DatabaseExecutor) => A) => A;
@@ -29,18 +25,14 @@ export const makeRootDatabaseSession = (client: DatabaseClient): DatabaseSession
   db: client.db,
   drizzle: client.drizzle,
   write: (operation) => withSqliteWriteRetry(operation),
-  transaction: (operation) => withSqliteWriteRetry(() => client.drizzle.transaction(operation)),
+  transaction: (operation) =>
+    withSqliteWriteRetry(() => runDatabaseTransaction(client.drizzle, operation)),
 });
 
-export const makeTransactionDatabaseSession = (
+export const runImmediateDatabaseTransaction = <A>(
   client: DatabaseClient,
-  executor: DatabaseTransaction
-): DatabaseSession => ({
-  db: client.db,
-  drizzle: executor,
-  write: (operation) => operation(),
-  transaction: (operation) => executor.transaction(operation),
-});
+  operation: (transaction: DatabaseTransaction) => A
+): A => runDatabaseTransaction(client.drizzle, operation, { behavior: "immediate" });
 
 export const RootDatabaseSessionLive = Layer.effect(
   DatabaseSessionTag,

@@ -1,4 +1,3 @@
-import type { SQLQueryBindings } from "bun:sqlite";
 import {
   type CodeRef,
   CodeRefSchema,
@@ -174,7 +173,7 @@ export const SqliteEntityRepositorySessionLive = Layer.effect(
   Effect.gen(function* () {
     const { db, drizzle, transaction, write } = yield* DatabaseSessionTag;
 
-    const searchFts = db.prepare<RawEntityRow, SQLQueryBindings[]>(`
+    const searchFts = db.prepare<RawEntityRow>(`
       SELECT e.* FROM entities e
       JOIN entities_fts fts ON e.rowid = fts.rowid
       WHERE entities_fts MATCH ?

@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import assert from "node:assert/strict";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,12 +12,14 @@ type MigrationJournalRow = { to_name: string; related_term_id: string | null };
 
 const migrationsFolder = resolve(dirname(fileURLToPath(import.meta.url)), "../../../../drizzle");
 const legacyFolder = mkdtempSync(resolve(tmpdir(), "aerograph-drizzle-v2-"));
-mkdirSync(resolve(legacyFolder, "meta"));
-const journal = JSON.parse(readFileSync(resolve(migrationsFolder, "meta/_journal.json"), "utf8"));
-const legacyJournal = { ...journal, entries: journal.entries.slice(0, 3) };
-writeFileSync(resolve(legacyFolder, "meta/_journal.json"), JSON.stringify(legacyJournal));
-for (const { tag } of legacyJournal.entries) {
-  copyFileSync(resolve(migrationsFolder, `${tag}.sql`), resolve(legacyFolder, `${tag}.sql`));
+const initialMigrations = readdirSync(migrationsFolder)
+  .filter((entry) => entry.startsWith("20"))
+  .sort()
+  .slice(0, 3);
+for (const migration of initialMigrations) {
+  cpSync(resolve(migrationsFolder, migration), resolve(legacyFolder, migration), {
+    recursive: true,
+  });
 }
 
 const sqlite = new Database(":memory:");

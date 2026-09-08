@@ -1,5 +1,3 @@
-import * as BunRuntime from "@effect/platform-bun/BunRuntime";
-import * as BunServices from "@effect/platform-bun/BunServices";
 import { Effect, Layer, Stdio } from "effect";
 /**
  * AeroGraph CLI
@@ -28,6 +26,7 @@ import {
   ExecutionRecorderLive,
   withExecutionLifecycle,
 } from "./observability/index";
+import { runtimeKind } from "./runtime";
 import { CLI_VERSION } from "./version";
 
 // ============================================================================
@@ -74,8 +73,27 @@ const cli = Stdio.Stdio.use(({ args }) =>
 // Run
 // ============================================================================
 
-const PlatformLive = BunServices.layer;
-const RecorderLive = ExecutionRecorderLive(executionCommands).pipe(Layer.provide(PlatformLive));
-const MainLive = Layer.mergeAll(ConfigServiceLive, PlatformLive, RecorderLive);
+const run = async (): Promise<void> => {
+  if (runtimeKind === "bun") {
+    const [BunRuntime, BunServices] = await Promise.all([
+      import("@effect/platform-bun/BunRuntime"),
+      import("@effect/platform-bun/BunServices"),
+    ]);
+    const PlatformLive = BunServices.layer;
+    const RecorderLive = ExecutionRecorderLive(executionCommands).pipe(Layer.provide(PlatformLive));
+    const MainLive = Layer.mergeAll(ConfigServiceLive, PlatformLive, RecorderLive);
+    BunRuntime.runMain(cli.pipe(Effect.provide(MainLive)));
+    return;
+  }
 
-cli.pipe(Effect.provide(MainLive), BunRuntime.runMain);
+  const [NodeRuntime, NodeServices] = await Promise.all([
+    import("@effect/platform-node/NodeRuntime"),
+    import("@effect/platform-node/NodeServices"),
+  ]);
+  const PlatformLive = NodeServices.layer;
+  const RecorderLive = ExecutionRecorderLive(executionCommands).pipe(Layer.provide(PlatformLive));
+  const MainLive = Layer.mergeAll(ConfigServiceLive, PlatformLive, RecorderLive);
+  NodeRuntime.runMain(cli.pipe(Effect.provide(MainLive)));
+};
+
+void run();

@@ -2,12 +2,9 @@
  * SQLite Database Client
  * Manages database connection and initialization
  */
-import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { DatabaseError, MigrationError, normalizeTermName } from "@aerograph/core";
-import { type BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
 import { Context, Effect, Layer } from "effect";
 import { rebuildEntityIdPrefixes } from "./entity-prefix-index";
-import * as schema from "./schema";
 import {
   CREATE_SCHEMA_META_SQL,
   CREATE_TABLES_SQL,
@@ -22,14 +19,15 @@ import {
   TERM_NAME_NORMALIZED_CHECK,
   TERM_STATUS_VALUES,
 } from "./schema";
+import { type DrizzleDatabase, openDatabase, type SqliteDatabase } from "./sqlite-driver";
 
 // ============================================================================
 // Database Client Interface
 // ============================================================================
 
 export interface DatabaseClient {
-  readonly db: Database;
-  readonly drizzle: BunSQLiteDatabase<typeof schema>;
+  readonly db: SqliteDatabase;
+  readonly drizzle: DrizzleDatabase;
   readonly close: Effect.Effect<void, DatabaseError>;
 }
 
@@ -46,7 +44,7 @@ export class DatabaseClientTag extends Context.Service<DatabaseClientTag, Databa
 // ============================================================================
 
 const configureDatabaseConnection = (
-  db: Database,
+  db: SqliteDatabase,
   dbPath: string
 ): Effect.Effect<void, MigrationError> =>
   Effect.try({
@@ -68,21 +66,19 @@ const configureDatabaseConnection = (
   });
 
 const addColumnIfMissing = (
-  db: Database,
+  db: SqliteDatabase,
   table: string,
   column: string,
   definition: string
 ): void => {
-  const columns = db
-    .query<{ name: string }, SQLQueryBindings[]>(`PRAGMA table_info(${table})`)
-    .all();
+  const columns = db.query<{ name: string }>(`PRAGMA table_info(${table})`).all();
   if (columns.length === 0) return;
   if (!columns.some((c) => c.name === column)) {
     db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition};`);
   }
 };
 
-const tableExists = (db: Database, table: string): boolean =>
+const tableExists = (db: SqliteDatabase, table: string): boolean =>
   Boolean(db.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(table));
 
 interface LegacyTermNameRow {
@@ -130,11 +126,9 @@ const RETIRED_V4_CANONICAL_TRIGGERS = new Set([
   "terms_canonical_name_update_check",
 ]);
 
-const validateLegacyTerms = (db: Database): void => {
+const validateLegacyTerms = (db: SqliteDatabase): void => {
   const terms = db
-    .query<LegacyTermRow, SQLQueryBindings[]>(
-      "SELECT id, canonical_name AS canonicalName FROM terms"
-    )
+    .query<LegacyTermRow>("SELECT id, canonical_name AS canonicalName FROM terms")
     .all();
   for (const term of terms) {
     if (!term.canonicalName.trim() || term.canonicalName.includes(",")) {
@@ -143,7 +137,7 @@ const validateLegacyTerms = (db: Database): void => {
   }
 };
 
-const rebuildTermsV4 = (db: Database): void => {
+const rebuildTermsV4 = (db: SqliteDatabase): void => {
   validateLegacyTerms(db);
   db.run("DROP TABLE IF EXISTS terms_v4;");
   db.run(`
@@ -189,9 +183,9 @@ const normalizeLegacyTermName = (row: LegacyTermNameRow): string => {
   return normalizedName;
 };
 
-const validateLegacyLifecycle = (db: Database): void => {
+const validateLegacyLifecycle = (db: SqliteDatabase): void => {
   const rows = db
-    .query<LegacyLifecycleRow, SQLQueryBindings[]>(
+    .query<LegacyLifecycleRow>(
       "SELECT id, status, merged_into_id AS mergedIntoId FROM terms ORDER BY id"
     )
     .all();
@@ -216,7 +210,7 @@ const validateLegacyLifecycle = (db: Database): void => {
   }
 };
 
-const rebuildTermsV5 = (db: Database): void => {
+const rebuildTermsV5 = (db: SqliteDatabase): void => {
   validateLegacyLifecycle(db);
   db.run("DROP TABLE IF EXISTS terms_v5;");
   db.run(`
@@ -249,7 +243,7 @@ const rebuildTermsV5 = (db: Database): void => {
   db.run("CREATE INDEX idx_terms_merged_into_id ON terms(merged_into_id);");
 };
 
-const rebuildEntitiesFts = (db: Database): void => {
+const rebuildEntitiesFts = (db: SqliteDatabase): void => {
   db.run("DROP TRIGGER IF EXISTS entities_ai;");
   db.run("DROP TRIGGER IF EXISTS entities_ad;");
   db.run("DROP TRIGGER IF EXISTS entities_au;");
@@ -258,10 +252,10 @@ const rebuildEntitiesFts = (db: Database): void => {
   db.run("INSERT INTO entities_fts(entities_fts) VALUES ('rebuild');");
 };
 
-const legacyJournalRows = (db: Database): LegacyJournalRow[] =>
+const legacyJournalRows = (db: SqliteDatabase): LegacyJournalRow[] =>
   tableExists(db, "migration_journal")
     ? db
-        .query<LegacyJournalRow, SQLQueryBindings[]>(`
+        .query<LegacyJournalRow>(`
       SELECT id, operation, kind, from_name AS fromName, to_name AS toName,
         term_id AS termId, affected_entity_ids AS affectedEntityIds,
         affected_count AS affectedCount, reason, applied_at AS appliedAt,
@@ -277,10 +271,10 @@ const legacyJournalRows = (db: Database): LegacyJournalRow[] =>
  * now an alias or deprecated name. Every matching registry row is considered,
  * and a relation is accepted only when it identifies exactly one term.
  */
-const resolveLegacyJournalRelation = (db: Database, row: LegacyJournalRow): string | null => {
+const resolveLegacyJournalRelation = (db: SqliteDatabase, row: LegacyJournalRow): string | null => {
   if (row.operation !== "merge" && row.operation !== "deprecate") return null;
   const source = db
-    .query<{ kind: string; mergedIntoId: string | null }, SQLQueryBindings[]>(
+    .query<{ kind: string; mergedIntoId: string | null }>(
       "SELECT kind, merged_into_id AS mergedIntoId FROM terms WHERE id = ?"
     )
     .get(row.termId);
@@ -289,14 +283,14 @@ const resolveLegacyJournalRelation = (db: Database, row: LegacyJournalRow): stri
   const candidates = new Set<string>();
   if (row.operation === "merge" && source.mergedIntoId) {
     const directTarget = db
-      .query<{ id: string }, SQLQueryBindings[]>("SELECT id FROM terms WHERE id = ? AND kind = ?")
+      .query<{ id: string }>("SELECT id FROM terms WHERE id = ? AND kind = ?")
       .get(source.mergedIntoId, source.kind);
     if (directTarget) candidates.add(directTarget.id);
   }
 
   const normalized = normalizeTermName(row.toName);
   const matchingTerms = db
-    .query<{ id: string }, SQLQueryBindings[]>(`
+    .query<{ id: string }>(`
       SELECT DISTINCT t.id AS id
       FROM terms t
       LEFT JOIN term_names n ON n.term_id = t.id AND n.kind = t.kind
@@ -318,21 +312,19 @@ const resolveLegacyJournalRelation = (db: Database, row: LegacyJournalRow): stri
   return [...candidates][0] ?? null;
 };
 
-const captureUnmanagedTriggers = (db: Database): string[] =>
+const captureUnmanagedTriggers = (db: SqliteDatabase): string[] =>
   db
-    .query<{ name: string; sql: string }, SQLQueryBindings[]>(
+    .query<{ name: string; sql: string }>(
       "SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND sql IS NOT NULL"
     )
     .all() // Keep custom triggers across rebuilt tables.
     .filter(({ name }) => !RETIRED_V4_CANONICAL_TRIGGERS.has(name))
     .map(({ sql }) => sql);
 
-const restoreUnmanagedTriggers = (db: Database, triggerSql: ReadonlyArray<string>): void => {
+const restoreUnmanagedTriggers = (db: SqliteDatabase, triggerSql: ReadonlyArray<string>): void => {
   const existing = new Set(
     db
-      .query<{ name: string }, SQLQueryBindings[]>(
-        "SELECT name FROM sqlite_master WHERE type = 'trigger'"
-      )
+      .query<{ name: string }>("SELECT name FROM sqlite_master WHERE type = 'trigger'")
       .all()
       .map(({ name }) => name)
   );
@@ -343,7 +335,7 @@ const restoreUnmanagedTriggers = (db: Database, triggerSql: ReadonlyArray<string
 };
 
 const rebuildMigrationJournalV5 = (
-  db: Database,
+  db: SqliteDatabase,
   resolutions: ReadonlyArray<LegacyJournalResolution>
 ): void => {
   db.run("DROP TABLE IF EXISTS migration_journal_v5;");
@@ -399,9 +391,9 @@ const rebuildMigrationJournalV5 = (
   db.run("CREATE INDEX idx_journal_related_term ON migration_journal(related_term_id);");
   db.run("CREATE INDEX idx_journal_applied_at ON migration_journal(applied_at);");
 };
-const rebuildTermNamesV4 = (db: Database): void => {
+const rebuildTermNamesV4 = (db: SqliteDatabase): void => {
   const rows = db
-    .query<LegacyTermNameRow, SQLQueryBindings[]>(
+    .query<LegacyTermNameRow>(
       `SELECT
         term_names.term_id AS termId,
         term_names.name AS name,
@@ -451,7 +443,7 @@ const rebuildTermNamesV4 = (db: Database): void => {
   db.run("CREATE INDEX idx_term_names_name ON term_names(name);");
 };
 
-const runMigrations = (db: Database, fromVersion: number): void => {
+const runMigrations = (db: SqliteDatabase, fromVersion: number): void => {
   if (fromVersion < 2) {
     // v1 -> v2: entity_id_prefixes table (created by CREATE_TABLES_SQL IF NOT EXISTS)
   }
@@ -499,7 +491,7 @@ const runMigrations = (db: Database, fromVersion: number): void => {
   }
 };
 
-const initializeDatabase = (db: Database): Effect.Effect<void, MigrationError> =>
+const initializeDatabase = (db: SqliteDatabase): Effect.Effect<void, MigrationError> =>
   Effect.try({
     try: () => {
       // TODO: This is in a transitional state and requires drizzle running on start up
@@ -507,9 +499,7 @@ const initializeDatabase = (db: Database): Effect.Effect<void, MigrationError> =
       db.run(CREATE_SCHEMA_META_SQL);
 
       // Check/set schema version
-      const versionResult = db
-        .query<{ value: string }, SQLQueryBindings[]>(GET_SCHEMA_VERSION_SQL)
-        .get();
+      const versionResult = db.query<{ value: string }>(GET_SCHEMA_VERSION_SQL).get();
 
       if (!versionResult) {
         // First time setup — CREATE_TABLES_SQL creates everything fresh
@@ -559,8 +549,8 @@ export const makeDatabaseClient = (
   dbPath: string
 ): Effect.Effect<DatabaseClient, DatabaseError | MigrationError> =>
   Effect.gen(function* () {
-    const db = yield* Effect.try({
-      try: () => new Database(dbPath, { create: true }),
+    const { db, drizzle: drizzleDb } = yield* Effect.tryPromise({
+      try: () => openDatabase(dbPath),
       catch: (error) =>
         new DatabaseError({
           message: `Failed to open database at ${dbPath}: ${error instanceof Error ? error.message : String(error)}`,
@@ -570,7 +560,6 @@ export const makeDatabaseClient = (
 
     yield* configureDatabaseConnection(db, dbPath);
     yield* initializeDatabase(db);
-    const drizzleDb = drizzle({ client: db, schema });
     rebuildEntityIdPrefixes(drizzleDb);
 
     return {

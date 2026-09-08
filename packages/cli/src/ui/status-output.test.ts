@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { formatStatus, type StatusResult } from "./status-output";
 
 const result: StatusResult = {
+  runtime: "Bun 1.2.15",
   project: {
     name: "AeroGraph",
     id: "project-1",
@@ -53,6 +54,7 @@ Links:    8
 Storage and Resolution
 ----------------------------------------
 Resolution: git_common_dir
+Runtime:    Bun 1.2.15
 Registry:   /home/.aerograph/config.json
 Database:   /home/.aerograph/projects/project-1/aerograph.db
 Git common: /repos/aerograph/.git

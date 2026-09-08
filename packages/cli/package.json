@@ -1,6 +1,6 @@
 {
   "name": "aerograph",
-  "description": "Bun-only command-line interface for the AeroGraph local-first knowledge graph.",
+  "description": "Bun-first command-line interface for the AeroGraph local-first knowledge graph, with Node.js support.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -26,13 +26,14 @@
   "files": [
     "package.json",
     "bin/aerograph",
-    "dist/cli.js",
+    "dist",
     "README.md",
     "LICENSE",
     "THIRD_PARTY_LICENSES.md"
   ],
   "engines": {
-    "bun": ">=1.1"
+    "bun": ">=1.1.38",
+    "node": ">=24"
   },
   "publishConfig": {
     "access": "public",
@@ -56,8 +57,9 @@
     "@aerograph/core": "workspace:*",
     "@biomejs/biome": "^2.4.16",
     "@effect/platform-bun": "4.0.0-rc.112",
+    "@effect/platform-node": "4.0.0-rc.112",
     "@types/bun": "^1.1.14",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "1.0.0-rc.4",
     "effect": "4.0.0-rc.112",
     "typescript": "^7.0.2",
     "vitest": "^2.1.8"

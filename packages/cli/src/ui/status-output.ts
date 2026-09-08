@@ -1,6 +1,7 @@
 import { type CliOutput, formatLines } from "./output";
 
 export interface StatusResult {
+  readonly runtime: string;
   readonly project: {
     readonly name: string;
     readonly id: string;
@@ -42,6 +43,7 @@ export const formatStatus = (result: StatusResult, verbose: boolean): CliOutput 
       "Storage and Resolution",
       "-".repeat(40),
       `Resolution: ${result.storage.resolutionMethod}`,
+      `Runtime:    ${result.runtime}`,
       `Registry:   ${result.storage.configPath}`,
       `Database:   ${result.storage.dbPath}`
     );
