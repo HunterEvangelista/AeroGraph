@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Stdio } from "effect";
 /**
  * AeroGraph CLI
  * Main entry point for the command-line interface
@@ -21,6 +21,11 @@ import {
   unlinkCommand,
 } from "./commands/index";
 import { ConfigServiceLive } from "./config";
+import {
+  commandCatalog,
+  ExecutionRecorderLive,
+  withExecutionLifecycle,
+} from "./observability/index";
 import { runtimeKind } from "./runtime";
 import { CLI_VERSION } from "./version";
 
@@ -51,9 +56,18 @@ const command = aerograph.pipe(
   ])
 );
 
-const cli = Command.run(command, {
+const executionCommands = commandCatalog(command);
+const runCommand = Command.runWith(command, {
   version: CLI_VERSION,
 });
+
+const cli = Stdio.Stdio.use(({ args }) =>
+  args.pipe(
+    Effect.flatMap((commandArgs) =>
+      withExecutionLifecycle(executionCommands, commandArgs, CLI_VERSION, runCommand(commandArgs))
+    )
+  )
+);
 
 // ============================================================================
 // Run
@@ -65,7 +79,9 @@ const run = async (): Promise<void> => {
       import("@effect/platform-bun/BunRuntime"),
       import("@effect/platform-bun/BunServices"),
     ]);
-    const MainLive = Layer.mergeAll(ConfigServiceLive, BunServices.layer);
+    const PlatformLive = BunServices.layer;
+    const RecorderLive = ExecutionRecorderLive(executionCommands).pipe(Layer.provide(PlatformLive));
+    const MainLive = Layer.mergeAll(ConfigServiceLive, PlatformLive, RecorderLive);
     BunRuntime.runMain(cli.pipe(Effect.provide(MainLive)));
     return;
   }
@@ -74,7 +90,9 @@ const run = async (): Promise<void> => {
     import("@effect/platform-node/NodeRuntime"),
     import("@effect/platform-node/NodeServices"),
   ]);
-  const MainLive = Layer.mergeAll(ConfigServiceLive, NodeServices.layer);
+  const PlatformLive = NodeServices.layer;
+  const RecorderLive = ExecutionRecorderLive(executionCommands).pipe(Layer.provide(PlatformLive));
+  const MainLive = Layer.mergeAll(ConfigServiceLive, PlatformLive, RecorderLive);
   NodeRuntime.runMain(cli.pipe(Effect.provide(MainLive)));
 };
 
