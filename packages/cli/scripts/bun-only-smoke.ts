@@ -9,6 +9,8 @@ if (tarballArgument === undefined || process.argv.length !== 3) {
 
 const tarball = resolve(tarballArgument);
 const bunExecutable = process.execPath;
+const gitExecutable = Bun.which("git");
+if (gitExecutable === null) throw new Error("Bun-only smoke test requires git");
 const tempRoot = await mkdtemp(join(tmpdir(), "aerograph-bun-only-smoke-"));
 const runtimeBin = join(tempRoot, "bin");
 const project = join(tempRoot, "project");
@@ -22,8 +24,9 @@ const run = async (command: string[], cwd: string) => {
       ...Bun.env,
       AEROGRAPH_HOME: home,
       HOME: home,
-      // Only Bun is available. In particular, neither node nor npm can be
-      // discovered by the package manager or the installed CLI.
+      // Only Bun and the CLI's optional Git integration are available. In
+      // particular, neither node nor npm can be discovered by the package
+      // manager or the installed CLI.
       PATH: runtimeBin,
     },
     stdout: "pipe",
@@ -45,6 +48,7 @@ try {
     mkdir(installRoot, { recursive: true }),
   ]);
   await symlink(bunExecutable, join(runtimeBin, "bun"));
+  await symlink(gitExecutable, join(runtimeBin, "git"));
   await writeFile(
     join(installRoot, "package.json"),
     `${JSON.stringify(
