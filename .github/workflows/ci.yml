@@ -47,6 +47,8 @@ jobs:
           node-version: 24
       - name: Install dependencies
         run: bun install --frozen-lockfile
+      - name: Install website test browser
+        run: node node_modules/playwright/cli.js install --with-deps chromium
       - name: Test workspaces
         run: bun run test
       - name: Test Oxlint plugins
@@ -71,6 +73,8 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Build packages
         run: bun run build
+      - name: Validate Cloudflare website deployment
+        run: node node_modules/wrangler/bin/wrangler.js deploy --dry-run --config apps/website/wrangler.jsonc
       - name: Build and validate CLI tarball
         run: bun run --cwd packages/cli pack:smoke --output "${{ runner.temp }}/package"
       - name: Upload validated CLI tarball

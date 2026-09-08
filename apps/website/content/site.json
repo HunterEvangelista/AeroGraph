@@ -1,0 +1,52 @@
+{
+  "name": "AeroGraph",
+  "url": "https://aerograph.dev",
+  "description": "AeroGraph is a local command-line tool for saving decisions, linking them to code, and finding the context for your next task.",
+  "links": {
+    "repository": "https://github.com/HunterEvangelista/AeroGraph",
+    "start": "https://github.com/HunterEvangelista/AeroGraph#getting-started",
+    "issues": "https://github.com/HunterEvangelista/AeroGraph/issues",
+    "license": "https://github.com/HunterEvangelista/AeroGraph/blob/main/LICENSE",
+    "author": "https://github.com/HunterEvangelista"
+  },
+  "navigation": { "examples": "Examples", "project": "About AeroGraph", "repository": "GitHub" },
+  "hero": {
+    "title": "Project context for you and your coding agents.",
+    "description": "AeroGraph is a local command-line tool for saving decisions, linking them to code, and finding the context for your next task.",
+    "primary": "Get started",
+    "secondary": "See an example",
+    "note": "Open source · In alpha"
+  },
+  "featured": {
+    "title": "Hand off the context.\nNot just the task.",
+    "description": "Give the next agent a brief with the decisions and constraints it needs.",
+    "link": "See the handoff example",
+    "slug": "agent-handoff",
+    "previewLabel": "Example brief",
+    "briefTitle": "Add session expiry",
+    "briefDescription": "Expire inactive sessions without interrupting an active checkout.",
+    "contextLabel": "Related examples",
+    "contextLinks": [
+      { "label": "Session decisions", "slug": "remember-the-reason" },
+      { "label": "Unfinished work", "slug": "pick-up-the-thread" }
+    ],
+    "disclaimer": "Example workflow. AeroGraph stores the context; your agents handle the work."
+  },
+  "examples": {
+    "title": "Other ways to use AeroGraph",
+    "detailLabel": "Example workflow",
+    "stepsTitle": "How it works",
+    "boundaryTitle": "Keep in mind",
+    "relatedTitle": "Related example",
+    "back": "All examples"
+  },
+  "cta": {
+    "title": "Start with something\nworth remembering.",
+    "description": "Save one decision from your project.",
+    "primary": "Get started",
+    "secondary": "GitHub",
+    "note": "In alpha. See the docs for setup and current usage."
+  },
+  "footer": { "note": "Keep the thinking connected.", "author": "Built by Hunter Evangelista", "feedback": "Share feedback", "license": "Apache 2.0" },
+  "notFound": { "title": "No context here.", "description": "This page doesn’t exist. Head back to the project.", "link": "Back to AeroGraph" }
+}

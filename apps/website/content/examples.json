@@ -1,0 +1,60 @@
+[
+  {
+    "slug": "agent-handoff",
+    "title": "Hand off more than an assignment.",
+    "summary": "Give the next agent a brief, its background, and a way to signal that the work is ready for review.",
+    "situation": "An agent needs to add session expiry without interrupting checkout. Give it a brief linked to the security decision and checkout constraint.",
+    "steps": [
+      { "title": "Prepare the brief.", "body": "Record the goal, review criteria, and links to the relevant decisions." },
+      { "title": "Record progress.", "body": "The working agent adds findings and updates the brief’s status tag." },
+      { "title": "Review with context.", "body": "The coordinating agent retrieves the result and its supporting context." }
+    ],
+    "sample": {
+      "label": "Example brief",
+      "text": "Add session expiry. Preserve active checkout sessions. Explain the implementation and record any unresolved questions."
+    },
+    "transition": {
+      "label": "An example status convention",
+      "from": "#status:in-progress",
+      "to": "#status:review-ready",
+      "description": "The working agent replaces the in-progress tag when its findings are ready. The coordinating agent checks for review-ready work."
+    },
+    "boundary": "Status tags are conventions, not automation. Your agents handle delegation, updates, status checks, and review.",
+    "related": "remember-the-reason"
+  },
+  {
+    "slug": "remember-the-reason",
+    "title": "Keep the reason behind the code.",
+    "summary": "Link a decision to the code it explains.",
+    "situation": "A checkout exception looks safe to remove. The linked decision explains why active payments need it.",
+    "steps": [
+      { "title": "Save the reason.", "body": "Record the session policy and the checkout constraint." },
+      { "title": "Link it to the code.", "body": "Connect the decision to the session-handling code reference." },
+      { "title": "Use it in review.", "body": "Retrieve the decision before changing session handling." }
+    ],
+    "sample": {
+      "label": "Example decision",
+      "text": "Inactive sessions expire after 30 minutes. An active checkout must not lose its session partway through payment."
+    },
+    "boundary": "People or agents must record and maintain these links. Check that the decision still applies before relying on it.",
+    "related": "pick-up-the-thread"
+  },
+  {
+    "slug": "pick-up-the-thread",
+    "title": "Pick up the thread without starting over.",
+    "summary": "Save what you found and what to check next.",
+    "situation": "The debugging session ends before the bug is fixed. Save what you learned so the next session has a starting point.",
+    "steps": [
+      { "title": "Save the findings.", "body": "Note what you observed, ruled out, and still need to check." },
+      { "title": "Link the background.", "body": "Attach the relevant policy and code reference." },
+      { "title": "Resume with a question.", "body": "Retrieve the note and give your agent the next thing to investigate." }
+    ],
+    "sample": {
+      "label": "Example working note",
+      "text": "The timeout only appears when checkout remains open. Token refresh succeeds. Still to check: when the checkout marks the session active."
+    },
+    "boundary": "Notes must be saved and retrieved explicitly. AeroGraph does not capture chats or resume agent sessions automatically.",
+    "takeaway": "Preserve the useful result of a session, not every line of the conversation.",
+    "related": "agent-handoff"
+  }
+]
