@@ -1,42 +1,8 @@
-# AeroGraph Cloud Design Lab
+# Aeroform — Website foundation
 
-A controlled environment for developing AeroGraph's visual language around one fixed signature form. The Cloud geometry, graph topology, and tangential orbital camera remain deterministic while material, Petrol intensity, typography, and wordmark treatments are compared.
+A dependency-free visual experiment for Aero Graph: Syne typography, a sphere between Aero and Graph in the wordmark, and Vermilion / Ink material. The main sculpture uses a small orbiting sphere and progressively completed contour bands as an abstract relationship metaphor, not a visualization of project data.
 
-Dark space is the fixed base environment. It supplies the contrast needed for speed, metallic depth, and concentrated chromatic highlights rather than treating dark mode as another permutation.
-
-## Variables
-
-### Material
-
-- **Vapor** — fast airbrushed density with directional particulate drag
-- **Liquid** — soft liquid-metal volume with sparse directional chrome highlights
-- **Emulsion** — high-contrast photographic grain
-
-### Petrol intensity
-
-- **Restrained** — low-chroma alloy and a quiet warm index
-- **Balanced** — black petrol, oxidized green, mint interference, and amber
-- **Charged** — brighter interference color and a hotter index
-
-Balanced is the working default. Petrol is fixed as the color family rather than one palette among unrelated alternatives.
-
-### Typography
-
-- **Extended** — wide, forward-leaning corporate grotesk
-- **Industrial** — practical industrial grotesk
-- **Humanist** — quieter editorial technical sans
-
-### Wordmark
-
-- **Slant** — forward-skewed extended wordmark
-- **Mono** — `Space Mono` proxy for evaluating a Slight Chance Mono direction
-- **Wide** — low geometric aerospace proportions
-
-The control buttons preview each direction, and the larger lockup above the headline shows the active wordmark. The reusable optical ellipse is available at `assets/aerograph-mark.svg`. The Mono option prefers a locally available `Slight Chance Mono` font and falls back to `Space Mono`. The exact face requires a licensed webfont asset before it can be evaluated or shipped accurately.
-
-Ambient graph detail remains subdued. The active neighborhood receives the strongest contrast and color so topology resolves through focus rather than an equally weighted mesh.
-
-## Run
+## Preview
 
 From the repository root:
 
@@ -44,8 +10,26 @@ From the repository root:
 python3 -m http.server 4173 --directory prototypes/aeroform
 ```
 
-Open <http://localhost:4173>. Scroll to orbit the Cloud. Use the controls or press `M`, `C`, `T`, and `L` to cycle material, color, typography, and wordmark. The current permutation is encoded in the URL for sharing.
+Open <http://localhost:4173>.
 
-The prototype renders only in response to interaction and caps canvas pixel density. It is a dependency-free design study rather than production rendering code.
+The design-study section contains two controls:
 
-See `DESIGN_DIRECTION.md` for the locked foundation, remaining calibration decisions, and near-term website scope.
+- **Palette:** Vermilion / Ink (primary) or Lavender / Black (alternate).
+- **Orbit traversal:** scrub from 0° to 360° using a pointer or keyboard. The traveler follows a fixed path, passing behind and in front of the principal sphere. The contour trail closes at 360°. There is no automatic playback.
+
+The URL stores palette and orbital progress (under `connection`). Unrecognized values use defaults; numeric progress is clamped to 0–100. Legacy `type` and `mark` parameters do not alter the fixed Syne/sphere wordmark foundation and are removed when controls update the URL.
+
+Alternate preview: <http://localhost:4173/?palette=lavender&connection=75>.
+
+## Implementation
+
+- `index.html`: provisional product copy, wordmark, artwork, and prototype-only controls.
+- `styles.css`: one font family, four content-size tokens, palette variables, and responsive layout.
+- `aeroform.js`: cached sphere material, fixed orbital geometry, depth ordering, controls, and URL state.
+- `DESIGN_DIRECTION.md`: baseline design rules and production handoff checklist for the future Cloudflare website.
+
+Google Fonts supplies Syne; Arial is the offline fallback. No serif or monospace font is loaded. Code samples on a future page may use functional monospace styling, but ordinary labels and controls use Syne.
+
+Canvas rendering is demand-driven, with pixel density capped at 2. Sphere shading is cached per palette. Pointer movement produces a small positional response; touch and reduced-motion users do not receive it. A CSS sphere remains visible when JavaScript or the 2D context is unavailable. There is no scroll hijacking.
+
+The SVG in `assets/aerograph-mark.svg` is an unused earlier logo study. Reference artwork is not bundled. This prototype does not configure or deploy Cloudflare resources.
