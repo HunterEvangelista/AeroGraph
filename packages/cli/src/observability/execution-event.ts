@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { CANONICAL_COMMAND_NAMES, type CanonicalCommandName } from "./command-name";
+import type { CanonicalCommandName } from "./command-name";
 
 export const EXECUTION_EVENT_SCHEMA_VERSION = 1 as const;
 export const EXECUTION_EVENT_TYPE = "cli_execution" as const;
@@ -32,7 +32,8 @@ export const ExecutionEventSchema = Schema.Struct({
   schemaVersion: Schema.Literal(EXECUTION_EVENT_SCHEMA_VERSION),
   eventType: Schema.Literal(EXECUTION_EVENT_TYPE),
   runId: Schema.String.check(Schema.isUUID(4)),
-  command: Schema.Literals(CANONICAL_COMMAND_NAMES),
+  // The runtime catalog derives the allowed values from the Effect command tree before recording.
+  command: Schema.String,
   cliVersion: Schema.String,
   startedAt: Schema.String,
   endedAt: Schema.String,

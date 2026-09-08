@@ -23,7 +23,11 @@ import {
   unlinkCommand,
 } from "./commands/index";
 import { ConfigServiceLive } from "./config";
-import { ExecutionRecorderLive, withExecutionLifecycle } from "./observability/index";
+import {
+  commandCatalog,
+  ExecutionRecorderLive,
+  withExecutionLifecycle,
+} from "./observability/index";
 import { CLI_VERSION } from "./version";
 
 // ============================================================================
@@ -53,6 +57,7 @@ const command = aerograph.pipe(
   ])
 );
 
+const executionCommands = commandCatalog(command);
 const runCommand = Command.runWith(command, {
   version: CLI_VERSION,
 });
@@ -60,7 +65,7 @@ const runCommand = Command.runWith(command, {
 const cli = Stdio.Stdio.use(({ args }) =>
   args.pipe(
     Effect.flatMap((commandArgs) =>
-      withExecutionLifecycle(commandArgs, CLI_VERSION, runCommand(commandArgs))
+      withExecutionLifecycle(executionCommands, commandArgs, CLI_VERSION, runCommand(commandArgs))
     )
   )
 );
@@ -70,7 +75,7 @@ const cli = Stdio.Stdio.use(({ args }) =>
 // ============================================================================
 
 const PlatformLive = BunServices.layer;
-const RecorderLive = ExecutionRecorderLive.pipe(Layer.provide(PlatformLive));
+const RecorderLive = ExecutionRecorderLive(executionCommands).pipe(Layer.provide(PlatformLive));
 const MainLive = Layer.mergeAll(ConfigServiceLive, PlatformLive, RecorderLive);
 
 cli.pipe(Effect.provide(MainLive), BunRuntime.runMain);

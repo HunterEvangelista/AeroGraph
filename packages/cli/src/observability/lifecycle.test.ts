@@ -1,9 +1,15 @@
 import { describe, expect, it } from "bun:test";
 import { Deferred, Effect, Exit, Fiber, Layer } from "effect";
+import { Command } from "effect/unstable/cli";
 import { ConfigServiceLive } from "../config";
+import { commandCatalog } from "./command-name";
 import type { ExecutionEvent } from "./execution-event";
 import { ExecutionRecorderTag } from "./execution-recorder";
 import { withExecutionLifecycle } from "./lifecycle";
+
+const testCatalog = commandCatalog(
+  Command.make("aerograph").pipe(Command.withSubcommands([Command.make("status")]))
+);
 
 const runLifecycle = async (
   program: Effect.Effect<void, never>
@@ -17,7 +23,7 @@ const runLifecycle = async (
   });
   const services = Layer.merge(ConfigServiceLive, recorder);
   const exit = await Effect.runPromise(
-    Effect.exit(withExecutionLifecycle(["status"], "test-version", program)).pipe(
+    Effect.exit(withExecutionLifecycle(testCatalog, ["status"], "test-version", program)).pipe(
       Effect.provide(services)
     )
   );
@@ -57,7 +63,7 @@ describe("execution lifecycle finalization", () => {
         const started = yield* Deferred.make<void>();
         const command = Deferred.succeed(started, undefined).pipe(Effect.andThen(Effect.never));
         const fiber = yield* Effect.forkChild(
-          withExecutionLifecycle(["status"], "test-version", command)
+          withExecutionLifecycle(testCatalog, ["status"], "test-version", command)
         );
         yield* Deferred.await(started);
         yield* Fiber.interrupt(fiber);

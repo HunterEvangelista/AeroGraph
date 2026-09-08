@@ -1,6 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { Context, Effect, FileSystem, Layer, Logger, Option, Schema } from "effect";
 import { getAeroGraphHome } from "../config";
+import type { CommandCatalog } from "./command-name";
 import { type ExecutionEvent, ExecutionEventSchema, encodeExecutionEvent } from "./execution-event";
 
 export const EXECUTION_LOGS_DIR = "logs";
@@ -8,7 +10,10 @@ export const EXECUTION_LOG_RETENTION_DAYS = 14;
 export const EXECUTION_LOG_CLOSED_FILE_BUDGET_BYTES = 50n * 1024n * 1024n;
 
 const LOG_FILE_PATTERN = /^cli-(\d{4}-\d{2}-\d{2})\.jsonl$/;
-const BUDGET_PRUNE_SAFETY_MILLIS = 24 * 60 * 60 * 1000;
+const EXECUTION_LOG_LOCK = ".writer-lock";
+const EXECUTION_LOG_LOCK_OWNER = "owner";
+const LOCK_RETRY_ATTEMPTS = 200;
+const LOCK_RETRY_DELAY = "10 millis";
 const MAX_EXECUTION_RECORD_BYTES = 4096;
 
 export interface ExecutionRecorder {
@@ -28,7 +33,6 @@ interface LogFile {
   readonly path: string;
   readonly day: string;
   readonly size: bigint;
-  readonly modifiedAtMillis?: number | undefined;
 }
 
 const inspectLogFile = (
@@ -53,7 +57,6 @@ const inspectLogFile = (
           path,
           day,
           size: BigInt(info.size),
-          modifiedAtMillis: Option.getOrUndefined(info.mtime)?.getTime(),
         });
       }),
       Effect.orElseSucceed(() => Option.none<LogFile>())
@@ -67,10 +70,7 @@ const retentionCutoffDay = (now: Date): string => {
   return cutoff.toISOString().slice(0, 10);
 };
 
-/**
- * Retention only removes closed daily files. Budget pruning also excludes files modified during
- * the last day, preventing a midnight boundary from unlinking another process's append target.
- */
+/** Retention only removes closed daily files while the writer lock is held. */
 export const pruneExecutionLogs = (
   directory: string,
   activeFileName: string,
@@ -97,12 +97,7 @@ export const pruneExecutionLogs = (
 
     const retained = candidates.filter((file) => !removed.has(file.path));
     let retainedBytes = retained.reduce((total, file) => total + file.size, 0n);
-    const budgetCandidates = retained.filter(
-      (file) =>
-        file.modifiedAtMillis !== undefined &&
-        now.getTime() - file.modifiedAtMillis >= BUDGET_PRUNE_SAFETY_MILLIS
-    );
-    for (const file of budgetCandidates) {
+    for (const file of retained) {
       if (retainedBytes <= EXECUTION_LOG_CLOSED_FILE_BUDGET_BYTES) {
         break;
       }
@@ -111,29 +106,107 @@ export const pruneExecutionLogs = (
     }
   }).pipe(Effect.ignore);
 
-const ensureRecordBoundary = (path: string): Effect.Effect<void, never, FileSystem.FileSystem> =>
+const finalNewlineIndex = (bytes: Uint8Array, length: number): number => {
+  for (let index = length - 1; index >= 0; index -= 1) {
+    if (bytes[index] === 10) return index;
+  }
+  return -1;
+};
+
+const repairRecordBoundary = (path: string): Effect.Effect<void, never, FileSystem.FileSystem> =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
-    if (!(yield* fileSystem.exists(path))) {
-      return;
-    }
+    if (!(yield* fileSystem.exists(path))) return;
+
     const info = yield* fileSystem.stat(path);
-    if (info.size === 0n) {
-      return;
-    }
+    if (info.size === 0n) return;
 
     yield* Effect.scoped(
       Effect.gen(function* () {
-        const file = yield* fileSystem.open(path, { flag: "a+" });
-        yield* file.seek(info.size - 1n, "start");
-        const finalByte = new Uint8Array(1);
-        const bytesRead = yield* file.read(finalByte);
-        if (bytesRead > 0n && finalByte[0] !== 10) {
-          yield* file.write(new Uint8Array([10]));
-        }
+        const file = yield* fileSystem.open(path, { flag: "r+" });
+        const maximumTail = BigInt(MAX_EXECUTION_RECORD_BYTES);
+        const tailSize = info.size < maximumTail ? info.size : maximumTail;
+        const tailStart = info.size - tailSize;
+        yield* file.seek(tailStart, "start");
+        const tail = new Uint8Array(Number(tailSize));
+        const bytesRead = Number(yield* file.read(tail));
+        if (tail[bytesRead - 1] === 10) return;
+
+        const finalNewline = finalNewlineIndex(tail, bytesRead);
+        yield* file.truncate(finalNewline < 0 ? tailStart : tailStart + BigInt(finalNewline + 1));
       })
     );
   }).pipe(Effect.ignore);
+
+const lockOwnerPid = (owner: string): number | undefined => {
+  const separator = owner.indexOf(":");
+  if (separator < 1) return undefined;
+  const pid = Number(owner.slice(0, separator));
+  return Number.isSafeInteger(pid) && pid > 0 ? pid : undefined;
+};
+
+const processIsAlive = (pid: number): boolean => {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    const processError = Schema.decodeUnknownOption(Schema.Struct({ code: Schema.String }))(error);
+    // Permission failures cannot distinguish a live foreign process from an absent one. Keeping
+    // its lock is safer than admitting two writers.
+    return Option.isNone(processError) || processError.value.code !== "ESRCH";
+  }
+};
+
+const reapDeadLock = (fileSystem: FileSystem.FileSystem, lockPath: string): Effect.Effect<void> =>
+  Effect.gen(function* () {
+    const owner = yield* fileSystem.readFileString(join(lockPath, EXECUTION_LOG_LOCK_OWNER));
+    const pid = lockOwnerPid(owner);
+    if (pid === undefined || processIsAlive(pid)) return;
+
+    // Renaming elects exactly one reaper. Other contenders cannot remove a successor's lock after
+    // the dead lock leaves the canonical path.
+    const abandonedPath = `${lockPath}.abandoned-${randomUUID()}`;
+    yield* fileSystem.rename(lockPath, abandonedPath);
+    yield* fileSystem.remove(abandonedPath, { recursive: true, force: true }).pipe(Effect.ignore);
+  }).pipe(Effect.ignore);
+
+const withWriterLock = <A, E, R>(directory: string, effect: Effect.Effect<A, E, R>) =>
+  FileSystem.FileSystem.use((fileSystem) => {
+    const lockPath = join(directory, EXECUTION_LOG_LOCK);
+    const owner = `${process.pid}:${randomUUID()}`;
+    const acquire = Effect.gen(function* () {
+      for (let attempt = 0; attempt < LOCK_RETRY_ATTEMPTS; attempt += 1) {
+        const result = yield* Effect.result(fileSystem.makeDirectory(lockPath));
+        if (result._tag === "Success") {
+          yield* fileSystem
+            .writeFileString(join(lockPath, EXECUTION_LOG_LOCK_OWNER), owner)
+            .pipe(
+              Effect.tapError(() =>
+                fileSystem.remove(lockPath, { recursive: true, force: true }).pipe(Effect.ignore)
+              )
+            );
+          return;
+        }
+        yield* reapDeadLock(fileSystem, lockPath);
+        if (attempt + 1 < LOCK_RETRY_ATTEMPTS) yield* Effect.sleep(LOCK_RETRY_DELAY);
+      }
+      return yield* Effect.die("Unable to acquire execution log writer lock");
+    });
+    const release = Effect.gen(function* () {
+      const currentOwner = yield* fileSystem.readFileString(
+        join(lockPath, EXECUTION_LOG_LOCK_OWNER)
+      );
+      if (currentOwner === owner) {
+        yield* fileSystem.remove(lockPath, { recursive: true, force: true });
+      }
+    }).pipe(Effect.ignore);
+
+    return Effect.acquireUseRelease(
+      acquire,
+      () => effect,
+      () => release
+    );
+  });
 
 const noopRecorder: ExecutionRecorder = {
   record: () => Effect.void,
@@ -141,56 +214,72 @@ const noopRecorder: ExecutionRecorder = {
 
 export const ExecutionRecorderNoop = Layer.succeed(ExecutionRecorderTag, noopRecorder);
 
-const makeLiveRecorder = Effect.gen(function* () {
-  const fileSystem = yield* FileSystem.FileSystem;
+const makeLiveRecorder = (catalog: CommandCatalog) =>
+  Effect.gen(function* () {
+    const fileSystem = yield* FileSystem.FileSystem;
 
-  return {
-    record: (event) =>
-      Effect.scoped(
-        Effect.gen(function* () {
-          const completedAt = new Date();
-          const directory = join(getAeroGraphHome(), EXECUTION_LOGS_DIR);
-          const fileName = executionLogFileName(completedAt);
-          const filePath = join(directory, fileName);
+    return {
+      record: (event) => {
+        if (!catalog.names.has(event.command)) return Effect.void;
 
+        const completedAt = new Date();
+        const directory = join(getAeroGraphHome(), EXECUTION_LOGS_DIR);
+        const fileName = executionLogFileName(completedAt);
+        const filePath = join(directory, fileName);
+        const writeRecord = Effect.scoped(
+          Effect.gen(function* () {
+            yield* pruneExecutionLogs(directory, fileName, completedAt).pipe(
+              Effect.provideService(FileSystem.FileSystem, fileSystem)
+            );
+            yield* repairRecordBoundary(filePath).pipe(
+              Effect.provideService(FileSystem.FileSystem, fileSystem)
+            );
+
+            const logFile = yield* fileSystem.open(filePath, { flag: "a+", mode: 0o600 });
+            yield* fileSystem.chmod(filePath, 0o600);
+
+            const formatter = Logger.make<unknown, string>(({ message }) => {
+              const messages = Array.isArray(message) ? message : [message];
+              return messages
+                .map((value) => Schema.decodeUnknownSync(ExecutionEventSchema)(value))
+                .map(encodeExecutionEvent)
+                .join("\n");
+            });
+            const encoder = new TextEncoder();
+            const fileLogger = yield* Logger.batched(formatter, {
+              window: "1 hour",
+              flush: (records) => {
+                const bytes = encoder.encode(`${records.join("\n")}\n`);
+                if (bytes.byteLength > MAX_EXECUTION_RECORD_BYTES) return Effect.void;
+
+                // The writer lock keeps a short write from interleaving with another process. It
+                // is not retried because duplicating an unknown prefix is worse than dropping the
+                // incomplete record; the next invocation truncates the incomplete tail.
+                return logFile.write(bytes).pipe(
+                  Effect.flatMap((written) =>
+                    written === BigInt(bytes.byteLength)
+                      ? Effect.void
+                      : Effect.die("Incomplete execution log write")
+                  ),
+                  Effect.ignore
+                );
+              },
+            });
+
+            yield* Effect.log(event).pipe(Effect.provide(Logger.layer([fileLogger])));
+          })
+        );
+
+        return Effect.gen(function* () {
           yield* fileSystem.makeDirectory(directory, { recursive: true, mode: 0o700 });
           yield* fileSystem.chmod(directory, 0o700);
-          yield* pruneExecutionLogs(directory, fileName, completedAt).pipe(
+          yield* withWriterLock(directory, writeRecord).pipe(
             Effect.provideService(FileSystem.FileSystem, fileSystem)
           );
-          yield* ensureRecordBoundary(filePath).pipe(
-            Effect.provideService(FileSystem.FileSystem, fileSystem)
-          );
+        }).pipe(Effect.ignoreCause);
+      },
+    } satisfies ExecutionRecorder;
+  });
 
-          const logFile = yield* fileSystem.open(filePath, { flag: "a+", mode: 0o600 });
-          yield* fileSystem.chmod(filePath, 0o600);
-
-          const formatter = Logger.make<unknown, string>(({ message }) => {
-            const messages = Array.isArray(message) ? message : [message];
-            return messages
-              .map((value) => Schema.decodeUnknownSync(ExecutionEventSchema)(value))
-              .map(encodeExecutionEvent)
-              .join("\n");
-          });
-          const encoder = new TextEncoder();
-          const fileLogger = yield* Logger.batched(formatter, {
-            window: "1 hour",
-            flush: (records) => {
-              const bytes = encoder.encode(`${records.join("\n")}\n`);
-              if (bytes.byteLength > MAX_EXECUTION_RECORD_BYTES) {
-                return Effect.void;
-              }
-              // Append mode assigns the offset and writes this bounded record in one filesystem
-              // operation. A partial write is not retried because a retry could interleave with
-              // another process; the next invocation separates any incomplete trailing record.
-              return logFile.write(bytes).pipe(Effect.ignore);
-            },
-          });
-
-          yield* Effect.log(event).pipe(Effect.provide(Logger.layer([fileLogger])));
-        })
-      ).pipe(Effect.ignoreCause),
-  } satisfies ExecutionRecorder;
-});
-
-export const ExecutionRecorderLive = Layer.effect(ExecutionRecorderTag, makeLiveRecorder);
+export const ExecutionRecorderLive = (catalog: CommandCatalog) =>
+  Layer.effect(ExecutionRecorderTag, makeLiveRecorder(catalog));

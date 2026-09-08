@@ -1,8 +1,20 @@
 import { describe, expect, it } from "bun:test";
 import { Cause } from "effect";
-import { canonicalCommandName } from "./command-name";
+import { Command } from "effect/unstable/cli";
+import { commandCatalog } from "./command-name";
 import { classifyCause, errorCategory } from "./error-category";
 import { createExecutionEvent, encodeExecutionEvent } from "./execution-event";
+
+const testCatalog = commandCatalog(
+  Command.make("aerograph").pipe(
+    Command.withSubcommands([
+      Command.make("doc").pipe(Command.withSubcommands([Command.make("create")])),
+      Command.make("query"),
+      Command.make("status"),
+      Command.make("tag").pipe(Command.withSubcommands([Command.make("list")])),
+    ])
+  )
+);
 
 const event = createExecutionEvent({
   runId: "00000000-0000-4000-8000-000000000000",
@@ -33,18 +45,21 @@ describe("execution event contract", () => {
   });
 
   it("classifies only known command paths", () => {
-    expect(canonicalCommandName(["doc", "create", "private title"])).toBe("doc.create");
-    expect(canonicalCommandName(["--log-level", "debug", "tag", "list"])).toBe("tag.list");
-    expect(canonicalCommandName(["query", "private prompt"])).toBe("query");
-    expect(canonicalCommandName(["invalid-command", "status"])).toBe("unknown");
-    expect(canonicalCommandName(["--invalid-option", "status"])).toBe("unknown");
-    expect(canonicalCommandName(["--completions", "status"])).toBe("aerograph");
-    expect(canonicalCommandName(["--help=true"])).toBe("aerograph");
-    expect(canonicalCommandName(["--no-version"])).toBe("aerograph");
-    expect(canonicalCommandName(["-hv"])).toBe("aerograph");
-    expect(canonicalCommandName(["-h", "doc", "list"])).toBe("doc.list");
-    expect(canonicalCommandName(["--version"])).toBe("aerograph");
-    expect(canonicalCommandName(["private-command", "private-value"])).toBe("unknown");
+    expect(testCatalog.classify(["doc", "create", "private title"])).toBe("doc.create");
+    expect(testCatalog.classify(["--log-level", "debug", "tag", "list"])).toBe("tag.list");
+    expect(testCatalog.classify(["query", "private prompt"])).toBe("query");
+    expect(testCatalog.classify(["invalid-command", "status"])).toBe("unknown");
+    expect(testCatalog.classify(["--invalid-option", "status"])).toBe("unknown");
+    expect(testCatalog.classify(["--completions", "status"])).toBe("aerograph");
+    expect(testCatalog.classify(["--help=true"])).toBe("aerograph");
+    expect(testCatalog.classify(["--no-version"])).toBe("aerograph");
+    expect(testCatalog.classify(["-hv"])).toBe("aerograph");
+    expect(testCatalog.classify(["-h", "doc", "create"])).toBe("doc.create");
+    expect(testCatalog.classify(["--version"])).toBe("aerograph");
+    expect(testCatalog.classify(["private-command", "private-value"])).toBe("unknown");
+    expect(testCatalog.names).toEqual(
+      new Set(["aerograph", "doc", "doc.create", "query", "status", "tag", "tag.list", "unknown"])
+    );
   });
 
   it("maps failures to coarse categories without using their messages", () => {

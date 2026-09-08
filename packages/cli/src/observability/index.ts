@@ -1,4 +1,5 @@
-export { CANONICAL_COMMAND_NAMES, canonicalCommandName } from "./command-name";
+export type { CanonicalCommandName, CommandCatalog } from "./command-name";
+export { commandCatalog } from "./command-name";
 export { classifyCause, errorCategory } from "./error-category";
 export {
   createExecutionEvent,

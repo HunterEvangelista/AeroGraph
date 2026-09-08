@@ -1,79 +1,11 @@
-export const CANONICAL_COMMAND_NAMES = [
-  "aerograph",
-  "code-ref",
-  "code-ref.add",
-  "code-ref.show",
-  "code-ref.list",
-  "code-ref.delete",
-  "context",
-  "doc",
-  "doc.create",
-  "doc.show",
-  "doc.list",
-  "doc.edit",
-  "doc.delete",
-  "history",
-  "init",
-  "link",
-  "link.list",
-  "migrate",
-  "next",
-  "next.list",
-  "next.clear",
-  "query",
-  "status",
-  "story",
-  "story.create",
-  "story.show",
-  "story.list",
-  "story.edit",
-  "story.delete",
-  "tag",
-  "tag.create",
-  "tag.list",
-  "tag.apply",
-  "tag.remove",
-  "tag.govern",
-  "tag.show",
-  "tag.delete",
-  "term",
-  "term.list",
-  "term.create",
-  "term.show",
-  "term.audit",
-  "term.alias",
-  "term.deprecate",
-  "term.merge",
-  "unlink",
-  "unknown",
-] as const;
+import type * as CliCommand from "effect/unstable/cli/Command";
 
-export type CanonicalCommandName = (typeof CANONICAL_COMMAND_NAMES)[number];
+export type CanonicalCommandName = string;
 
-const canonicalCommandNames = new Map<string, CanonicalCommandName>(
-  CANONICAL_COMMAND_NAMES.map((name) => [name, name])
-);
-
-const COMMANDS = {
-  "code-ref": ["add", "show", "list", "delete"],
-  context: [],
-  doc: ["create", "show", "list", "edit", "delete"],
-  history: [],
-  init: [],
-  link: ["list"],
-  migrate: [],
-  next: ["list", "clear"],
-  query: [],
-  status: [],
-  story: ["create", "show", "list", "edit", "delete"],
-  tag: ["create", "list", "apply", "remove", "govern", "show", "delete"],
-  term: ["list", "create", "show", "audit", "alias", "deprecate", "merge"],
-  unlink: [],
-} as const satisfies Readonly<Record<string, ReadonlyArray<string>>>;
-
-type TopLevelCommand = keyof typeof COMMANDS;
-
-const isTopLevelCommand = (value: string): value is TopLevelCommand => value in COMMANDS;
+export interface CommandCatalog {
+  readonly names: ReadonlySet<CanonicalCommandName>;
+  readonly classify: (args: ReadonlyArray<string>) => CanonicalCommandName;
+}
 
 const BOOLEAN_GLOBAL_FLAGS = new Set([
   "--help",
@@ -136,33 +68,75 @@ const commandPosition = (args: ReadonlyArray<string>, start: number): CommandPos
   return { index, valid: true };
 };
 
+const childrenOf = (command: CliCommand.Command.Any): ReadonlyArray<CliCommand.Command.Any> =>
+  command.subcommands.flatMap(({ commands }) => commands);
+
+const commandForLabel = (
+  commands: ReadonlyArray<CliCommand.Command.Any>,
+  label: string
+): CliCommand.Command.Any | undefined =>
+  commands.find((command) => command.name === label || command.alias === label);
+
+const collectNames = (
+  command: CliCommand.Command.Any,
+  parentPath: ReadonlyArray<string>,
+  names: Set<string>
+): void => {
+  const path = [...parentPath, command.name];
+  names.add(path.join("."));
+  for (const child of childrenOf(command)) {
+    collectNames(child, path, names);
+  }
+};
+
+const descendCommandTree = (
+  initial: CliCommand.Command.Any,
+  args: ReadonlyArray<string>,
+  start: number
+): CanonicalCommandName => {
+  let selected = initial;
+  const path = [selected.name];
+  let searchFrom = start;
+  while (childrenOf(selected).length > 0) {
+    const position = commandPosition(args, searchFrom);
+    if (!position.valid) return path.join(".");
+
+    const label = args[position.index];
+    if (label === undefined) return path.join(".");
+
+    const child = commandForLabel(childrenOf(selected), label);
+    if (child === undefined) return path.join(".");
+    selected = child;
+    path.push(selected.name);
+    searchFrom = position.index + 1;
+  }
+  return path.join(".");
+};
+
+const classifyCommand = (
+  root: CliCommand.Command.Any,
+  args: ReadonlyArray<string>
+): CanonicalCommandName => {
+  const position = commandPosition(args, 0);
+  if (!position.valid) return "unknown";
+
+  const label = args[position.index];
+  if (label === undefined) return root.name;
+
+  const selected = commandForLabel(childrenOf(root), label);
+  return selected === undefined
+    ? "unknown"
+    : descendCommandTree(selected, args, position.index + 1);
+};
+
 /**
- * Returns only labels declared by the static command tree. Global flags are consumed by their
- * known arity, and option or operand values are never searched for command-like strings.
+ * Effect commands are the authority for canonical execution names. The catalog reads the public
+ * command tree so adding, removing, aliasing, or regrouping a command cannot leave a second action
+ * registry out of sync.
  */
-export const canonicalCommandName = (args: ReadonlyArray<string>): CanonicalCommandName => {
-  const topLevelPosition = commandPosition(args, 0);
-  if (!topLevelPosition.valid) {
-    return "unknown";
-  }
-  const topLevel = args[topLevelPosition.index];
-  if (topLevel === undefined) {
-    return "aerograph";
-  }
-  if (!isTopLevelCommand(topLevel)) {
-    return "unknown";
-  }
+export const commandCatalog = (root: CliCommand.Command.Any): CommandCatalog => {
+  const names = new Set<CanonicalCommandName>([root.name, "unknown"]);
+  for (const child of childrenOf(root)) collectNames(child, [], names);
 
-  const subcommands: ReadonlyArray<string> = COMMANDS[topLevel];
-  const subcommandPosition = commandPosition(args, topLevelPosition.index + 1);
-  if (!subcommandPosition.valid) {
-    return topLevel;
-  }
-  const subcommand = args[subcommandPosition.index];
-  if (subcommand === undefined || !subcommands.includes(subcommand)) {
-    return topLevel;
-  }
-
-  const commandName = `${topLevel}.${subcommand}`;
-  return canonicalCommandNames.get(commandName) ?? "unknown";
+  return { names, classify: (args) => classifyCommand(root, args) };
 };
