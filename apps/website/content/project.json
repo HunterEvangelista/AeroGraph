@@ -1,0 +1,15 @@
+{
+  "title": "About AeroGraph",
+  "intro": "AeroGraph is an open-source command-line tool for keeping project knowledge connected.",
+  "authorLabel": "Created by Hunter Evangelista",
+  "sourceLabel": "GitHub",
+  "approachTitle": "Why it’s built this way",
+  "choices": [
+    { "title": "Local to your project", "body": "Knowledge is stored locally in SQLite, with no hosted account required. Starting with a command-line tool makes it possible to use project context directly in coding workflows.", "tradeoff": "Shared cloud workspaces are not part of the current offering." },
+    { "title": "Connections you control", "body": "People and agents record notes and link them to relevant code and work. Explicit connections make the reasoning inspectable rather than asking you to trust inferred relationships.", "tradeoff": "Those notes and links need upkeep; AeroGraph does not infer them from your code." },
+    { "title": "Context, not orchestration", "body": "Export context as Markdown for your coding agent. Keeping knowledge separate from execution lets the same context support different agents and workflows.", "tradeoff": "Your agent handles execution and review." }
+  ],
+  "statusTitle": "In alpha",
+  "status": "Interfaces are evolving. The repository has setup instructions and current usage.",
+  "feedbackLabel": "Share feedback"
+}
