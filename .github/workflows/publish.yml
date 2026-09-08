@@ -96,6 +96,8 @@ jobs:
         run: bun run lint
       - name: Typecheck without cache
         run: bun run typecheck:ci
+      - name: Install website test browser
+        run: node node_modules/playwright/cli.js install --with-deps chromium
       - name: Test workspaces
         run: bun run test
       - name: Test Oxlint plugins
