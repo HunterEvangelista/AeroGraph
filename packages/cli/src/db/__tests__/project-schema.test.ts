@@ -5,16 +5,12 @@ import { describe, expect, it } from "vitest";
 
 const fixturePath = join(
   dirname(fileURLToPath(import.meta.url)),
-  "helpers/database-upgrade-fixture.ts"
+  "helpers/project-schema-fixture.ts"
 );
 
-describe("database upgrades", () => {
-  it("preserves v4 create journal names while stamping v7 constraints", () => {
-    const result = spawnSync("bun", ["run", fixturePath], {
-      encoding: "utf8",
-      shell: false,
-    });
-
+describe("project membership schema", () => {
+  it("enforces independent project membership and preserves existing stores", () => {
+    const result = spawnSync("bun", ["run", fixturePath], { encoding: "utf8" });
     expect(result.status, `${result.stderr}\n${result.stdout}`).toBe(0);
   });
 });

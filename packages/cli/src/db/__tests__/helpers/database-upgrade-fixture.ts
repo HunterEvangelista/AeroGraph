@@ -260,12 +260,32 @@ try {
       );
       assert.deepEqual(client.db.query("PRAGMA foreign_key_check").all(), []);
       assert.equal(
+        client.db
+          .query<{ name: string }, []>(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'projects'"
+          )
+          .get()?.name,
+        "projects"
+      );
+      assert.equal(
+        client.db
+          .query<{ name: string }, []>(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'entity_projects'"
+          )
+          .get()?.name,
+        "entity_projects"
+      );
+      assert.equal(
+        client.db.query<CountRow, []>("SELECT count(*) AS count FROM entity_projects").get()?.count,
+        0
+      );
+      assert.equal(
         getRequired(
           client.db
             .query<SchemaMetaRow, []>("SELECT value FROM schema_meta WHERE key = 'version'")
             .get()
         ).value,
-        "6"
+        "7"
       );
     })
   );

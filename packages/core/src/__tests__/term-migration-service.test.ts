@@ -555,6 +555,15 @@ const createTestLayer = (config: {
       deleteBetween: unavailable,
       count: unavailable(),
     },
+    projects: {
+      create: unavailable,
+      getById: unavailable,
+      getAll: unavailable(),
+      addEntity: unavailable,
+      removeEntity: unavailable,
+      getProjectsForEntity: unavailable,
+      getEntityIds: unavailable,
+    },
     next: {
       create: unavailable,
       list: unavailable,

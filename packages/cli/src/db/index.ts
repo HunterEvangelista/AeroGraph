@@ -16,6 +16,7 @@ export { CliCoreLive, CliServicesLive, SqliteRepositoriesLive } from "./layers";
 export { SqliteLinkRepositoryLive } from "./link-repository";
 export { SqliteMigrationJournalRepositoryLive } from "./migration-journal-repository";
 export { SqliteNextRepositoryLive } from "./next-repository";
+export { SqliteProjectRepositoryLive } from "./project-repository";
 export { CREATE_TABLES_SQL, SCHEMA_VERSION } from "./schema";
 export type { DatabaseExecutor, DatabaseSession } from "./session";
 export {

@@ -47,6 +47,19 @@ const MIGRATION_OPERATION_CHECK_VALUES = sqlStringList(MIGRATION_OPERATION_VALUE
  * packages/core/src/domain/link.ts, and here, where the shape of a link is defined 3 times.
  */
 
+export const projects = sqliteTable(
+  "projects",
+  {
+    id: text("id").notNull().primaryKey(),
+    name: text("name").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    check("projects_id_nonempty_check", sql`length(${table.id}) > 0`),
+    check("projects_name_nonempty_check", sql`length(${table.name}) > 0`),
+  ]
+);
+
 export const entities = sqliteTable(
   "entities",
   {
@@ -173,6 +186,23 @@ export const tags = sqliteTable(
   (table) => [index("idx_tags_parent").on(table.parentId), index("idx_tags_term").on(table.termId)]
 );
 
+export const entityProjects = sqliteTable(
+  "entity_projects",
+  {
+    entityId: text("entity_id")
+      .notNull()
+      .references(() => entities.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "restrict" }),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.entityId, table.projectId] }),
+    index("idx_entity_projects_project").on(table.projectId, table.entityId),
+  ]
+);
+
 export const entityTags = sqliteTable(
   "entity_tags",
   {
@@ -274,7 +304,7 @@ export const schemaMeta = sqliteTable("schema_meta", {
   value: text("value").notNull(),
 });
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export const CREATE_SCHEMA_META_SQL = `
 CREATE TABLE IF NOT EXISTS schema_meta (
@@ -284,6 +314,13 @@ CREATE TABLE IF NOT EXISTS schema_meta (
 `;
 
 export const CREATE_TABLES_SQL = `
+-- Projects are independent identities that can group entities through entity_projects.
+CREATE TABLE IF NOT EXISTS projects (
+  id TEXT NOT NULL PRIMARY KEY CHECK(length(id) > 0),
+  name TEXT NOT NULL CHECK(length(name) > 0),
+  created_at TEXT NOT NULL
+);
+
 -- Entities table (stores current state)
 CREATE TABLE IF NOT EXISTS entities (
   id TEXT PRIMARY KEY,
@@ -354,6 +391,14 @@ CREATE TABLE IF NOT EXISTS tags (
   created_at TEXT NOT NULL
 );
 
+-- Entity-Project junction table
+CREATE TABLE IF NOT EXISTS entity_projects (
+  entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (entity_id, project_id)
+);
+
 -- Entity-Tag junction table
 CREATE TABLE IF NOT EXISTS entity_tags (
   entity_id TEXT REFERENCES entities(id) ON DELETE CASCADE,
@@ -407,6 +452,7 @@ ${CREATE_SCHEMA_META_SQL}
 
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(type);
+CREATE INDEX IF NOT EXISTS idx_entity_projects_project ON entity_projects(project_id, entity_id);
 CREATE INDEX IF NOT EXISTS idx_entity_tags_tag ON entity_tags(tag_id);
 CREATE INDEX IF NOT EXISTS idx_links_source ON links(source_id);
 CREATE INDEX IF NOT EXISTS idx_links_target ON links(target_id);

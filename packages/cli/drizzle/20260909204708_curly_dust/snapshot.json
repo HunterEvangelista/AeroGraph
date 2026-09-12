@@ -1,0 +1,1550 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "id": "52b186af-4978-4e37-b1a7-5c61c0b47159",
+  "prevIds": [
+    "d144011e-57b8-4f0b-9f9e-fc2ca3eba3c8"
+  ],
+  "ddl": [
+    {
+      "name": "entities",
+      "entityType": "tables"
+    },
+    {
+      "name": "entity_id_prefixes",
+      "entityType": "tables"
+    },
+    {
+      "name": "entity_projects",
+      "entityType": "tables"
+    },
+    {
+      "name": "entity_tags",
+      "entityType": "tables"
+    },
+    {
+      "name": "entity_versions",
+      "entityType": "tables"
+    },
+    {
+      "name": "links",
+      "entityType": "tables"
+    },
+    {
+      "name": "migration_journal",
+      "entityType": "tables"
+    },
+    {
+      "name": "next_commands",
+      "entityType": "tables"
+    },
+    {
+      "name": "projects",
+      "entityType": "tables"
+    },
+    {
+      "name": "schema_meta",
+      "entityType": "tables"
+    },
+    {
+      "name": "tags",
+      "entityType": "tables"
+    },
+    {
+      "name": "term_names",
+      "entityType": "tables"
+    },
+    {
+      "name": "terms",
+      "entityType": "tables"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "entities"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "type",
+      "entityType": "columns",
+      "table": "entities"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "title",
+      "entityType": "columns",
+      "table": "entities"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "content",
+      "entityType": "columns",
+      "table": "entities"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "metadata",
+      "entityType": "columns",
+      "table": "entities"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "entities"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "entities"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "1",
+      "generated": null,
+      "name": "version",
+      "entityType": "columns",
+      "table": "entities"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "scope",
+      "entityType": "columns",
+      "table": "entity_id_prefixes"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "table": "entity_id_prefixes"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "prefix",
+      "entityType": "columns",
+      "table": "entity_id_prefixes"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "prefix_length",
+      "entityType": "columns",
+      "table": "entity_id_prefixes"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "entity_id_prefixes"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "table": "entity_projects"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "project_id",
+      "entityType": "columns",
+      "table": "entity_projects"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "entity_projects"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "table": "entity_tags"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "tag_id",
+      "entityType": "columns",
+      "table": "entity_tags"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "entity_versions"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "table": "entity_versions"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "version",
+      "entityType": "columns",
+      "table": "entity_versions"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "data",
+      "entityType": "columns",
+      "table": "entity_versions"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "change_type",
+      "entityType": "columns",
+      "table": "entity_versions"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "changed_fields",
+      "entityType": "columns",
+      "table": "entity_versions"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "entity_versions"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "links"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "source_id",
+      "entityType": "columns",
+      "table": "links"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "target_id",
+      "entityType": "columns",
+      "table": "links"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "type",
+      "entityType": "columns",
+      "table": "links"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "links"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "operation",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "kind",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "from_name",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "to_name",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "term_id",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "related_term_id",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "affected_entity_ids",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "affected_count",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "reason",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "applied_at",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "applied_by",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "false",
+      "generated": null,
+      "name": "dry_run",
+      "entityType": "columns",
+      "table": "migration_journal"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": true,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "next_commands"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "entity_id",
+      "entityType": "columns",
+      "table": "next_commands"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "prefix",
+      "entityType": "columns",
+      "table": "next_commands"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "command_type",
+      "entityType": "columns",
+      "table": "next_commands"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "next_commands"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "projects"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name",
+      "entityType": "columns",
+      "table": "projects"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "projects"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "key",
+      "entityType": "columns",
+      "table": "schema_meta"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "value",
+      "entityType": "columns",
+      "table": "schema_meta"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "tags"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name",
+      "entityType": "columns",
+      "table": "tags"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "description",
+      "entityType": "columns",
+      "table": "tags"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "parent_id",
+      "entityType": "columns",
+      "table": "tags"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "aliases",
+      "entityType": "columns",
+      "table": "tags"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "term_id",
+      "entityType": "columns",
+      "table": "tags"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "tags"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "term_id",
+      "entityType": "columns",
+      "table": "term_names"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "kind",
+      "entityType": "columns",
+      "table": "term_names"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name",
+      "entityType": "columns",
+      "table": "term_names"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "display_name",
+      "entityType": "columns",
+      "table": "term_names"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "name_kind",
+      "entityType": "columns",
+      "table": "term_names"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "term_names"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "terms"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "canonical_name",
+      "entityType": "columns",
+      "table": "terms"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "kind",
+      "entityType": "columns",
+      "table": "terms"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "description",
+      "entityType": "columns",
+      "table": "terms"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "'active'",
+      "generated": null,
+      "name": "status",
+      "entityType": "columns",
+      "table": "terms"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "merged_into_id",
+      "entityType": "columns",
+      "table": "terms"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "replacement_term_id",
+      "entityType": "columns",
+      "table": "terms"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "table": "terms"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "updated_at",
+      "entityType": "columns",
+      "table": "terms"
+    },
+    {
+      "columns": [
+        "entity_id"
+      ],
+      "tableTo": "entities",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "entity_id_prefixes_entity_id_entities_id_fk",
+      "entityType": "fks",
+      "table": "entity_id_prefixes"
+    },
+    {
+      "columns": [
+        "entity_id"
+      ],
+      "tableTo": "entities",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_entity_projects_entity_id_entities_id_fk",
+      "entityType": "fks",
+      "table": "entity_projects"
+    },
+    {
+      "columns": [
+        "project_id"
+      ],
+      "tableTo": "projects",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "RESTRICT",
+      "nameExplicit": false,
+      "name": "fk_entity_projects_project_id_projects_id_fk",
+      "entityType": "fks",
+      "table": "entity_projects"
+    },
+    {
+      "columns": [
+        "entity_id"
+      ],
+      "tableTo": "entities",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "entity_tags_entity_id_entities_id_fk",
+      "entityType": "fks",
+      "table": "entity_tags"
+    },
+    {
+      "columns": [
+        "tag_id"
+      ],
+      "tableTo": "tags",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "entity_tags_tag_id_tags_id_fk",
+      "entityType": "fks",
+      "table": "entity_tags"
+    },
+    {
+      "columns": [
+        "source_id"
+      ],
+      "tableTo": "entities",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "links_source_id_entities_id_fk",
+      "entityType": "fks",
+      "table": "links"
+    },
+    {
+      "columns": [
+        "target_id"
+      ],
+      "tableTo": "entities",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "links_target_id_entities_id_fk",
+      "entityType": "fks",
+      "table": "links"
+    },
+    {
+      "columns": [
+        "term_id"
+      ],
+      "tableTo": "terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "migration_journal_term_id_terms_id_fk",
+      "entityType": "fks",
+      "table": "migration_journal"
+    },
+    {
+      "columns": [
+        "related_term_id"
+      ],
+      "tableTo": "terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "migration_journal_related_term_id_terms_id_fk",
+      "entityType": "fks",
+      "table": "migration_journal"
+    },
+    {
+      "columns": [
+        "entity_id"
+      ],
+      "tableTo": "entities",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "next_commands_entity_id_entities_id_fk",
+      "entityType": "fks",
+      "table": "next_commands"
+    },
+    {
+      "columns": [
+        "parent_id"
+      ],
+      "tableTo": "tags",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "tags_parent_id_tags_id_fk",
+      "entityType": "fks",
+      "table": "tags"
+    },
+    {
+      "columns": [
+        "term_id"
+      ],
+      "tableTo": "terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "term_names_term_id_terms_id_fk",
+      "entityType": "fks",
+      "table": "term_names"
+    },
+    {
+      "columns": [
+        "merged_into_id"
+      ],
+      "tableTo": "terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "terms_merged_into_id_terms_id_fk",
+      "entityType": "fks",
+      "table": "terms"
+    },
+    {
+      "columns": [
+        "replacement_term_id"
+      ],
+      "tableTo": "terms",
+      "columnsTo": [
+        "id"
+      ],
+      "onUpdate": "NO ACTION",
+      "onDelete": "NO ACTION",
+      "nameExplicit": false,
+      "name": "terms_replacement_term_id_terms_id_fk",
+      "entityType": "fks",
+      "table": "terms"
+    },
+    {
+      "columns": [
+        "scope",
+        "entity_id"
+      ],
+      "nameExplicit": false,
+      "name": "entity_id_prefixes_scope_entity_id_pk",
+      "entityType": "pks",
+      "table": "entity_id_prefixes"
+    },
+    {
+      "columns": [
+        "entity_id",
+        "project_id"
+      ],
+      "nameExplicit": false,
+      "name": "entity_projects_pk",
+      "entityType": "pks",
+      "table": "entity_projects"
+    },
+    {
+      "columns": [
+        "entity_id",
+        "tag_id"
+      ],
+      "nameExplicit": false,
+      "name": "entity_tags_entity_id_tag_id_pk",
+      "entityType": "pks",
+      "table": "entity_tags"
+    },
+    {
+      "columns": [
+        "term_id",
+        "name"
+      ],
+      "nameExplicit": false,
+      "name": "term_names_term_id_name_pk",
+      "entityType": "pks",
+      "table": "term_names"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "entities_pk",
+      "table": "entities",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "entity_versions_pk",
+      "table": "entity_versions",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "links_pk",
+      "table": "links",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "migration_journal_pk",
+      "table": "migration_journal",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "next_commands_pk",
+      "table": "next_commands",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "projects_pk",
+      "table": "projects",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "key"
+      ],
+      "nameExplicit": false,
+      "name": "schema_meta_pk",
+      "table": "schema_meta",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "tags_pk",
+      "table": "tags",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "terms_pk",
+      "table": "terms",
+      "entityType": "pks"
+    },
+    {
+      "columns": [
+        {
+          "value": "type",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_entities_type",
+      "entityType": "indexes",
+      "table": "entities"
+    },
+    {
+      "columns": [
+        {
+          "value": "scope",
+          "isExpression": false
+        },
+        {
+          "value": "prefix",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_entity_id_prefixes_scope_prefix",
+      "entityType": "indexes",
+      "table": "entity_id_prefixes"
+    },
+    {
+      "columns": [
+        {
+          "value": "entity_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_entity_id_prefixes_entity",
+      "entityType": "indexes",
+      "table": "entity_id_prefixes"
+    },
+    {
+      "columns": [
+        {
+          "value": "project_id",
+          "isExpression": false
+        },
+        {
+          "value": "entity_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_entity_projects_project",
+      "entityType": "indexes",
+      "table": "entity_projects"
+    },
+    {
+      "columns": [
+        {
+          "value": "tag_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_entity_tags_tag",
+      "entityType": "indexes",
+      "table": "entity_tags"
+    },
+    {
+      "columns": [
+        {
+          "value": "entity_id",
+          "isExpression": false
+        },
+        {
+          "value": "version",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "entity_versions_entity_id_version_unique",
+      "entityType": "indexes",
+      "table": "entity_versions"
+    },
+    {
+      "columns": [
+        {
+          "value": "entity_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_entity_versions_entity",
+      "entityType": "indexes",
+      "table": "entity_versions"
+    },
+    {
+      "columns": [
+        {
+          "value": "source_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_links_source",
+      "entityType": "indexes",
+      "table": "links"
+    },
+    {
+      "columns": [
+        {
+          "value": "target_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_links_target",
+      "entityType": "indexes",
+      "table": "links"
+    },
+    {
+      "columns": [
+        {
+          "value": "term_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_journal_term",
+      "entityType": "indexes",
+      "table": "migration_journal"
+    },
+    {
+      "columns": [
+        {
+          "value": "related_term_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_journal_related_term",
+      "entityType": "indexes",
+      "table": "migration_journal"
+    },
+    {
+      "columns": [
+        {
+          "value": "applied_at",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_journal_applied_at",
+      "entityType": "indexes",
+      "table": "migration_journal"
+    },
+    {
+      "columns": [
+        {
+          "value": "entity_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_next_commands_entity",
+      "entityType": "indexes",
+      "table": "next_commands"
+    },
+    {
+      "columns": [
+        {
+          "value": "command_type",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_next_commands_command_type",
+      "entityType": "indexes",
+      "table": "next_commands"
+    },
+    {
+      "columns": [
+        {
+          "value": "parent_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_tags_parent",
+      "entityType": "indexes",
+      "table": "tags"
+    },
+    {
+      "columns": [
+        {
+          "value": "term_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_tags_term",
+      "entityType": "indexes",
+      "table": "tags"
+    },
+    {
+      "columns": [
+        {
+          "value": "kind",
+          "isExpression": false
+        },
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_term_names_kind_name",
+      "entityType": "indexes",
+      "table": "term_names"
+    },
+    {
+      "columns": [
+        {
+          "value": "term_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": "\"term_names\".\"name_kind\" = 'canonical'",
+      "origin": "manual",
+      "name": "idx_term_names_one_canonical",
+      "entityType": "indexes",
+      "table": "term_names"
+    },
+    {
+      "columns": [
+        {
+          "value": "name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_term_names_name",
+      "entityType": "indexes",
+      "table": "term_names"
+    },
+    {
+      "columns": [
+        {
+          "value": "kind",
+          "isExpression": false
+        },
+        {
+          "value": "canonical_name",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_terms_kind_canonical_name",
+      "entityType": "indexes",
+      "table": "terms"
+    },
+    {
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_terms_status",
+      "entityType": "indexes",
+      "table": "terms"
+    },
+    {
+      "columns": [
+        {
+          "value": "merged_into_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "idx_terms_merged_into_id",
+      "entityType": "indexes",
+      "table": "terms"
+    },
+    {
+      "value": "\"operation\" in ('rename', 'merge', 'deprecate', 'create')",
+      "name": "migration_journal_operation_check",
+      "entityType": "checks",
+      "table": "migration_journal"
+    },
+    {
+      "value": "\"kind\" is null OR \"kind\" in ('brand', 'project', 'feature', 'api', 'concept', 'package', 'other')",
+      "name": "migration_journal_kind_check",
+      "entityType": "checks",
+      "table": "migration_journal"
+    },
+    {
+      "value": "(\"operation\" = 'create' AND (\"to_name\" IS NULL OR length(trim(\"to_name\")) > 0) AND \"related_term_id\" IS NULL) OR (\"operation\" = 'rename' AND \"to_name\" IS NOT NULL AND length(trim(\"to_name\")) > 0 AND \"related_term_id\" IS NULL) OR (\"operation\" = 'merge' AND \"to_name\" IS NOT NULL AND length(trim(\"to_name\")) > 0 AND \"related_term_id\" IS NOT NULL) OR (\"operation\" = 'deprecate' AND ((\"to_name\" IS NULL AND \"related_term_id\" IS NULL) OR (\"to_name\" IS NOT NULL AND length(trim(\"to_name\")) > 0 AND \"related_term_id\" IS NOT NULL)))",
+      "name": "migration_journal_semantics_check",
+      "entityType": "checks",
+      "table": "migration_journal"
+    },
+    {
+      "value": "length(\"id\") > 0",
+      "name": "projects_id_nonempty_check",
+      "entityType": "checks",
+      "table": "projects"
+    },
+    {
+      "value": "length(\"name\") > 0",
+      "name": "projects_name_nonempty_check",
+      "entityType": "checks",
+      "table": "projects"
+    },
+    {
+      "value": "\"kind\" in ('brand', 'project', 'feature', 'api', 'concept', 'package', 'other')",
+      "name": "term_names_kind_check",
+      "entityType": "checks",
+      "table": "term_names"
+    },
+    {
+      "value": "\"name\" = lower(\"name\") AND \"name\" = trim(\"name\") AND instr(\"name\", ' ') = 0 AND instr(\"name\", '_') = 0 AND instr(\"name\", ',') = 0",
+      "name": "term_names_name_normalized_check",
+      "entityType": "checks",
+      "table": "term_names"
+    },
+    {
+      "value": "\"name_kind\" in ('canonical', 'alias', 'deprecated')",
+      "name": "term_names_name_kind_check",
+      "entityType": "checks",
+      "table": "term_names"
+    },
+    {
+      "value": "instr(\"display_name\", ',') = 0",
+      "name": "term_names_display_name_check",
+      "entityType": "checks",
+      "table": "term_names"
+    },
+    {
+      "value": "\"kind\" in ('brand', 'project', 'feature', 'api', 'concept', 'package', 'other')",
+      "name": "terms_kind_check",
+      "entityType": "checks",
+      "table": "terms"
+    },
+    {
+      "value": "\"status\" in ('active', 'deprecated', 'merged')",
+      "name": "terms_status_check",
+      "entityType": "checks",
+      "table": "terms"
+    },
+    {
+      "value": "(\"status\" = 'active' AND \"merged_into_id\" IS NULL AND \"replacement_term_id\" IS NULL) OR (\"status\" = 'deprecated' AND \"merged_into_id\" IS NULL) OR (\"status\" = 'merged' AND \"merged_into_id\" IS NOT NULL AND \"replacement_term_id\" IS NULL)",
+      "name": "terms_lifecycle_shape_check",
+      "entityType": "checks",
+      "table": "terms"
+    },
+    {
+      "value": "instr(\"canonical_name\", ',') = 0",
+      "name": "terms_canonical_name_check",
+      "entityType": "checks",
+      "table": "terms"
+    }
+  ],
+  "renames": []
+}

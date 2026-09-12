@@ -10,6 +10,8 @@ export type { MigrationJournalRepository } from "./migration-journal-repository"
 export { MigrationJournalRepositoryTag } from "./migration-journal-repository";
 export type { NextRepository } from "./next-repository";
 export { NextRepositoryTag } from "./next-repository";
+export type { ProjectRepository } from "./project-repository";
+export { ProjectRepositoryTag } from "./project-repository";
 export type { TagRepository } from "./tag-repository";
 export { TagRepositoryTag } from "./tag-repository";
 export type { ResolvedTermName, TermRepository } from "./term-repository";

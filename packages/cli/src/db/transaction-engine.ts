@@ -3,6 +3,7 @@ import {
   LinkRepositoryTag,
   MigrationJournalRepositoryTag,
   NextRepositoryTag,
+  ProjectRepositoryTag,
   RepositoryError,
   TagRepositoryTag,
   TermRepositoryTag,
@@ -18,6 +19,7 @@ import { type DatabaseExecutor, runDatabaseTransaction } from "./executor";
 import { SqliteLinkRepositorySessionLive } from "./link-repository";
 import { SqliteMigrationJournalRepositorySessionLive } from "./migration-journal-repository";
 import { SqliteNextRepositorySessionLive } from "./next-repository";
+import { SqliteProjectRepositorySessionLive } from "./project-repository";
 import {
   type DatabaseSession,
   DatabaseSessionTag,
@@ -34,6 +36,7 @@ const transactionRepositoriesLive = (session: DatabaseSession) =>
     SqliteLinkRepositorySessionLive,
     SqliteMigrationJournalRepositorySessionLive,
     SqliteNextRepositorySessionLive,
+    SqliteProjectRepositorySessionLive,
     SqliteTagRepositorySessionLive,
     SqliteTermRepositorySessionLive,
     SqliteVersionRepositorySessionLive
@@ -65,6 +68,7 @@ const runWithRepositories = <A, E>(
       links: yield* LinkRepositoryTag,
       migrationJournal: yield* MigrationJournalRepositoryTag,
       next: yield* NextRepositoryTag,
+      projects: yield* ProjectRepositoryTag,
       tags: yield* TagRepositoryTag,
       terms: yield* TermRepositoryTag,
       versions: yield* VersionRepositoryTag,
