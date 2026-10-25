@@ -45,7 +45,8 @@
     "description": "Save one decision from your project.",
     "primary": "Get started",
     "secondary": "GitHub",
-    "note": "In alpha. See the docs for setup and current usage."
+    "command": "npx aerograph init",
+    "note": "In alpha. Needs Node.js 24+ or Bun. Full setup is in the README."
   },
   "footer": { "note": "Keep the thinking connected.", "author": "Built by Hunter Evangelista", "feedback": "Share feedback", "license": "Apache 2.0" },
   "notFound": { "title": "No context here.", "description": "This page doesn’t exist. Head back to the project.", "link": "Back to AeroGraph" }

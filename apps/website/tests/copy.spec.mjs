@@ -14,6 +14,7 @@ test("homepage explains the product and presents one handoff plus two other uses
   await expect(page).toHaveURL(/#examples$/);
   await expect(page.locator("#featured-title")).toBeInViewport();
   await expect(page.locator(".closing .caption")).toHaveCount(0);
+  await expect(page.locator(".closing .install code")).toHaveText("npx aerograph init");
 });
 
 test("examples use one sample, concise steps, and explicit boundaries", async ({ page }) => {

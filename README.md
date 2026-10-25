@@ -122,7 +122,26 @@ aerograph doc create "Authentication constraint" \
 
 Tags label related knowledge. Links describe how individual documents, code references, and stories relate to one another. Together they let you retrieve a useful part of the graph without reading the whole project history.
 
-The sections below introduce tags and the terms that keep tag names consistent as a project changes.
+Point to the code the decision explains with a code reference:
+
+```bash
+aerograph code-ref add --title "Session TTL" \
+  --file src/session.ts \
+  --symbol SESSION_TTL \
+  --tag authentication
+```
+
+Then link the document to it. Each `create` and `add` command prints the record's ID; the first eight characters are enough:
+
+```bash
+aerograph link 825c7515 32aa3643 --type references
+```
+
+Link types are `references`, `related_to`, `parent_of`, `child_of`, `blocks`, and `blocked_by`. To see what is connected to a record:
+
+```bash
+aerograph next 32aa3643 --related
+```
 
 ### Retrieve Context
 
@@ -138,7 +157,32 @@ Use `context` when you want agent-ready Markdown:
 aerograph context --tags authentication
 ```
 
-This is only the outline of the first-run workflow. A complete quickstart will add a small working example, expected output, and the commands for tagging and linking its records.
+```markdown
+# AeroGraph Context: Tags #authentication
+
+Agent-ready project memory exported from AeroGraph.
+
+## Code References
+
+### Session TTL
+
+- ID: 32aa3643-5cfa-4021-bdfe-df6260ba5176
+- Type: code_ref
+- Location: src/session.ts
+- Tags: #authentication
+
+## Related Docs
+
+### Authentication constraint
+
+- ID: 825c7515-ec88-4a98-8b56-fc139b2d75eb
+- Type: doc
+- Tags: #authentication
+
+Sessions expire after 30 minutes.
+```
+
+Paste that into your agent's prompt, or let the agent run `aerograph context` itself.
 
 ## Tags and Terms
 
@@ -146,7 +190,7 @@ This is only the outline of the first-run workflow. A complete quickstart will a
 
 **Terms** keep names consistent as a project changes. Suppose a company named `AcmeCorp` is also called `Acme Corp` in older documents. A term records those names as the same concept. If the company later becomes `AeroGraph`, the term can keep `AcmeCorp` as an older name so either name still leads to the relevant project knowledge.
 
-Detailed workflows for renaming, merging, and retiring terms will live in the documentation.
+Manage terms with `aerograph term` (`create`, `alias`, `merge`, `deprecate`, `audit`). Run `aerograph term --help` for details.
 
 ## License
 

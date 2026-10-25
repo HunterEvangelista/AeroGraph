@@ -1,7 +1,7 @@
 [
   {
     "slug": "agent-handoff",
-    "title": "Hand off more than an assignment.",
+    "title": "Hand off the context, not just the task.",
     "summary": "Give the next agent a brief, its background, and a way to signal that the work is ready for review.",
     "situation": "An agent needs to add session expiry without interrupting checkout. Give it a brief linked to the security decision and checkout constraint.",
     "steps": [
