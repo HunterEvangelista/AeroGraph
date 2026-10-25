@@ -41,7 +41,7 @@ function cta(site, { compact = false, showNote = true } = {}) {
   const copy = site.cta;
   return `<section class="closing${compact ? " closing-compact" : ""}" aria-label="${e(copy.primary)}">
     ${compact ? "" : `<div><h2>${lines(copy.title)}</h2><p>${e(copy.description)}</p></div>`}
-    <div class="closing-actions"><div class="action-row">
+    <div class="closing-actions"><p class="install"><code>${e(copy.command)}</code></p><div class="action-row">
       <a class="button" href="${e(site.links.start)}">${e(copy.primary)} ${arrow}</a>
       <a class="text-link" href="${e(site.links.repository)}">${e(copy.secondary)} ${arrow}</a>
     </div>${showNote ? `<p class="caption">${e(copy.note)}</p>` : ""}</div>
@@ -85,7 +85,6 @@ export function renderHome(site, examples) {
     <section class="featured" aria-labelledby="featured-title">
       <div class="featured-intro"><h2 id="featured-title">${lines(f.title)}</h2><p>${e(f.description)}</p>
         <a class="text-link" href="${exampleUrl(f.slug)}">${e(f.link)} ${arrow}</a>
-        <p class="caption feature-disclaimer">${e(f.disclaimer)}</p>
       </div>
       <div class="brief"><div class="brief-heading"><span class="caption">${e(f.previewLabel)}</span><i class="brief-mark" aria-hidden="true"></i></div>
         <h3>${e(f.briefTitle)}</h3><p>${e(f.briefDescription)}</p>

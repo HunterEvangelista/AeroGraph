@@ -73,7 +73,12 @@ try {
   ];
   await run(invoke("--version"), installRoot);
   await run(invoke("init", project), installRoot);
-  await run(invoke("status"), project);
+  // `status` must run from the project, where `bun x` cannot see the local install and
+  // would fetch aerograph@latest from the registry instead of the tarball under test.
+  await run(
+    [bunExecutable, "--bun", join(installRoot, "node_modules", ".bin", "aerograph"), "status"],
+    project
+  );
 
   console.log(`Bun-only runtime smoke test passed: ${basename(tarball)}`);
 } finally {

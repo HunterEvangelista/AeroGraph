@@ -258,10 +258,6 @@ nav a[aria-current] {
 .featured-intro > .text-link {
   margin-top: 20px;
 }
-.featured-intro .feature-disclaimer {
-  margin-top: 24px;
-  max-width: 400px;
-}
 .brief {
   color-scheme: light;
   padding: 28px;
@@ -348,6 +344,22 @@ nav a[aria-current] {
 .closing-actions {
   justify-self: end;
   align-self: center;
+}
+.install {
+  margin-bottom: 20px;
+}
+.install code {
+  display: inline-block;
+  padding: 10px 14px;
+  background: #29212f;
+  color: var(--lavender);
+  font:
+    15px / 1.4 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Consolas,
+    monospace;
+  user-select: all;
 }
 .closing-compact {
   display: block;
