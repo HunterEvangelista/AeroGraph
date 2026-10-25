@@ -52,6 +52,13 @@ export {
   NextCommandSchema,
   NextCommandTypeSchema,
 } from "./next-command";
+export type { CreateProjectInput, EntityProjectMembership, Project, ProjectId } from "./project";
+export {
+  CreateProjectInputSchema,
+  EntityProjectMembershipSchema,
+  ProjectIdSchema,
+  ProjectSchema,
+} from "./project";
 export { NonNegativeInteger, PositiveInteger } from "./scalars";
 export type { TagId } from "./tag";
 // Tag types and schemas

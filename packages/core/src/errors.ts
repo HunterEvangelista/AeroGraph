@@ -23,6 +23,11 @@ export class ValidationError extends Data.TaggedError("ValidationError")<{
 // Not Found Errors
 // ============================================================================
 
+export class ProjectNotFoundError extends Data.TaggedError("ProjectNotFoundError")<{
+  readonly projectId: string;
+  readonly message?: string;
+}> {}
+
 export class EntityNotFoundError extends Data.TaggedError("EntityNotFoundError")<{
   readonly entityId: string;
   readonly message?: string;
@@ -126,6 +131,7 @@ export class MigrationError extends Data.TaggedError("MigrationError")<{
 export type AeroGraphError =
   | RepositoryError
   | ValidationError
+  | ProjectNotFoundError
   | EntityNotFoundError
   | TagNotFoundError
   | TermNotFoundError

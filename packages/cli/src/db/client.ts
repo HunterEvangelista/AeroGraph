@@ -491,6 +491,15 @@ const runMigrations = (db: SqliteDatabase, fromVersion: number): void => {
   }
 };
 
+const stampSchemaVersion = (db: SqliteDatabase): void => {
+  db.run(INSERT_SCHEMA_VERSION_SQL, [String(SCHEMA_VERSION)]);
+  // Schema changes and their recorded version must commit together, even if a trigger suppresses the stamp.
+  const recorded = db.query<{ value: string }>(GET_SCHEMA_VERSION_SQL).get();
+  if (recorded?.value !== String(SCHEMA_VERSION)) {
+    throw new Error(`Failed to record schema version ${SCHEMA_VERSION}.`);
+  }
+};
+
 const initializeDatabase = (db: SqliteDatabase): Effect.Effect<void, MigrationError> =>
   Effect.try({
     try: () => {
@@ -505,7 +514,7 @@ const initializeDatabase = (db: SqliteDatabase): Effect.Effect<void, MigrationEr
         // First time setup — CREATE_TABLES_SQL creates everything fresh
         db.transaction(() => {
           db.run(CREATE_TABLES_SQL);
-          db.run(INSERT_SCHEMA_VERSION_SQL, [String(SCHEMA_VERSION)]);
+          stampSchemaVersion(db);
         })();
       } else {
         const currentVersion = Number(versionResult.value);
@@ -524,7 +533,7 @@ const initializeDatabase = (db: SqliteDatabase): Effect.Effect<void, MigrationEr
               if (foreignKeyErrors.length > 0) {
                 throw new Error("Foreign key violations found after schema migration.");
               }
-              db.run(INSERT_SCHEMA_VERSION_SQL, [String(SCHEMA_VERSION)]);
+              stampSchemaVersion(db);
             })();
           } finally {
             db.run("PRAGMA foreign_keys = ON;");

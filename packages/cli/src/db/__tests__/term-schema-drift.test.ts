@@ -6,8 +6,10 @@ import { getTableConfig } from "drizzle-orm/sqlite-core";
 import { describe, expect, it } from "vitest";
 import {
   CREATE_TABLES_SQL,
+  entityProjects,
   MIGRATION_OPERATION_VALUES,
   migrationJournal,
+  projects,
   sqlStringList,
   TERM_KIND_VALUES,
   TERM_NAME_KIND_VALUES,
@@ -45,6 +47,24 @@ describe("term registry schema drift guards", () => {
   it("keeps tags.term_id as an intentional soft reference", () => {
     expect(CREATE_TABLES_SQL).toContain("term_id TEXT,");
     expect(CREATE_TABLES_SQL).not.toContain("term_id TEXT REFERENCES terms(id)");
+  });
+
+  it("declares additive project membership constraints in Drizzle and bootstrap metadata", () => {
+    expect(checkNames(projects)).toEqual([
+      "projects_id_nonempty_check",
+      "projects_name_nonempty_check",
+    ]);
+    expect(getTableConfig(entityProjects).indexes.map(({ config }) => config.name)).toContain(
+      "idx_entity_projects_project"
+    );
+    expect(CREATE_TABLES_SQL).toContain("id TEXT NOT NULL PRIMARY KEY CHECK(length(id) > 0)");
+    expect(CREATE_TABLES_SQL).toContain("name TEXT NOT NULL CHECK(length(name) > 0)");
+    expect(CREATE_TABLES_SQL).toContain(
+      "project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE RESTRICT"
+    );
+    expect(CREATE_TABLES_SQL).toContain(
+      "entity_id TEXT NOT NULL REFERENCES entities(id) ON DELETE CASCADE"
+    );
   });
 
   it("declares term registry checks in Drizzle metadata", () => {
@@ -91,5 +111,6 @@ describe("term registry schema drift guards", () => {
     expect(checkNamesFor("terms")).toEqual(checkNames(terms));
     expect(checkNamesFor("term_names")).toEqual(checkNames(termNames));
     expect(checkNamesFor("migration_journal")).toEqual(checkNames(migrationJournal));
+    expect(checkNamesFor("projects")).toEqual(checkNames(projects));
   });
 });

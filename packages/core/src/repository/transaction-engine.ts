@@ -4,6 +4,7 @@ import type { EntityRepository } from "./entity-repository";
 import type { LinkRepository } from "./link-repository";
 import type { MigrationJournalRepository } from "./migration-journal-repository";
 import type { NextRepository } from "./next-repository";
+import type { ProjectRepository } from "./project-repository";
 import type { TagRepository } from "./tag-repository";
 import type { TermRepository } from "./term-repository";
 import type { VersionRepository } from "./version-repository";
@@ -13,6 +14,7 @@ export interface TransactionRepositories {
   readonly links: LinkRepository;
   readonly migrationJournal: MigrationJournalRepository;
   readonly next: NextRepository;
+  readonly projects: ProjectRepository;
   readonly tags: TagRepository;
   readonly terms: TermRepository;
   readonly versions: VersionRepository;
