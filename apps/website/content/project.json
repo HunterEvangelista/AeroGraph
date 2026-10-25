@@ -5,11 +5,11 @@
   "sourceLabel": "GitHub",
   "approachTitle": "Why it’s built this way",
   "choices": [
-    { "title": "Local to your project", "body": "Knowledge is stored locally in SQLite, with no hosted account required. Starting with a command-line tool makes it possible to use project context directly in coding workflows.", "tradeoff": "Shared cloud workspaces are not part of the current offering." },
-    { "title": "Connections you control", "body": "People and agents record notes and link them to relevant code and work. Explicit connections make the reasoning inspectable rather than asking you to trust inferred relationships.", "tradeoff": "Those notes and links need upkeep; AeroGraph does not infer them from your code." },
-    { "title": "Context, not orchestration", "body": "Export context as Markdown for your coding agent. Keeping knowledge separate from execution lets the same context support different agents and workflows.", "tradeoff": "Your agent handles execution and review." }
+    { "title": "Local to your project", "body": "Knowledge lives in a SQLite database on your machine. No account, no server.", "tradeoff": "No shared cloud workspace yet." },
+    { "title": "Connections you control", "body": "You and your agents link notes to code and work explicitly, so the reasoning stays inspectable.", "tradeoff": "Links need upkeep. Nothing is inferred from your code." },
+    { "title": "Context, not orchestration", "body": "Context exports as Markdown, so it works with whichever agent you use.", "tradeoff": "Your agent handles execution and review." }
   ],
   "statusTitle": "In alpha",
-  "status": "Interfaces are evolving. The repository has setup instructions and current usage.",
+  "status": "Interfaces may still change between releases.",
   "feedbackLabel": "Share feedback"
 }

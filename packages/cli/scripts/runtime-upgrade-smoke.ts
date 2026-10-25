@@ -167,7 +167,7 @@ const NODE_ASSERTIONS = `
   const [path, termName] = process.argv.slice(1);
   const db = new DatabaseSync(path);
   try {
-    assert.equal(db.prepare("SELECT value FROM schema_meta WHERE key = 'version'").get().value, "6");
+    assert.equal(db.prepare("SELECT value FROM schema_meta WHERE key = 'version'").get().value, "7");
     assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
     assert.equal(db.prepare("SELECT count(*) AS count FROM links").get().count, 1);
     assert.equal(db.prepare("SELECT count(*) AS count FROM terms").get().count, 1);

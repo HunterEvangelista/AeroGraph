@@ -9,6 +9,7 @@ import { SqliteEntityRepositoryLive } from "./entity-repository";
 import { SqliteLinkRepositoryLive } from "./link-repository";
 import { SqliteMigrationJournalRepositoryLive } from "./migration-journal-repository";
 import { SqliteNextRepositoryLive } from "./next-repository";
+import { SqliteProjectRepositoryLive } from "./project-repository";
 import { SqliteTagRepositoryLive } from "./tag-repository";
 import { SqliteTermRepositoryLive } from "./term-repository";
 import { TransactionEngineLive } from "./transaction-engine";
@@ -20,6 +21,7 @@ const SqliteRepositoryImplementationsLive = Layer.mergeAll(
   SqliteLinkRepositoryLive,
   SqliteVersionRepositoryLive,
   SqliteNextRepositoryLive,
+  SqliteProjectRepositoryLive,
   SqliteTermRepositoryLive,
   SqliteMigrationJournalRepositoryLive,
   EntityPrefixIndexLive,
