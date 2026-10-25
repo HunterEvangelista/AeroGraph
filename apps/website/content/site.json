@@ -19,7 +19,7 @@
   },
   "featured": {
     "title": "Hand off the context.\nNot just the task.",
-    "description": "Give the next agent a brief with the decisions and constraints it needs.",
+    "description": "Give the next agent a brief linked to the decisions and constraints it needs.",
     "link": "See the handoff example",
     "slug": "agent-handoff",
     "previewLabel": "Example brief",
@@ -29,8 +29,7 @@
     "contextLinks": [
       { "label": "Session decisions", "slug": "remember-the-reason" },
       { "label": "Unfinished work", "slug": "pick-up-the-thread" }
-    ],
-    "disclaimer": "Example workflow. AeroGraph stores the context; your agents handle the work."
+    ]
   },
   "examples": {
     "title": "Other ways to use AeroGraph",

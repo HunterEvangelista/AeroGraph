@@ -2,24 +2,24 @@
   {
     "slug": "agent-handoff",
     "title": "Hand off the context, not just the task.",
-    "summary": "Give the next agent a brief, its background, and a way to signal that the work is ready for review.",
-    "situation": "An agent needs to add session expiry without interrupting checkout. Give it a brief linked to the security decision and checkout constraint.",
+    "summary": "Give the next agent a brief linked to the decisions behind it.",
+    "situation": "An agent needs to add session expiry without breaking checkout. Give it a brief linked to the decisions that matter.",
     "steps": [
-      { "title": "Prepare the brief.", "body": "Record the goal, review criteria, and links to the relevant decisions." },
+      { "title": "Prepare the brief.", "body": "Link the goal and review criteria to the relevant decisions." },
       { "title": "Record progress.", "body": "The working agent adds findings and updates the brief’s status tag." },
-      { "title": "Review with context.", "body": "The coordinating agent retrieves the result and its supporting context." }
+      { "title": "Review with context.", "body": "The coordinating agent pulls the result and the context behind it." }
     ],
     "sample": {
       "label": "Example brief",
-      "text": "Add session expiry. Preserve active checkout sessions. Explain the implementation and record any unresolved questions."
+      "text": "Add session expiry. Keep active checkouts alive. Record open questions."
     },
     "transition": {
       "label": "An example status convention",
       "from": "#status:in-progress",
       "to": "#status:review-ready",
-      "description": "The working agent replaces the in-progress tag when its findings are ready. The coordinating agent checks for review-ready work."
+      "description": "The working agent swaps the tag when it’s done. The coordinator looks for review-ready work."
     },
-    "boundary": "Status tags are conventions, not automation. Your agents handle delegation, updates, status checks, and review.",
+    "boundary": "Status tags are a convention, not automation. Your agents do the work and the review.",
     "related": "remember-the-reason"
   },
   {
@@ -36,14 +36,14 @@
       "label": "Example decision",
       "text": "Inactive sessions expire after 30 minutes. An active checkout must not lose its session partway through payment."
     },
-    "boundary": "People or agents must record and maintain these links. Check that the decision still applies before relying on it.",
+    "boundary": "Someone has to record and maintain these links. Check that a decision still applies before relying on it.",
     "related": "pick-up-the-thread"
   },
   {
     "slug": "pick-up-the-thread",
     "title": "Pick up the thread without starting over.",
     "summary": "Save what you found and what to check next.",
-    "situation": "The debugging session ends before the bug is fixed. Save what you learned so the next session has a starting point.",
+    "situation": "The session ends before the bug is fixed. Save what you learned so the next one starts ahead.",
     "steps": [
       { "title": "Save the findings.", "body": "Note what you observed, ruled out, and still need to check." },
       { "title": "Link the background.", "body": "Attach the relevant policy and code reference." },
@@ -53,8 +53,7 @@
       "label": "Example working note",
       "text": "The timeout only appears when checkout remains open. Token refresh succeeds. Still to check: when the checkout marks the session active."
     },
-    "boundary": "Notes must be saved and retrieved explicitly. AeroGraph does not capture chats or resume agent sessions automatically.",
-    "takeaway": "Preserve the useful result of a session, not every line of the conversation.",
+    "boundary": "Notes are saved and retrieved explicitly. AeroGraph doesn’t record chats or resume sessions.",
     "related": "agent-handoff"
   }
 ]

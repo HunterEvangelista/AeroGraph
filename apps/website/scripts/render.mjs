@@ -85,7 +85,6 @@ export function renderHome(site, examples) {
     <section class="featured" aria-labelledby="featured-title">
       <div class="featured-intro"><h2 id="featured-title">${lines(f.title)}</h2><p>${e(f.description)}</p>
         <a class="text-link" href="${exampleUrl(f.slug)}">${e(f.link)} ${arrow}</a>
-        <p class="caption feature-disclaimer">${e(f.disclaimer)}</p>
       </div>
       <div class="brief"><div class="brief-heading"><span class="caption">${e(f.previewLabel)}</span><i class="brief-mark" aria-hidden="true"></i></div>
         <h3>${e(f.briefTitle)}</h3><p>${e(f.briefDescription)}</p>
